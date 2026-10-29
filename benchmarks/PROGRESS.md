@@ -262,6 +262,48 @@ Next:
 
 ### Next priority
 
-Extend benchmarking to multiple forecast cycles and dates,
-then evaluate performance consistency, reference compatibility,
-and cache behavior across longer periods.
+Extend validated multi-day benchmarking to longer date ranges
+and repeated trials, then evaluate performance consistency,
+reference compatibility, and cache behavior.
+
+
+
+## Automated three-day benchmark — October 29, 2026
+
+Configuration:
+- Forecast dates: 2026-04-19 through 2026-04-21
+- Product: short_range, CONUS, t00z
+- Forecast hour: f001
+- Reaches: 5
+- Retrieval methods: 4
+- Trials: 1 per date
+
+Validated results:
+- 12 retrieval operations
+- 60 streamflow records
+- Correct forecast reference and valid times
+- Numerical agreement across all four methods
+- No duplicate records
+
+| Method | Median time (s) | Accounted bytes |
+|---|---:|---:|
+| Kerchunk | 0.608 | 7865304 |
+| Native remote | 0.632 | 12313146 |
+| Native download | 0.501 | 42627027 |
+| Native local | 0.060 | 0 |
+
+Findings:
+- Kerchunk transferred 36.1% fewer accounted bytes than native remote.
+- Kerchunk transferred 81.5% fewer than full native downloads.
+- Timing differences remain inconclusive.
+- Cache and network conditions were not fully controlled.
+
+Validation:
+- Multi-day execution and date isolation tested.
+- CSV overwrite protection and ordinary failure cleanup tested.
+- Last automated test suite: 67 passed.
+
+Next:
+- Extend to longer date ranges with repeated trials.
+- Investigate Kerchunk reference freshness and source compatibility.
+- Review benchmark findings before operational integration.

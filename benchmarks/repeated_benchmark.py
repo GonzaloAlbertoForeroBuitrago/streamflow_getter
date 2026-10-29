@@ -15,6 +15,7 @@ import fsspec
 import numpy as np
 import s3fs
 import xarray as xr
+import tempfile
 
 from http_trace import trace_http_reads, trace_native_http_reads
 from dataclasses import dataclass
@@ -23,16 +24,6 @@ from dataclasses import dataclass
 DATA_DIR = Path("benchmarks/data")
 RESULTS_DIR = Path("benchmarks/results")
 
-
-
-@dataclass(frozen=True)
-class ForecastConfig:
-    """Identify one operational NWM forecast cycle."""
-
-    date: str = "2026-04-19"
-    cycle: int = 0
-    product: str = "short_range"
-    domain: str = "conus"
 
 
 @dataclass(frozen=True)
@@ -104,18 +95,6 @@ class ForecastConfig:
         )
 
 
-
-NATIVE_ROOT = (
-    "https://storage.googleapis.com/national-water-model/"
-    "nwm.20260419/short_range/"
-)
-
-REFERENCE_ROOT = (
-    "ciroh-nwm-zarr-copy/national-water-model/"
-    "nwm.20260419/short_range/"
-)
-
-
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Benchmark NWM Kerchunk and native NetCDF retrieval."
@@ -136,13 +115,31 @@ def parse_args():
         default=0,
         help="Forecast initialization cycle (0–23 UTC).",
     )
+
+
+    parser.add_argument(
+        "--start-date",
+        type=str,
+        default=None,
+        help="First forecast date for multi-day benchmarking.",
+    )
+
+    parser.add_argument(
+        "--end-date",
+        type=str,
+        default=None,
+        help="Last forecast date for multi-day benchmarking.",
+    )
+
+
+
     parser.add_argument(
         "--output-prefix",
         type=str,
         default="repeated_benchmark",
         help="Prefix for benchmark CSV output filenames.",
     )
-    
+
     parser.add_argument(
         "--reach",
         type=int,
@@ -158,12 +155,42 @@ def parse_args():
         help="One or more NWM feature IDs.",
     )
     args = parser.parse_args()
+
     try:
-        parsed_date = datetime.strptime(args.date, "%Y-%m-%d")
-        if parsed_date.strftime("%Y-%m-%d") != args.date:
-            raise ValueError
+        if args.start_date is not None or args.end_date is not None:
+            if args.start_date is None or args.end_date is None:
+                parser.error(
+                    "--start-date and --end-date must be provided together."
+                )
+
+            start = datetime.strptime(args.start_date, "%Y-%m-%d")
+            end = datetime.strptime(args.end_date, "%Y-%m-%d")
+
+            if (
+                start.strftime("%Y-%m-%d") != args.start_date
+                or end.strftime("%Y-%m-%d") != args.end_date
+            ):
+                raise ValueError
+
+            if start > end:
+                parser.error("--start-date must not exceed --end-date.")
+
+            args.dates = [
+                (start + timedelta(days=i)).strftime("%Y-%m-%d")
+                for i in range((end - start).days + 1)
+            ]
+
+        else:
+            parsed = datetime.strptime(args.date, "%Y-%m-%d")
+
+            if parsed.strftime("%Y-%m-%d") != args.date:
+                raise ValueError
+
+            args.dates = [args.date]
+
     except ValueError:
-        parser.error("--date must be a valid YYYY-MM-DD date.")
+        parser.error("Forecast dates must use valid YYYY-MM-DD values.")
+
 
     if not 0 <= args.cycle <= 23:
         parser.error("--cycle must be between 0 and 23.")
@@ -184,20 +211,8 @@ def parse_args():
 
     if len(set(args.reach_ids)) != len(args.reach_ids):
         parser.error("Duplicate reach IDs are not allowed.")
-    
-
-
-
-
-
     return args
 
-
-def filename(hour):
-    return (
-        f"nwm.t00z.short_range.channel_rt."
-        f"f{hour:03d}.conus.nc"
-    )
 
 
 def download_native(hour, config=None):
@@ -445,33 +460,25 @@ def read_kerchunk(hour, indices, reaches, config=None):
 
 
 
-def main(args=None):
-    if args is None:
-        args = parse_args()
 
-    config = ForecastConfig(
-        date=getattr(args, "date", "2026-04-19"),
-        cycle=getattr(args, "cycle", 0),
-    )
-
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-
+def run_forecast(config, args, rng):
+    """Benchmark one forecast date and return validated records."""
     hours = list(range(args.start_hour, args.end_hour + 1))
     reaches = args.reach_ids
     indices = {}
 
+    print(
+        f"\nForecast: {config.date} "
+        f"{config.cycle_name} {config.product}"
+    )
     print("Verifying reach identity before timed trials...")
 
     for hour in hours:
         indices[hour] = verify_reach(hour, reaches, config)
-        print(
-            f"f{hour:03d}: "
-            f"{len(reaches)} reaches verified"
-        )
+        print(f"f{hour:03d}: {len(reaches)} reaches verified")
 
     operation_records = []
     flow_records = []
-    rng = random.Random(42)
 
     for trial in range(1, args.trials + 1):
         for hour in hours:
@@ -499,20 +506,13 @@ def main(args=None):
                     ) = read_kerchunk(
                         hour, indices[hour], reaches, config
                     )
-
-                    response_bytes = (
-                        chunk_bytes + reference_bytes
-                    )
+                    response_bytes = chunk_bytes + reference_bytes
 
                 elif method == "native_download":
                     _, response_bytes = download_native(hour, config)
-
-                    flows, valid_time, reference_time = (
-                        read_native(
-                            hour, indices[hour], reaches, config
-                        )
+                    flows, valid_time, reference_time = read_native(
+                        hour, indices[hour], reaches, config
                     )
-
                     requests = 1
                     reference_bytes = 0
 
@@ -526,16 +526,12 @@ def main(args=None):
                     ) = read_native_remote(
                         hour, indices[hour], reaches, config
                     )
-
                     reference_bytes = 0
 
                 else:
-                    flows, valid_time, reference_time = (
-                        read_native(
-                            hour, indices[hour], reaches, config
-                        )
+                    flows, valid_time, reference_time = read_native(
+                        hour, indices[hour], reaches, config
                     )
-
                     requests = 0
                     response_bytes = 0
                     reference_bytes = 0
@@ -546,13 +542,16 @@ def main(args=None):
                     raise ValueError(
                         f"Unexpected flow count for {method}"
                     )
+
                 config.validate_timestamps(
-                    hour,
-                    valid_time,
-                    reference_time,
+                    hour, valid_time, reference_time
                 )
 
                 operation_records.append({
+                    "forecast_date": config.date,
+                    "forecast_cycle": config.cycle,
+                    "product": config.product,
+                    "domain": config.domain,
                     "trial": trial,
                     "hour": hour,
                     "method": method,
@@ -565,6 +564,10 @@ def main(args=None):
 
                 for reach, flow in zip(reaches, flows):
                     flow_records.append({
+                        "forecast_date": config.date,
+                        "forecast_cycle": config.cycle,
+                        "product": config.product,
+                        "domain": config.domain,
                         "trial": trial,
                         "hour": hour,
                         "method": method,
@@ -576,11 +579,10 @@ def main(args=None):
 
                 print(
                     f"  {method:18} "
-                    f"{elapsed:.3f}s "
-                    f"reaches={len(reaches)}"
+                    f"{elapsed:.3f}s reaches={len(reaches)}"
                 )
 
-    # Verify scientific agreement across all methods.
+    # Validate scientific agreement within this forecast only.
     for hour in hours:
         for reach in reaches:
             matching = [
@@ -590,8 +592,7 @@ def main(args=None):
             ]
 
             values = np.array([
-                r["streamflow_m3s"]
-                for r in matching
+                r["streamflow_m3s"] for r in matching
             ])
 
             if not np.allclose(
@@ -602,39 +603,120 @@ def main(args=None):
             ):
                 raise ValueError(
                     f"Streamflow mismatch: "
-                    f"f{hour:03d}, reach {reach}"
+                    f"{config.date}, f{hour:03d}, reach {reach}"
                 )
 
             if len({r["valid_time"] for r in matching}) != 1:
                 raise ValueError(
-                    f"Valid-time mismatch: f{hour:03d}"
+                    f"Valid-time mismatch: {config.date}, f{hour:03d}"
                 )
 
-            if len({
-                r["reference_time"] for r in matching
-            }) != 1:
+            if len({r["reference_time"] for r in matching}) != 1:
                 raise ValueError(
-                    f"Reference-time mismatch: f{hour:03d}"
+                    f"Reference-time mismatch: {config.date}, f{hour:03d}"
                 )
+
+    return operation_records, flow_records
+
+
+def main(args=None):
+    """Run one or more forecast dates and save consolidated results."""
+    if args is None:
+        args = parse_args()
+
+    dates = getattr(args, "dates", None)
+    if dates is None:
+        dates = [getattr(args, "date", "2026-04-19")]
+
+    if not 1 <= len(dates) <= 7:
+        raise ValueError(
+            "Multi-day benchmark is limited to 7 dates per execution"
+        )
+
+    if len(set(dates)) != len(dates):
+        raise ValueError("Duplicate forecast dates are not allowed")
 
     operation_output = RESULTS_DIR / f"{args.output_prefix}.csv"
     flow_output = RESULTS_DIR / f"{args.output_prefix}_flows.csv"
 
-    with operation_output.open("w", newline="") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=list(operation_records[0])
+    if operation_output.exists() or flow_output.exists():
+        raise FileExistsError(
+            "Benchmark output already exists. "
+            "Choose a different --output-prefix."
         )
-        writer.writeheader()
-        writer.writerows(operation_records)
 
-    with flow_output.open("w", newline="") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=list(flow_records[0])
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    operation_records = []
+    flow_records = []
+    rng = random.Random(42)
+
+    for date in dates:
+        config = ForecastConfig(
+            date=date,
+            cycle=getattr(args, "cycle", 0),
         )
-        writer.writeheader()
-        writer.writerows(flow_records)
+
+        operations, flows = run_forecast(config, args, rng)
+        operation_records.extend(operations)
+        flow_records.extend(flows)
+
+    # Write results only after every forecast passes validation.
+
+    # Write both CSV files before publishing either result.
+    temporary_paths = []
+    published_paths = []
+
+    try:
+        for destination, records in (
+            (operation_output, operation_records),
+            (flow_output, flow_records),
+        ):
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                newline="",
+                encoding="utf-8",
+                dir=RESULTS_DIR,
+                prefix=".benchmark-",
+                suffix=".tmp",
+                delete=False,
+            ) as temporary:
+                temporary_path = Path(temporary.name)
+                temporary_paths.append(temporary_path)
+
+                writer = csv.DictWriter(
+                    temporary,
+                    fieldnames=list(records[0]),
+                )
+                writer.writeheader()
+                writer.writerows(records)
+
+        # Publish without overwriting existing results.
+        for temporary_path, destination in zip(
+            temporary_paths,
+            (operation_output, flow_output),
+        ):
+            with destination.open("xb") as output:
+                published_paths.append(destination)
+                with temporary_path.open("rb") as source:
+                    while chunk := source.read(1024 * 1024):
+                        output.write(chunk)
+
+    except Exception:
+        # Remove incomplete results created by this execution.
+        for path in published_paths:
+            path.unlink(missing_ok=True)
+        raise
+
+    finally:
+        for path in temporary_paths:
+            path.unlink(missing_ok=True)
+
 
     print("\nSummary:")
+    print(f"Forecast dates: {len(dates)}")
+    print(f"Operations: {len(operation_records)}")
+    print(f"Flow records: {len(flow_records)}")
 
     for method in (
         "kerchunk",
@@ -657,7 +739,6 @@ def main(args=None):
 
     print("\nSaved:", operation_output)
     print("Saved:", flow_output)
-
 
 
 if __name__ == "__main__":

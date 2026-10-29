@@ -109,7 +109,7 @@ uv run --locked --with h5py --with h5netcdf \
 
 Both commands use the April 19, 2026, `t00z` short-range CONUS forecast.
 
-The current runner supports forecast hours `f001`–`f006`. The complete 18-hour cycle and configurable forecast dates/cycles remain under development.
+The benchmark supports forecast hours `f001`–`f018`, configurable forecast dates and cycles, and automated multi-day execution using `--start-date` and `--end-date`. A complete 18-hour cycle and a three-day benchmark have been validated.
 
 Reach indices are resolved and verified before timed retrievals.
 
@@ -154,7 +154,7 @@ Run the complete test suite:
 uv run --locked pytest -q
 ```
 
-**Last verified result: 64 tests passed**, including eight benchmark-specific tests.
+**Last verified result: 67 tests passed**, including 14 benchmark-specific tests.
 
 The benchmark tests verify batch extraction, feature identity, reach ordering, single-reach compatibility, non-finite value rejection, CSV output structure, streamflow disagreement detection, and timestamp disagreement detection.
 
