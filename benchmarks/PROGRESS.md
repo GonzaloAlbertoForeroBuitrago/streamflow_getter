@@ -1,0 +1,267 @@
+
+# NWM Operational Retrieval — Development Progress
+
+**Last updated:** October 27, 2026  
+**Branch:** `benchmark/nwm-kerchunk-native`  
+**Requirements:** `docs/ROADMAP.md`  
+**Status:** Benchmark development and validation in progress
+
+## 1. Objective
+
+Develop and evaluate reliable, efficient retrieval of operational National Water Model (NWM) streamflow using Kerchunk references and native NetCDF.
+
+The work focuses on retrieval performance, network transfer, numerical agreement, reach resolution, and reference caching before integration into the operational package.
+
+## 2. Reference Dataset
+
+| Parameter | Configuration |
+|---|---|
+| Forecast date | 2026-04-19 |
+| Product | `short_range` |
+| Forecast cycle | `t00z` |
+| Domain | CONUS |
+| Variable | `streamflow` (m³/s) |
+| Initial benchmark | `f001`–`f006` |
+| Available forecast horizon | `f001`–`f018` |
+| Available cycles | 24 hourly cycles |
+| Total channel_rt files | 432 |
+| Features per file | 2,776,734 |
+
+The reference dataset was verified for the tested forecast date and product.
+
+## 3. Completed Experiments
+
+### Experiment 1 — Retrieval Method Comparison
+
+Four methods were implemented and tested:
+
+1. Kerchunk remote references
+2. Native NetCDF through HTTP range requests
+3. Native NetCDF full download and local read
+4. Native NetCDF local read
+
+**Repeated benchmark:** Six forecast hours, five trials per method and hour, one reach, 120 retrieval operations.
+
+| Method | Median time |
+|---|---:|
+| Native remote | 0.3554 s |
+| Kerchunk | 0.4753 s |
+| Native download | 0.6416 s |
+| Native local | 0.0600 s |
+
+Accounted response-body totals across 30 operations per remote method:
+
+| Method | Data transferred |
+|---|---:|
+| Kerchunk | 79.41 MB |
+| Native remote | 123.89 MB |
+| Native download | 429.95 MB |
+
+Native remote was faster in this experiment, while Kerchunk required fewer accounted response-body bytes.
+
+### Experiment 2 — Cache Behavior
+
+Investigated same-process versus separate-process retrieval and Kerchunk reference caching.
+
+| Cache experiment | Median time |
+|---|---:|
+| Same-process native remote | 0.491 s |
+| Separate-process native remote | 0.943 s |
+| Kerchunk without reference cache | 0.434 s |
+| Kerchunk with memory cache | 0.320 s |
+| Kerchunk with disk cache | 0.292 s |
+
+The reference JSON was 7,887 bytes. Caching avoided repeated reference downloads but did not eliminate remote model-data chunk retrieval.
+
+These timings were exploratory; network and cache conditions were not fully controlled.
+
+### Experiment 3 — Reference Validation and Persistence
+
+Developed an experimental single-record reference-cache implementation with:
+
+- Structural and external byte-range validation
+- Source URL identity verification
+- ETag and GCS generation metadata comparison
+- SHA-256 integrity checks
+- Atomic cache-file replacement
+- Failed-refresh protection
+
+The tested reference contained 32 entries, including seven external byte-range references.
+
+### Experiment 4 — Live Cache Integration
+
+Tested against the operational NWM forecast for reach `3586192`, hour `f001`.
+
+| Execution | Cache retrieval time |
+|---|---:|
+| First (reference downloaded) | 0.748 s |
+| Second (reference reused) | 0.429 s |
+
+Both executions returned `0.40999999083578587 m³/s`, with valid time `2026-04-19 01:00 UTC` and reference time `2026-04-19 00:00 UTC`.
+
+The experiment verified cross-process reference reuse, not a controlled performance improvement.
+
+### Experiment 5 — Multi-Reach Retrieval
+
+Verified five feature IDs at consistent array indices across six forecast hours.
+
+| Feature ID | Array index | f001 streamflow (m³/s) |
+|---|---:|---:|
+| 1122645 | 100,000 | 7.08 |
+| 3586192 | 351,819 | 0.41 |
+| 7144704 | 750,000 | 0.00 |
+| 14191043 | 1,500,000 | 16,062.71 |
+| 23610484 | 2,500,000 | 0.01 |
+
+Implemented shared batch extraction for native local, native remote, and Kerchunk readers. The full benchmark also supports native download followed by batch reading.
+
+**Five-reach benchmark:** One forecast hour, one trial, four methods.
+
+| Method | Elapsed time | Accounted bytes |
+|---|---:|---:|
+| Native download | 0.595 s | 14,324,480 |
+| Native remote | 0.868 s | 4,131,132 |
+| Kerchunk | 0.901 s | 2,648,518 |
+| Native local | 0.059 s | 0 |
+
+All methods returned matching streamflow and forecast timestamps.
+
+Performance and scientific outputs are separated into:
+
+- `benchmarks/results/repeated_benchmark.csv`
+- `benchmarks/results/repeated_benchmark_flows.csv`
+
+## 4. Automated Validation
+
+**61 tests passed**, including eight benchmark-specific tests.
+
+Verified behavior includes batch extraction, feature-ID identity and ordering, single-reach compatibility, non-finite value rejection, CSV output structure, streamflow mismatch detection, and timestamp mismatch detection.
+
+The existing package tests remain passing.
+
+## 5. Remaining Limitations
+
+- Multi-reach timing has been measured for only one forecast hour and one trial.
+- Full 18-hour cycles and multi-day or multi-week benchmarks remain pending.
+- Network and cache conditions were not fully controlled.
+- Accounted response-body bytes exclude some HTTP metadata and protocol overhead.
+- Reach resolution is excluded from timed retrievals.
+- Remote reference/source version compatibility is not fully established.
+- Concurrent cache refresh and operational cache integration remain untested.
+- RouteLink-based geographic and gage resolution is not implemented.
+
+## 6. Next Development Priorities
+
+Following `docs/ROADMAP.md`:
+
+1. **Complete benchmarking:** Expand to 18 forecast hours, multiple cycles, several reaches, and days/weeks. Investigate reference age/version compatibility and reproducible performance.
+2. **Reach resolution:** Implement RouteLink/hydrofabric mapping for gages and spatial selections.
+3. **Operational retrieval:** Integrate Kerchunk-first access, native NetCDF fallback, reference preprocessing/cache, product selection, ensembles, and default `analysis_assim` t0 handling.
+4. **Outputs and compatibility:** Add Parquet alongside CSV, preserve forecast reference/valid times and lead time, and validate products, domains, and model versions.
+
+GEOGLOWS and further NWM retrospective development remain subject to the approval gates in `docs/ROADMAP.md`.
+
+## 7. Development Practices
+
+Development remains on the current branch. Reuse existing implementations, avoid redundant scripts and unnecessary backup files, maintain automated test coverage, and use Git for version history.
+
+Pull-request preparation is postponed until development and validation are complete.
+
+
+## Complete 18-hour forecast benchmark — 2026-10-27
+
+Configuration:
+- Forecast: 2026-04-19, short_range, t00z, CONUS
+- Forecast hours: f001–f018
+- Reaches: 5
+- Methods: 4
+- Trials: 1
+- Retrieval operations: 72
+- Streamflow records: 360
+
+Results:
+
+| Method | Median time (s) | Accounted bytes |
+|---|---:|---:|
+| Native remote | 0.476 | 74245753 |
+| Kerchunk | 0.497 | 47558690 |
+| Native download | 0.545 | 257304483 |
+| Native local | 0.061 | 0 |
+
+Scientific validation:
+- All 18 forecast hours passed.
+- Streamflow agreement verified for all five reaches.
+- Forecast valid and reference times matched.
+- No duplicate records detected.
+
+Limitations:
+- One forecast cycle and one trial per hour.
+- Reach resolution excluded from timing.
+- Network and cache conditions not controlled.
+- Accounted bytes do not include complete HTTP overhead.
+
+Next:
+- Repeat full-cycle measurements.
+- Expand to multiple forecast cycles and dates.
+- Investigate reference age/version compatibility.
+
+
+## Complete 18-hour benchmark — Three trials (2026-10-27)
+
+Configuration:
+- NWM short_range, CONUS, 2026-04-19, t00z
+- Forecast hours: f001–f018
+- Reaches: 5
+- Trials: 3
+- Methods: Kerchunk, native remote, native download, native local
+
+Validation:
+- 216 retrieval operations
+- 1,080 streamflow records
+- All streamflow and forecast timestamps matched
+- No duplicate records
+- Last automated test suite: 63 passed
+
+| Method | Median (s) | Accounted bytes |
+|---|---:|---:|
+| Kerchunk | 0.482 | 142676070 |
+| Native remote | 0.477 | 222737259 |
+| Native download | 0.536 | 771913449 |
+| Native local | 0.060 | 0 |
+
+Findings:
+- Kerchunk used 35.9% fewer accounted bytes than native remote.
+- Kerchunk used 81.5% fewer than full native downloads.
+- Kerchunk and native remote had similar median retrieval times.
+- Cache and network conditions were not fully controlled.
+- Reach resolution was excluded from timed retrievals.
+
+Next:
+- Extend benchmarking to multiple forecast cycles and dates.
+- Investigate CIROH reference age/version compatibility.
+
+
+
+**Last updated:** October 29, 2026
+
+**Current status:** Configurable multi-reach NWM benchmark validated.
+
+### Latest verified milestone
+
+- Complete 18-hour short-range forecast cycle.
+- Five NWM reaches.
+- Four retrieval methods.
+- Three repeated trials.
+- 216 retrieval operations.
+- 1,080 streamflow records.
+- Numerical agreement across retrieval methods.
+- Forecast date, cycle, and lead-hour validation.
+- Atomic native NetCDF downloads.
+- Configurable forecast paths and output filenames.
+- Complete automated test suite: 64 passed.
+
+### Next priority
+
+Extend benchmarking to multiple forecast cycles and dates,
+then evaluate performance consistency, reference compatibility,
+and cache behavior across longer periods.
