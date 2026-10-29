@@ -307,3 +307,74 @@ Next:
 - Extend to longer date ranges with repeated trials.
 - Investigate Kerchunk reference freshness and source compatibility.
 - Review benchmark findings before operational integration.
+
+## Kerchunk reference compatibility — October 29, 2026
+
+Reference:
+- Forecast: 2026-04-19, short_range, t00z, f001, CONUS
+- Native source size: 14,324,480 bytes
+- Kerchunk reference size: 7,887 bytes
+- Reference entries: 32
+- External byte ranges: 7
+- Maximum referenced byte boundary: 14,324,480
+
+Validation:
+- Reference structure passed.
+- External source URL identity passed.
+- All external byte ranges fit within the native source.
+- NWM version: v3.0
+- NWM code version: v5.3.0-alpha1
+- Previous Kerchunk/native streamflow comparisons passed.
+
+Limitations:
+- Reference JSON does not expose the original GCS source generation.
+- Exact reference/source generation compatibility is not proven.
+- Valid byte ranges do not guarantee identical source contents.
+- Validation covers the selected forecast and tested reaches.
+- Cache freshness detection does not establish original provenance.
+
+Conclusion:
+The tested reference is structurally valid and consistent with
+the current native source size and selected streamflow values.
+Retain conservative cache invalidation when source metadata changes.
+
+Next:
+- Proceed to operational reach resolution using RouteLink/hydrofabric.
+- Preserve reference compatibility checks for future integration.
+
+## Operational RouteLink reach resolution — October 29, 2026
+
+Source:
+- Repository: jameshalgren/troute-lab
+- Source revision: bb24900e3229851f6e997b037c337a8643471562
+- Dataset: NWM v3.1.6 RouteLink_CONUS.nc
+- File size: 269,369,766 bytes
+- SHA-256: 4957655896f4f27854f893d02fa084f9f79c1cf8e80ce77565a7356dadb6fc0e
+
+Verified dataset:
+- 2,776,734 unique NWM feature IDs.
+- 8,735 unique gage associations.
+- All five benchmark feature IDs found.
+- USGS 08165500 maps to NWM feature_id 3586192.
+- All associated RouteLink coordinates have valid numeric ranges.
+
+Implementation:
+- Added reusable operational gage resolver.
+- Preserves identifiers as exact strings.
+- No automatic leading-zero padding.
+- Detects duplicate feature IDs and ambiguous gage mappings.
+- Rejects noninteger feature IDs.
+- Supports configurable RouteLink NetCDF loading.
+- No permanent geospatial dependencies added.
+
+Validation:
+- Real RouteLink loader passed.
+- Twenty USGS API pilot identifiers matched exactly.
+- Point-to-point geographic distances ranged from 11.6 m to 2932.2 m.
+- Complete automated test suite: 78 passed.
+
+Limitations:
+- Complete geographic and hydrologic association accuracy is not established.
+- RouteLink v3.1.6 compatibility with all operational NWM versions is not proven.
+- Point, bounding-box, and polygon resolution remain pending.
+- NetCDF reading requires an available optional backend.
