@@ -52,8 +52,16 @@ def build_parser() -> argparse.ArgumentParser:
     operational.add_argument("--date", required=True)
     operational.add_argument("--cycle", type=int, default=0)
     operational.add_argument(
-        "--reach", type=int, action="append", required=True,
+        "--reach", type=int, action="append", default=[],
         help="NWM feature ID; repeat for several reaches",
+    )
+    operational.add_argument(
+        "--gage", action="append", default=[],
+        help="USGS gage ID; preserve leading zeros",
+    )
+    operational.add_argument(
+        "--routelink",
+        help="Path to local RouteLink NetCDF for gage resolution",
     )
     operational.add_argument(
         "--start-hour", type=int, default=1,
@@ -130,9 +138,47 @@ def main(argv: list[str] | None = None) -> int:
                 f"Output already exists: {destination_path}"
             )
 
+        # Resolve gages locally before requesting NWM data.
+        if not (args.reach or args.gage):
+            raise ValueError(
+                "Provide at least one --reach or --gage"
+            )
+
+        if args.gage and not args.routelink:
+            raise ValueError(
+                "--routelink is required when using --gage"
+            )
+
+        if args.routelink and not args.gage:
+            raise ValueError(
+                "--routelink requires at least one --gage"
+            )
+
+        reaches = list(args.reach)
+
+        if args.gage:
+            from streamflow_getter.reach_resolution import (
+                load_gage_index,
+                resolve_gages,
+            )
+
+            index = load_gage_index(args.routelink)
+            resolved = resolve_gages(args.gage, index)
+            reaches.extend(resolved.values())
+
+        if any(reach <= 0 for reach in reaches):
+            raise ValueError(
+                "Reach IDs must be positive integers"
+            )
+
+        if len(reaches) != len(set(reaches)):
+            raise ValueError(
+                "Duplicate NWM feature IDs are not allowed"
+            )
+
         frame = fetch_operational_series(
             config,
-            args.reach,
+            reaches,
             args.start_hour,
             args.end_hour,
             include_t0=not args.no_t0,

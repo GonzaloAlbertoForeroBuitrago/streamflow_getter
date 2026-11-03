@@ -765,3 +765,73 @@ with its existing behavior and help descriptions.
 - Extend reach selection using existing RouteLink functions.
 - Review operational support across NWM versions.
 - Prepare focused contributions following James's PR workflow.
+
+## Operational USGS gage CLI integration — November 3, 2026
+
+### Objective
+
+Expose RouteLink-based USGS gage resolution through the operational
+NWM CLI, following docs/ROADMAP.md.
+
+### Implementation
+
+Module: src/streamflow_getter/cli.py
+
+- Added repeatable --gage selection.
+- Added --routelink for local RouteLink NetCDF files.
+- Preserved direct --reach selection.
+- Supported combined reach and gage requests.
+- Reused existing RouteLink resolution functions.
+- Preserved leading zeros in USGS gage identifiers.
+- Rejected missing, unknown, and duplicate selections.
+- Performed reach resolution before remote NWM retrieval.
+
+### Real-data validation
+
+RouteLink:
+- File: RouteLink_CONUS.nc
+- Reaches: 2,776,734
+- Mapped USGS gages: 8,735
+
+Reference station:
+- USGS gage: 08165500
+- NWM feature ID: 3586192
+
+Forecast:
+- Date: 2026-04-19
+- Cycle: t00z
+- Product: short_range CONUS
+- Method: Kerchunk
+
+Analysis t0:
+- Valid time: 2026-04-19 00:00 UTC
+- Reference time: 2026-04-18 21:00 UTC
+
+Forecast f001:
+- Valid time: 2026-04-19 01:00 UTC
+- Reference time: 2026-04-19 00:00 UTC
+
+The complete USGS gage to RouteLink to operational NWM
+to CSV workflow passed.
+
+### Automated validation
+
+- 29 operational CLI tests passed.
+- 267 complete repository tests passed.
+- Git whitespace validation passed.
+
+### Limitations
+
+- RouteLink compatibility across all NWM versions is not proven.
+- Geographic point, bounding-box, and polygon CLI selection
+  remain pending.
+- Operational support remains limited to short_range CONUS.
+- Real-data CLI validation covered one USGS gage and one
+  forecast cycle.
+
+### Next
+
+- Review and commit the gage CLI milestone.
+- Extend geographic CLI selection using existing spatial
+  resolution functions.
+- Validate compatibility across NWM versions.

@@ -118,7 +118,6 @@ def test_operational_cli_parquet_and_cache(mock_operational):
 @pytest.mark.parametrize(
     "arguments",
     [
-        ["--date", "2026-04-19", "--out", "forecast.csv"],
         ["--reach", "3586192", "--out", "forecast.csv"],
         ["--date", "2026-04-19", "--reach", "3586192"],
         [
@@ -423,5 +422,191 @@ def test_cli_rejects_invalid_hours_before_fetch(
             "--reach", "3586192",
             "--start-hour", start_hour,
             "--end-hour", end_hour,
+            "--out", str(tmp_path / "forecast.csv"),
+        ])
+
+
+
+def test_operational_cli_requires_reach_or_gage(tmp_path):
+    """Reject requests without any reach-selection method."""
+    with pytest.raises(ValueError, match="--reach or --gage"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--out", str(tmp_path / "forecast.csv"),
+        ])
+
+
+def test_operational_cli_gage_resolution(
+    tmp_path, monkeypatch, mock_operational
+):
+    """Resolve a leading-zero USGS gage before retrieval."""
+    from streamflow_getter import reach_resolution
+
+    calls, _ = mock_operational
+
+    routelink = tmp_path / "RouteLink.nc"
+    routelink.touch()
+
+    def fake_load(path):
+        assert str(path) == str(routelink)
+        return {"08165500": 3586192}
+
+    monkeypatch.setattr(
+        reach_resolution,
+        "load_gage_index",
+        fake_load,
+    )
+
+    result = main([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--gage", "08165500",
+        "--routelink", str(routelink),
+        "--out", str(tmp_path / "forecast.csv"),
+    ])
+
+    assert result == 0
+    assert calls["reaches"] == [3586192]
+
+
+def test_operational_cli_mixed_reaches(
+    tmp_path, monkeypatch, mock_operational
+):
+    """Combine direct reaches and resolved gages."""
+    from streamflow_getter import reach_resolution
+
+    calls, _ = mock_operational
+
+    monkeypatch.setattr(
+        reach_resolution,
+        "load_gage_index",
+        lambda path: {"08165500": 3586192},
+    )
+
+    main([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--reach", "1122645",
+        "--gage", "08165500",
+        "--routelink", str(tmp_path / "RouteLink.nc"),
+        "--out", str(tmp_path / "forecast.csv"),
+    ])
+
+    assert calls["reaches"] == [1122645, 3586192]
+
+
+def test_operational_cli_rejects_duplicate_reach(
+    tmp_path, monkeypatch
+):
+    """Reject duplicate IDs from direct and gage selections."""
+    from streamflow_getter import reach_resolution
+    from streamflow_getter import operational_nwm
+
+    monkeypatch.setattr(
+        reach_resolution,
+        "load_gage_index",
+        lambda path: {"08165500": 3586192},
+    )
+
+    def unexpected_fetch(*args, **kwargs):
+        raise AssertionError("Retrieval must not run")
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "fetch_operational_series",
+        unexpected_fetch,
+    )
+
+    with pytest.raises(ValueError, match="Duplicate"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--reach", "3586192",
+            "--gage", "08165500",
+            "--routelink", str(tmp_path / "RouteLink.nc"),
+            "--out", str(tmp_path / "forecast.csv"),
+        ])
+
+
+@pytest.mark.parametrize(
+    "arguments,expected_error",
+    [
+        (
+            ["--gage", "08165500"],
+            "--routelink is required",
+        ),
+        (
+            ["--reach", "3586192",
+             "--routelink", "RouteLink.nc"],
+            "--routelink requires",
+        ),
+    ],
+)
+def test_operational_cli_invalid_gage_arguments(
+    tmp_path, arguments, expected_error
+):
+    """Reject incomplete RouteLink argument combinations."""
+    with pytest.raises(ValueError, match=expected_error):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            *arguments,
+            "--out", str(tmp_path / "forecast.csv"),
+        ])
+
+
+def test_operational_cli_unknown_gage_before_fetch(
+    tmp_path, monkeypatch
+):
+    """Reject unknown gages without requesting NWM data."""
+    from streamflow_getter import operational_nwm, reach_resolution
+
+    monkeypatch.setattr(
+        reach_resolution,
+        "load_gage_index",
+        lambda path: {"08165500": 3586192},
+    )
+
+    def unexpected_fetch(*args, **kwargs):
+        raise AssertionError("NWM retrieval must not run")
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "fetch_operational_series",
+        unexpected_fetch,
+    )
+
+    with pytest.raises(ValueError, match="not found"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--gage", "99999999",
+            "--routelink", str(tmp_path / "RouteLink.nc"),
+            "--out", str(tmp_path / "forecast.csv"),
+        ])
+
+
+def test_operational_cli_missing_routelink_before_fetch(
+    tmp_path, monkeypatch
+):
+    """Reject missing RouteLink files before NWM retrieval."""
+    from streamflow_getter import operational_nwm
+
+    def unexpected_fetch(*args, **kwargs):
+        raise AssertionError("NWM retrieval must not run")
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "fetch_operational_series",
+        unexpected_fetch,
+    )
+
+    with pytest.raises(FileNotFoundError, match="not found"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--gage", "08165500",
+            "--routelink", str(tmp_path / "missing.nc"),
             "--out", str(tmp_path / "forecast.csv"),
         ])
