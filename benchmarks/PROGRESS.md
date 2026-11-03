@@ -704,3 +704,64 @@ Module: src/streamflow_getter/output.py
 - Review James's CLI architecture and requirements.
 - Integrate CSV/Parquet selection into the CLI.
 - Preserve existing retrospective command behavior.
+
+## Operational NWM CLI integration — November 3, 2026
+
+### Objective
+
+Expose validated operational NWM short-range CONUS retrieval through
+the existing streamflow-getter command-line interface, following
+README.md and docs/ROADMAP.md.
+
+### Implementation
+
+Module: src/streamflow_getter/cli.py
+
+New subcommand: nwm-operational
+
+Supported options:
+- --date and --cycle
+- Repeated --reach for direct NWM feature IDs
+- --start-hour and --end-hour
+- --no-t0 to exclude analysis_assim t0
+- --cache-dir for optional reference caching
+- --format csv/parquet, with extension inference
+- --out for output destination
+
+The CLI reuses ForecastConfig, fetch_operational_series,
+and write_timeseries without duplicating retrieval or
+serialization logic.
+
+Invalid forecast-hour ranges, output formats, and existing
+output destinations are rejected before retrieval.
+
+The original nwm retrospective command remains available
+with its existing behavior and help descriptions.
+
+### Validation
+
+- 22 operational CLI tests passed.
+- 260 complete repository tests passed.
+- Operational and retrospective help commands passed.
+- CSV and Parquet output integration passed using mocked retrieval.
+- Retrospective execution regression test passed.
+- Git whitespace validation passed.
+
+### Limitations
+
+- Operational CLI supports direct feature IDs only.
+- RouteLink gage and geographic selection are not yet exposed.
+- Validated operational retrieval is limited to short_range CONUS.
+- Other NWM products, domains, ensembles, and model-version
+  compatibility require additional validation.
+- Cached retrieval errors currently propagate rather than
+  automatically attempting native fallback.
+- The new operational CLI has not yet undergone a live
+  end-to-end invocation through the installed command.
+
+### Next
+
+- Validate the operational CLI with real NWM data.
+- Extend reach selection using existing RouteLink functions.
+- Review operational support across NWM versions.
+- Prepare focused contributions following James's PR workflow.
