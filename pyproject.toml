@@ -20,6 +20,10 @@ spatial = [
     "shapely",
 ]
 
+parquet = [
+    "pyarrow",
+]
+
 operational = [
     "h5netcdf",
     "h5py",

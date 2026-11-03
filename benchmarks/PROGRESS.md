@@ -655,3 +655,52 @@ through the production Kerchunk workflow.
 - Implement CSV/Parquet output according to docs/ROADMAP.md.
 - Integrate operational retrieval into the existing CLI.
 - Expand product and domain support after source validation.
+
+## CSV and Parquet output writer — November 3, 2026
+
+### Objective
+
+Implement reusable CSV and Parquet serialization following
+README.md and docs/ROADMAP.md.
+
+### Implementation
+
+Module: src/streamflow_getter/output.py
+
+- Reusable write_timeseries() library function.
+- CSV and Parquet serialization using pandas.
+- Optional pyarrow dependency through the parquet extra.
+- Output format inferred from .csv or .parquet extensions.
+- Explicit output_format selection supported.
+- Conflicting explicit formats and extensions rejected.
+- Existing output files protected from overwriting.
+- Temporary-file serialization before publication.
+- Cleanup after serialization or publication failures.
+- Original DataFrame columns preserved.
+
+### Validation
+
+- 20 output-specific tests passed.
+- 238 complete repository tests passed.
+- Python syntax validation passed.
+- Git whitespace validation passed.
+- CSV and Parquet round-trip tests passed.
+- Existing-file protection verified.
+- Simulated partial-publication failure cleanup verified.
+
+### Limitations
+
+- Operational CLI integration is not yet implemented.
+- The --format CLI argument is not yet implemented.
+- The existing retrospective CLI still writes CSV directly.
+- The writer does not independently validate scientific
+  metadata; it expects a validated input DataFrame.
+- CSV timestamps are serialized as text, while Parquet
+  preserves supported column data types.
+
+### Next
+
+- Review and commit the validated output writer.
+- Review James's CLI architecture and requirements.
+- Integrate CSV/Parquet selection into the CLI.
+- Preserve existing retrospective command behavior.
