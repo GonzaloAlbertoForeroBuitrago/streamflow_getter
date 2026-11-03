@@ -20,6 +20,12 @@ spatial = [
     "shapely",
 ]
 
+operational = [
+    "h5netcdf",
+    "h5py",
+]
+
+
 [project.scripts]
 streamflow-getter = "streamflow_getter.cli:main"
 

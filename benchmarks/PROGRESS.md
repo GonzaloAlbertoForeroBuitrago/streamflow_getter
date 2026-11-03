@@ -470,3 +470,107 @@ Real hydrofabric:
 - Integrate reach selection with operational NWM retrieval.
 - Continue Kerchunk-first access, native fallback, and caching
   according to docs/ROADMAP.md.
+
+
+
+## Operational NWM retrieval — November 3, 2026
+
+### Objective
+
+Implement the initial operational NWM retrieval workflow described
+in docs/ROADMAP.md, reusing the existing benchmark implementations.
+
+### Scope
+
+Initial supported configuration:
+
+- NWM product: short_range
+- Domain: CONUS
+- Output variable: streamflow
+- Forecast data: channel_rt
+- Reference case: 2026-04-19, t00z, f001
+
+Other products, domains, ensemble members, and analysis t0 remain
+outside the validated implementation.
+
+### Production implementation
+
+Modules:
+
+- src/streamflow_getter/operational_nwm.py
+- src/streamflow_getter/reference_validation.py
+- src/streamflow_getter/reference_cache.py
+
+Implemented functionality:
+
+- Forecast configuration and source identification.
+- Forecast reference-time and valid-time validation.
+- Multi-reach streamflow extraction using feature IDs.
+- Kerchunk-first operational retrieval.
+- Native NetCDF remote retrieval.
+- Controlled native fallback for selected access failures.
+- Optional reference caching.
+- Reference structure and source-identity validation.
+- SHA-256 cache-record integrity validation.
+- Atomic cache-record persistence.
+- Reference ETag and source-generation freshness checks.
+- Rejection of unresolved source-generation changes.
+
+Caching is opt-in through cache_dir.
+
+When caching is enabled, the coordinator currently propagates
+retrieval errors rather than automatically attempting native fallback.
+
+### Validation
+
+Automated:
+
+- 177 tests passed with spatial and operational extras.
+- Git whitespace validation passed.
+
+Live reference forecast:
+
+- Date: 2026-04-19
+- Cycle: t00z
+- Product: short_range
+- Lead hour: f001
+- Domain: CONUS
+- Feature ID: 3586192
+- Streamflow: 0.40999999083578587 m3/s
+- Valid time: 2026-04-19 01:00 UTC
+- Reference time: 2026-04-19 00:00 UTC
+
+Verified:
+
+- Kerchunk retrieval.
+- Native NetCDF retrieval.
+- Controlled native fallback after simulated Kerchunk failure.
+- Cached Kerchunk retrieval and cache-record reuse.
+- Compatibility with existing benchmark extraction and cache behavior.
+
+### Known limitations
+
+- Initial production support is limited to short_range CONUS.
+- Forecast t0 from analysis_assim is not yet implemented.
+- Medium-range, long-range, ensemble, and other-domain support
+  remains pending.
+- Cache metadata comparison does not independently prove that
+  Kerchunk references were generated against the current NetCDF
+  source generation.
+- Cached requests currently disable automatic native fallback.
+- Broad OSError classification for uncached fallback requires
+  further refinement.
+- Reference JSON size is not equivalent to network bytes transferred.
+- Production CLI integration is not yet implemented.
+- Parquet output is not yet implemented.
+- Operational availability across dates and model versions has
+  not been comprehensively validated.
+
+### Next
+
+- Review the final implementation and staged changes.
+- Refine source compatibility and fallback error classification.
+- Integrate the operational reader with the CLI.
+- Implement forecast t0 handling according to docs/ROADMAP.md.
+- Add structured CSV/Parquet output with forecast reference time
+  and lead time.
