@@ -202,3 +202,92 @@ def test_kerchunk_nonfinite_streamflow(
         )
 
     mock_kerchunk["dataset_context"].__exit__.assert_called_once()
+
+
+
+def test_kerchunk_analysis_t0(
+    mock_kerchunk,
+    sample_dataset,
+):
+    """Retrieve analysis t0 and preserve its original reference time."""
+    import json
+
+    config = ForecastConfig()
+
+    sample_dataset.coords["time"] = [
+        np.datetime64("2026-04-19T00:00:00")
+    ]
+    sample_dataset.coords["reference_time"] = [
+        np.datetime64("2026-04-18T21:00:00")
+    ]
+
+    url = config.analysis_native_url()
+
+    reference = {
+        "version": 1,
+        "refs": {
+            ".zgroup": "{}",
+            "feature_id/.zarray": "{}",
+            "feature_id/0": [url, 0, 100],
+            "streamflow/.zarray": "{}",
+            "streamflow/0": [url, 100, 200],
+        },
+    }
+
+    mock_kerchunk["s3"].open.return_value.__enter__.return_value.read.return_value = (
+        json.dumps(reference).encode()
+    )
+
+    result = read_kerchunk_forecast(
+        config,
+        0,
+        [3586192],
+    )
+
+    assert result["product"] == "analysis_assim"
+    assert result["lead_hour"] == 0
+    assert result["streamflow_m3s"][3586192] == 0.41
+    assert result["valid_time"].startswith("2026-04-19T00:00:00")
+    assert result["reference_time"].startswith("2026-04-18T21:00:00")
+
+    mock_kerchunk["s3"].open.assert_called_once_with(
+        config.analysis_reference_path(),
+        "rb",
+    )
+
+
+def test_kerchunk_analysis_t0_rejects_wrong_valid_time(
+    mock_kerchunk,
+    sample_dataset,
+):
+    """Reject an analysis file whose valid time differs from the cycle."""
+    import json
+
+    config = ForecastConfig()
+    url = config.analysis_native_url()
+
+    reference = {
+        "version": 1,
+        "refs": {
+            ".zgroup": "{}",
+            "feature_id/.zarray": "{}",
+            "feature_id/0": [url, 0, 100],
+            "streamflow/.zarray": "{}",
+            "streamflow/0": [url, 100, 200],
+        },
+    }
+
+    mock_kerchunk["s3"].open.return_value.__enter__.return_value.read.return_value = (
+        json.dumps(reference).encode()
+    )
+
+    sample_dataset.coords["reference_time"] = [
+        np.datetime64("2026-04-18T21:00:00")
+    ]
+
+    with pytest.raises(ValueError, match="analysis t0 valid time"):
+        read_kerchunk_forecast(
+            config,
+            0,
+            [3586192],
+        )

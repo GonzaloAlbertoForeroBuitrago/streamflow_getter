@@ -7,7 +7,44 @@ import numpy as np
 import pytest
 import xarray as xr
 
-from streamflow_getter.operational_nwm import ForecastConfig, extract_streamflow
+from streamflow_getter.operational_nwm import (
+    ForecastConfig,
+    extract_streamflow,
+    resolve_operational_source,
+)
+
+
+
+def test_resolve_analysis_t0_source():
+    config = ForecastConfig(date="2026-04-19", cycle=0)
+
+    source = resolve_operational_source(config, 0)
+
+    assert source["source_product"] == "analysis_assim"
+    assert source["lead_hour"] == 0
+    assert source["filename"] == (
+        "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
+    )
+    assert source["native_url"] == config.analysis_native_url()
+    assert source["reference_path"] == config.analysis_reference_path()
+
+
+def test_resolve_forecast_source():
+    config = ForecastConfig(date="2026-04-19", cycle=0)
+
+    source = resolve_operational_source(config, 1)
+
+    assert source["source_product"] == "short_range"
+    assert source["lead_hour"] == 1
+    assert source["filename"] == config.filename(1)
+    assert source["native_url"] == config.native_url(1)
+    assert source["reference_path"] == config.reference_path(1)
+
+
+@pytest.mark.parametrize("hour", [-1, 1.5, True])
+def test_resolve_invalid_lead_hour(hour):
+    with pytest.raises(ValueError):
+        resolve_operational_source(ForecastConfig(), hour)
 
 
 def test_forecast_source_identity():
@@ -177,3 +214,67 @@ def test_extraction_matches_existing_benchmark():
     )
 
     assert list(production) == requested
+
+
+
+def test_analysis_t0_source_identity():
+    config = ForecastConfig(date="2026-04-19", cycle=0)
+
+    filename = (
+        "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
+    )
+
+    assert config.analysis_filename() == filename
+
+    assert config.analysis_native_url() == (
+        "https://storage.googleapis.com/national-water-model/"
+        f"nwm.20260419/analysis_assim/{filename}"
+    )
+
+    assert config.analysis_reference_path() == (
+        "ciroh-nwm-zarr-copy/national-water-model/"
+        f"nwm.20260419/analysis_assim/{filename}.json"
+    )
+
+
+@pytest.mark.parametrize("cycle", [0, 1, 6, 12, 18, 23])
+def test_analysis_t0_valid_time(cycle):
+    config = ForecastConfig(date="2026-04-19", cycle=cycle)
+
+    config.validate_analysis_timestamps(
+        f"2026-04-19T{cycle:02d}:00:00",
+        np.datetime64(
+            f"2026-04-19T{cycle:02d}:00:00"
+        ) - np.timedelta64(3, "h"),
+    )
+
+
+def test_analysis_t0_preserves_reference_time():
+    config = ForecastConfig()
+
+    # The source reference time is not required to equal
+    # the requested forecast cycle time.
+    config.validate_analysis_timestamps(
+        "2026-04-19T00:00:00",
+        "2026-04-18T21:00:00",
+    )
+
+
+def test_analysis_t0_rejects_wrong_valid_time():
+    config = ForecastConfig()
+
+    with pytest.raises(ValueError, match="analysis t0 valid time"):
+        config.validate_analysis_timestamps(
+            "2026-04-19T01:00:00",
+            "2026-04-18T21:00:00",
+        )
+
+
+def test_analysis_t0_rejects_missing_reference_time():
+    config = ForecastConfig()
+
+    with pytest.raises(ValueError, match="reference time"):
+        config.validate_analysis_timestamps(
+            "2026-04-19T00:00:00",
+            np.datetime64("NaT", "s"),
+        )

@@ -122,7 +122,10 @@ def test_native_nonfinite_streamflow(mock_native, sample_dataset):
     mock_native["remote_context"].__exit__.assert_called_once()
 
 
-def test_native_invalid_hour(monkeypatch):
+
+@pytest.mark.parametrize("hour", [-1, 1.5, True])
+def test_native_invalid_hour(monkeypatch, hour):
+    """Reject invalid lead hours before remote access."""
     import fsspec
 
     remote_open = MagicMock()
@@ -133,11 +136,54 @@ def test_native_invalid_hour(monkeypatch):
         remote_open,
     )
 
-    with pytest.raises(ValueError, match="positive"):
+    with pytest.raises(ValueError, match="Lead hour"):
+        read_native_forecast(
+            ForecastConfig(),
+            hour,
+            [3586192],
+        )
+
+    remote_open.assert_not_called()
+
+
+
+def test_native_analysis_t0(mock_native, sample_dataset):
+    """Retrieve analysis t0 while preserving source timestamps."""
+    config = ForecastConfig()
+
+    sample_dataset.coords["time"] = [
+        np.datetime64("2026-04-19T00:00:00")
+    ]
+    sample_dataset.coords["reference_time"] = [
+        np.datetime64("2026-04-18T21:00:00")
+    ]
+
+    result = read_native_forecast(
+        config,
+        0,
+        [3586192],
+    )
+
+    assert result["method"] == "native_remote"
+    assert result["product"] == "analysis_assim"
+    assert result["lead_hour"] == 0
+    assert result["streamflow_m3s"][3586192] == 0.41
+    assert result["valid_time"].startswith("2026-04-19T00:00:00")
+    assert result["reference_time"].startswith("2026-04-18T21:00:00")
+
+
+def test_native_analysis_t0_rejects_wrong_valid_time(
+    mock_native,
+    sample_dataset,
+):
+    """Reject analysis data with an incorrect valid time."""
+    sample_dataset.coords["reference_time"] = [
+        np.datetime64("2026-04-18T21:00:00")
+    ]
+
+    with pytest.raises(ValueError, match="analysis t0 valid time"):
         read_native_forecast(
             ForecastConfig(),
             0,
             [3586192],
         )
-
-    remote_open.assert_not_called()

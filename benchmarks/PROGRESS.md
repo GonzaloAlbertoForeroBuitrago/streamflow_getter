@@ -574,3 +574,84 @@ Verified:
 - Implement forecast t0 handling according to docs/ROADMAP.md.
 - Add structured CSV/Parquet output with forecast reference time
   and lead time.
+
+## NWM analysis t0 integration — November 3, 2026
+
+### Objective
+
+Implement default analysis_assim t0 retrieval for operational
+short_range CONUS forecasts, following docs/ROADMAP.md.
+
+### Implementation
+
+Module: src/streamflow_getter/operational_nwm.py
+
+- Resolve analysis_assim channel_rt tm00 for lead hour zero.
+- Preserve existing short_range forecast retrieval for positive leads.
+- Reuse Kerchunk-first and native NetCDF retrieval.
+- Preserve controlled fallback and optional reference caching.
+- Separate analysis_assim and short_range cache records.
+- Validate source identity, feature IDs, and timestamps.
+- Preserve the original analysis reference_time.
+- Assemble t0 and forecast hours into a pandas DataFrame.
+- Include t0 by default, with include_t0=False available.
+- Reject invalid reach IDs before remote retrieval.
+- Reject inconsistent forecast identity and nonfinite streamflow.
+
+### Live validation
+
+Reference date: 2026-04-19
+Forecast cycle: t00z
+Domain: CONUS
+Feature ID: 3586192
+
+Analysis t0:
+- Product: analysis_assim
+- Valid time: 2026-04-19 00:00 UTC
+- Source reference time: 2026-04-18 21:00 UTC
+- Streamflow: 0.40999999083578587 m3/s
+
+Forecast f001:
+- Product: short_range
+- Valid time: 2026-04-19 01:00 UTC
+- Source reference time: 2026-04-19 00:00 UTC
+- Streamflow: 0.40999999083578587 m3/s
+
+Kerchunk and native NetCDF returned matching t0 values and timestamps.
+
+Nine analysis cycles were checked for the reference date.
+All had valid times matching their requested cycle hours and
+source reference times three hours earlier.
+
+The analysis and forecast f001 files contained 2,776,734
+feature IDs with identical membership and ordering.
+
+The complete t0 + f001 series was retrieved successfully
+through the production Kerchunk workflow.
+
+### Automated validation
+
+- 218 tests passed with spatial and operational extras.
+- Python compilation passed.
+- Git whitespace validation passed.
+
+### Limitations
+
+- Validated production support remains short_range CONUS.
+- The observed three-hour analysis reference-time offset must
+  not be assumed universal.
+- Compatibility across other dates, products, domains, and
+  NWM versions remains unverified.
+- Medium-range and long-range ensemble t0 handling is pending.
+- analysis_assim_no_da handling is pending.
+- Operational CLI integration is pending.
+- CSV/Parquet output integration is pending.
+- Cached retrieval currently propagates errors rather than
+  automatically attempting native fallback.
+
+### Next
+
+- Review staged changes and commit the t0 milestone.
+- Implement CSV/Parquet output according to docs/ROADMAP.md.
+- Integrate operational retrieval into the existing CLI.
+- Expand product and domain support after source validation.

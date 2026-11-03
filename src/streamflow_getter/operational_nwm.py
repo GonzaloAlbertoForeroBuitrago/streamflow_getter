@@ -63,6 +63,54 @@ class ForecastConfig:
             f"{self.date_folder}/{self.product}/{self.filename(hour)}.json"
         )
 
+
+    def analysis_filename(self) -> str:
+        """Build the CONUS analysis_assim tm00 filename."""
+        return (
+            f"nwm.{self.cycle_name}.analysis_assim."
+            f"channel_rt.tm00.{self.domain}.nc"
+        )
+
+    def analysis_native_url(self) -> str:
+        """Return the native analysis_assim source URL."""
+        return (
+            "https://storage.googleapis.com/national-water-model/"
+            f"{self.date_folder}/analysis_assim/"
+            f"{self.analysis_filename()}"
+        )
+
+    def analysis_reference_path(self) -> str:
+        """Return the CIROH Kerchunk reference path for analysis t0."""
+        return (
+            "ciroh-nwm-zarr-copy/national-water-model/"
+            f"{self.date_folder}/analysis_assim/"
+            f"{self.analysis_filename()}.json"
+        )
+
+    def validate_analysis_timestamps(
+        self,
+        valid_time,
+        reference_time,
+    ) -> None:
+        """Validate analysis t0 without assuming a reference-time offset."""
+        expected_valid = np.datetime64(
+            datetime.combine(
+                date.fromisoformat(self.date),
+                datetime.min.time(),
+            ).replace(hour=self.cycle),
+            "s",
+        )
+
+        actual_valid = np.datetime64(valid_time, "s")
+        actual_reference = np.datetime64(reference_time, "s")
+
+        if np.isnat(actual_valid) or actual_valid != expected_valid:
+            raise ValueError("Incorrect analysis t0 valid time")
+
+        if np.isnat(actual_reference):
+            raise ValueError("Invalid analysis t0 reference time")
+
+
     def validate_timestamps(self, hour: int, valid_time, reference_time) -> None:
         """Verify forecast timestamps against the requested cycle."""
         self.filename(hour)
@@ -78,6 +126,36 @@ class ForecastConfig:
             raise ValueError(f"Incorrect forecast valid time for f{hour:03d}")
 
 
+
+def resolve_operational_source(
+    config: ForecastConfig,
+    hour: int,
+) -> dict:
+    """Resolve a supported NWM forecast or analysis t0 source."""
+    if isinstance(hour, bool) or not isinstance(hour, int):
+        raise ValueError("Lead hour must be an integer")
+
+    if hour < 0:
+        raise ValueError("Lead hour must be nonnegative")
+
+    if hour == 0:
+        return {
+            "source_product": "analysis_assim",
+            "filename": config.analysis_filename(),
+            "native_url": config.analysis_native_url(),
+            "reference_path": config.analysis_reference_path(),
+            "lead_hour": 0,
+        }
+
+    return {
+        "source_product": config.product,
+        "filename": config.filename(hour),
+        "native_url": config.native_url(hour),
+        "reference_path": config.reference_path(hour),
+        "lead_hour": hour,
+    }
+
+
 def extract_streamflow(ds, reach_ids: list[int]) -> dict[int, float]:
     """Extract one-timestep streamflow by exact NWM feature ID.
 
@@ -85,8 +163,10 @@ def extract_streamflow(ds, reach_ids: list[int]) -> dict[int, float]:
     duplicated matching dataset IDs, malformed IDs, and nonfinite values.
     """
     requested = list(reach_ids)
+
     if not requested:
         raise ValueError("At least one reach is required")
+
     if any(
         isinstance(reach, (bool, np.bool_))
         or not isinstance(reach, numbers.Integral)
@@ -94,7 +174,9 @@ def extract_streamflow(ds, reach_ids: list[int]) -> dict[int, float]:
         for reach in requested
     ):
         raise ValueError("Reach IDs must be positive integers")
+
     requested = [int(reach) for reach in requested]
+
     if len(requested) != len(set(requested)):
         raise ValueError("Duplicate reach IDs are not allowed")
 
@@ -131,7 +213,6 @@ def extract_streamflow(ds, reach_ids: list[int]) -> dict[int, float]:
     return {reach: float(flow) for reach, flow in zip(requested, flows)}
 
 
-
 def read_kerchunk_forecast(
     config: ForecastConfig,
     hour: int,
@@ -139,10 +220,9 @@ def read_kerchunk_forecast(
     *,
     cache_dir=None,
 ) -> dict:
-    """Read an operational NWM forecast through validated Kerchunk references.
+    """Read an operational forecast or analysis t0 using Kerchunk.
 
-    When cache_dir is None, use the original uncached reader.
-    Otherwise, reuse or refresh a validated reference-cache record.
+    Cache use is opt-in; cached references undergo the same validation.
     """
     import json
     from pathlib import Path
@@ -160,29 +240,23 @@ def read_kerchunk_forecast(
         valid_source_identity,
     )
 
-    config.filename(hour)
-
-    reference_path = config.reference_path(hour)
-    expected_url = config.native_url(hour)
-
+    source = resolve_operational_source(config, hour)
+    reference_path = source["reference_path"]
+    expected_url = source["native_url"]
     s3 = s3fs.S3FileSystem(anon=True)
 
     if cache_dir is None:
-        # Preserve the existing uncached behavior.
         with s3.open(reference_path, "rb") as file:
             reference_bytes = file.read()
-
         reference = json.loads(reference_bytes)
         reference_json_bytes = len(reference_bytes)
-
     else:
         cache_root = Path(cache_dir).expanduser()
-
         cache_file = (
             cache_root
             / config.date_folder
-            / config.product
-            / f"{config.filename(hour)}.cache.json"
+            / source["source_product"]
+            / f'{source["filename"]}.cache.json'
         )
 
         def metadata_provider():
@@ -202,16 +276,11 @@ def read_kerchunk_forecast(
             metadata_provider,
             downloader,
         )
+        # Serialized reference size, not bytes transferred over the network.
+        reference_json_bytes = len(json.dumps(reference).encode("utf-8"))
 
-        # This is the serialized reference size, not network bytes.
-        reference_json_bytes = len(
-            json.dumps(reference).encode("utf-8")
-        )
-
-    # Validate both cached and uncached references.
     if not validate_reference(reference):
         raise ValueError("Invalid Kerchunk reference structure")
-
     if not valid_source_identity(reference, expected_url):
         raise ValueError("Incorrect Kerchunk source identity")
 
@@ -230,20 +299,18 @@ def read_kerchunk_forecast(
         zarr_format=2,
     ) as ds:
         flows = extract_streamflow(ds, reach_ids)
-
         valid_time = ds.time.values[0]
         reference_time = ds.reference_time.values[0]
 
-        config.validate_timestamps(
-            hour,
-            valid_time,
-            reference_time,
-        )
+        if hour == 0:
+            config.validate_analysis_timestamps(valid_time, reference_time)
+        else:
+            config.validate_timestamps(hour, valid_time, reference_time)
 
     return {
         "forecast_date": config.date,
         "forecast_cycle": config.cycle,
-        "product": config.product,
+        "product": source["source_product"],
         "domain": config.domain,
         "lead_hour": hour,
         "method": "kerchunk",
@@ -254,19 +321,17 @@ def read_kerchunk_forecast(
     }
 
 
-
 def read_native_forecast(
     config: ForecastConfig,
     hour: int,
     reach_ids: list[int],
 ) -> dict:
-    """Read and validate one operational NWM forecast via native NetCDF."""
+    """Read an operational forecast or analysis t0 from native NetCDF."""
     import fsspec
     import xarray as xr
 
-    # Validate the requested forecast before remote access.
-    config.filename(hour)
-    url = config.native_url(hour)
+    source = resolve_operational_source(config, hour)
+    url = source["native_url"]
 
     with fsspec.open(
         url,
@@ -274,25 +339,20 @@ def read_native_forecast(
         block_size=1024 * 1024,
         cache_type="bytes",
     ) as remote_file:
-        with xr.open_dataset(
-            remote_file,
-            engine="h5netcdf",
-        ) as ds:
+        with xr.open_dataset(remote_file, engine="h5netcdf") as ds:
             flows = extract_streamflow(ds, reach_ids)
-
             valid_time = ds.time.values[0]
             reference_time = ds.reference_time.values[0]
 
-            config.validate_timestamps(
-                hour,
-                valid_time,
-                reference_time,
-            )
+            if hour == 0:
+                config.validate_analysis_timestamps(valid_time, reference_time)
+            else:
+                config.validate_timestamps(hour, valid_time, reference_time)
 
     return {
         "forecast_date": config.date,
         "forecast_cycle": config.cycle,
-        "product": config.product,
+        "product": source["source_product"],
         "domain": config.domain,
         "lead_hour": hour,
         "method": "native_remote",
@@ -303,8 +363,6 @@ def read_native_forecast(
     }
 
 
-
-
 def fetch_operational_forecast(
     config: ForecastConfig,
     hour: int,
@@ -312,48 +370,30 @@ def fetch_operational_forecast(
     *,
     cache_dir=None,
 ) -> dict:
-    """Fetch operational NWM data with controlled native fallback.
+    """Use Kerchunk first, with controlled native fallback when uncached.
 
-    Kerchunk is attempted first.
-
-    With caching disabled, recognized access failures may trigger
-    native NetCDF retrieval.
-
-    With caching enabled, errors are propagated until cache-specific
-    and remote-access failures can be distinguished reliably.
+    Cached retrieval errors are propagated to avoid masking cache failures.
     """
     import json
 
     try:
         if cache_dir is None:
-            return read_kerchunk_forecast(
-                config,
-                hour,
-                reach_ids,
-            )
-
+            return read_kerchunk_forecast(config, hour, reach_ids)
         return read_kerchunk_forecast(
             config,
             hour,
             reach_ids,
             cache_dir=cache_dir,
         )
-
     except PermissionError:
         raise
-
     except (OSError, json.JSONDecodeError) as exc:
         if cache_dir is not None:
             raise
-
         kerchunk_error = exc
 
     try:
-        result = read_native_forecast(
-            config,
-            hour,
-            reach_ids,
-        )
+        result = read_native_forecast(config, hour, reach_ids)
     except Exception as native_error:
         raise RuntimeError(
             "Both Kerchunk and native NWM retrieval failed"
@@ -362,5 +402,143 @@ def fetch_operational_forecast(
     result["fallback_reason"] = (
         f"{type(kerchunk_error).__name__}: {kerchunk_error}"
     )
-
     return result
+
+
+
+def fetch_operational_series(
+    config: ForecastConfig,
+    reach_ids: list[int],
+    start_hour: int,
+    end_hour: int,
+    *,
+    include_t0: bool = True,
+    cache_dir=None,
+):
+    """Retrieve a validated operational NWM streamflow time series.
+
+    Analysis t0 is included by default. Each row retains the original
+    source reference time, forecast cycle, lead hour, and product.
+    """
+    import pandas as pd
+
+
+    if (
+        isinstance(start_hour, bool)
+        or not isinstance(start_hour, int)
+        or isinstance(end_hour, bool)
+        or not isinstance(end_hour, int)
+    ):
+        raise ValueError("Forecast hours must be integers")
+
+    if start_hour < 1 or end_hour < start_hour:
+        raise ValueError("Invalid forecast hour range")
+
+    if not isinstance(include_t0, bool):
+        raise ValueError("include_t0 must be a boolean")
+
+    requested = list(reach_ids)
+
+    if not requested:
+        raise ValueError("At least one reach is required")
+
+    if any(
+        isinstance(reach, (bool, np.bool_))
+        or not isinstance(reach, numbers.Integral)
+        or int(reach) <= 0
+        for reach in requested
+    ):
+        raise ValueError("Reach IDs must be positive integers")
+
+    requested = [int(reach) for reach in requested]
+
+    if len(requested) != len(set(requested)):
+        raise ValueError("Duplicate reach IDs are not allowed")
+
+    hours = list(range(start_hour, end_hour + 1))
+
+    if include_t0:
+        hours.insert(0, 0)
+
+    records = []
+
+    for hour in hours:
+        if cache_dir is None:
+            result = fetch_operational_forecast(
+                config,
+                hour,
+                requested,
+            )
+        else:
+            result = fetch_operational_forecast(
+                config,
+                hour,
+                requested,
+                cache_dir=cache_dir,
+            )
+
+        if result["lead_hour"] != hour:
+            raise ValueError("Unexpected forecast lead hour")
+
+        if result["forecast_date"] != config.date:
+            raise ValueError("Unexpected forecast date")
+
+        if result["forecast_cycle"] != config.cycle:
+            raise ValueError("Unexpected forecast cycle")
+
+        if result["domain"] != config.domain:
+            raise ValueError("Unexpected NWM domain")
+
+        if hour == 0:
+            config.validate_analysis_timestamps(
+                result["valid_time"],
+                result["reference_time"],
+            )
+        else:
+            config.validate_timestamps(
+                hour,
+                result["valid_time"],
+                result["reference_time"],
+            )
+
+
+        expected_product = (
+            "analysis_assim" if hour == 0 else config.product
+        )
+
+        if result["product"] != expected_product:
+            raise ValueError("Unexpected NWM source product")
+
+        if set(result["streamflow_m3s"]) != set(requested):
+            raise ValueError("Unexpected feature IDs in forecast result")
+
+
+        if not np.isfinite(
+            list(result["streamflow_m3s"].values())
+        ).all():
+            raise ValueError("Non-finite streamflow values found")
+
+
+        for reach in requested:
+            records.append({
+                "forecast_date": result["forecast_date"],
+                "forecast_cycle": result["forecast_cycle"],
+                "product": result["product"],
+                "domain": result["domain"],
+                "lead_hour": result["lead_hour"],
+                "feature_id": reach,
+                "valid_time": result["valid_time"],
+                "reference_time": result["reference_time"],
+                "streamflow_m3s": result["streamflow_m3s"][reach],
+                "method": result["method"],
+            })
+
+    frame = pd.DataFrame.from_records(records)
+
+    if frame.duplicated(
+        subset=["forecast_date", "forecast_cycle",
+                "lead_hour", "feature_id"]
+    ).any():
+        raise ValueError("Duplicate forecast records")
+
+    return frame

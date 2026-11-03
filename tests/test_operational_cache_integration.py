@@ -332,3 +332,137 @@ def test_cached_reader_refreshes_changed_reference(
     assert updated["manifest"]["source_generation"] == "gen-1"
 
     s3.open.assert_called_once()
+
+
+
+def test_analysis_t0_cache_separate_from_forecast(
+    tmp_path, monkeypatch
+):
+    """Analysis t0 and forecast references use separate cache records."""
+    import json
+    from unittest.mock import MagicMock
+
+    import fsspec
+    import s3fs
+
+    from streamflow_getter import reference_cache
+
+    config = ForecastConfig()
+
+    def make_reference(url):
+        return {
+            "version": 1,
+            "refs": {
+                ".zgroup": "{}",
+                "feature_id/.zarray": "{}",
+                "feature_id/0": [url, 0, 100],
+                "streamflow/.zarray": "{}",
+                "streamflow/0": [url, 100, 200],
+            },
+        }
+
+    s3 = MagicMock()
+
+    def open_reference(path, mode):
+        if path == config.analysis_reference_path():
+            url = config.analysis_native_url()
+        else:
+            assert path == config.reference_path(1)
+            url = config.native_url(1)
+
+        context = MagicMock()
+        context.__enter__.return_value.read.return_value = (
+            json.dumps(make_reference(url)).encode()
+        )
+        return context
+
+    s3.open.side_effect = open_reference
+
+    monkeypatch.setattr(
+        s3fs,
+        "S3FileSystem",
+        lambda **kwargs: s3,
+    )
+
+    monkeypatch.setattr(
+        reference_cache,
+        "fetch_remote_metadata",
+        lambda *args, **kwargs: {
+            "reference_etag": "etag-1",
+            "source_generation": "gen-1",
+        },
+    )
+
+    filesystem = MagicMock()
+    filesystem.get_mapper.return_value = {}
+
+    monkeypatch.setattr(
+        fsspec,
+        "filesystem",
+        lambda *args, **kwargs: filesystem,
+    )
+
+    def open_dataset(*args, **kwargs):
+        # Use separate valid timestamps for analysis and forecast.
+        hour = open_dataset.calls
+        open_dataset.calls += 1
+
+        valid = (
+            "2026-04-19T00:00:00"
+            if hour == 0
+            else "2026-04-19T01:00:00"
+        )
+        reference = (
+            "2026-04-18T21:00:00"
+            if hour == 0
+            else "2026-04-19T00:00:00"
+        )
+
+        ds = xr.Dataset(
+            {"streamflow": ("feature_id", [0.41])},
+            coords={
+                "feature_id": [3586192],
+                "time": [np.datetime64(valid)],
+                "reference_time": [np.datetime64(reference)],
+            },
+        )
+
+        context = MagicMock()
+        context.__enter__.return_value = ds
+        return context
+
+    open_dataset.calls = 0
+
+    monkeypatch.setattr(
+        xr,
+        "open_zarr",
+        open_dataset,
+    )
+
+    analysis = read_kerchunk_forecast(
+        config, 0, [3586192], cache_dir=tmp_path
+    )
+    forecast = read_kerchunk_forecast(
+        config, 1, [3586192], cache_dir=tmp_path
+    )
+
+    analysis_path = (
+        tmp_path
+        / config.date_folder
+        / "analysis_assim"
+        / f"{config.analysis_filename()}.cache.json"
+    )
+
+    forecast_path = (
+        tmp_path
+        / config.date_folder
+        / "short_range"
+        / f"{config.filename(1)}.cache.json"
+    )
+
+    assert analysis_path.exists()
+    assert forecast_path.exists()
+    assert analysis_path != forecast_path
+
+    assert analysis["product"] == "analysis_assim"
+    assert forecast["product"] == "short_range"
