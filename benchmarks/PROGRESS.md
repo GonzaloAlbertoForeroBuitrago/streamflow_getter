@@ -378,3 +378,95 @@ Limitations:
 - RouteLink v3.1.6 compatibility with all operational NWM versions is not proven.
 - Point, bounding-box, and polygon resolution remain pending.
 - NetCDF reading requires an available optional backend.
+
+
+
+## Geographic NWM reach resolution — November 3, 2026
+
+### Objective
+
+Implement the geographic reach-selection functionality requested
+in docs/ROADMAP.md using NWM RouteLink and channel hydrofabric.
+
+### Implementation
+
+Module: src/streamflow_getter/spatial_resolution.py
+
+Supported operations:
+
+- USGS gage resolution through RouteLink
+  (reach_resolution.py).
+- Geographic point selection using projected channel distances.
+- Bounding-box selection using channel-geometry intersection.
+- Polygon and MultiPolygon selection using channel-geometry
+  intersection.
+
+Geographic implementation:
+
+- Input geographic coordinates: EPSG:4326.
+- Verified CONUS hydrofabric CRS: EPSG:4269.
+- Point distance calculations: EPSG:5070.
+- Geographic candidate loading: pyogrio.
+- Exact geometric intersection: GeoPandas/Shapely.
+- Feature-ID validation rejects noninteger and nonpositive IDs.
+- Hydrofabric CRS validation occurs before geographic loading.
+- Spatial dependencies are optional under the `spatial` extra.
+
+### Dataset provenance
+
+Source: jameshalgren/troute-lab
+Dataset: NWM v3.1.6 channel hydrofabric
+
+Local source:
+~/Documents/troute-lab/data/NWM_v3_hydrofabric.gdb
+
+Original archive:
+NWM_channel_hydrofabric.tar.gz
+
+Source URL:
+https://www.nohrsc.noaa.gov/owp_files/nwm/data_tools/NWM_channel_hydrofabric.tar.gz
+
+Published SHA-256:
+77d8975b543ff864cdac0736cc4f455fe86d77049c4d8b1fb8e458ec755dbc94
+
+Previously verified:
+- 2,776,734 unique CONUS feature IDs.
+- Exact RouteLink/hydrofabric feature-ID set correspondence.
+
+### Validation
+
+Automated:
+- 26 spatial tests passed.
+- 104 total tests passed with the spatial extra.
+- Standard environment previously passed 78 tests with
+  one optional module skipped.
+
+Real hydrofabric:
+- USGS 08165500 nearest reach: 3586192.
+- Nearest channel distance: approximately 98.34 m.
+- Bounding-box selection: 18 reaches.
+- Polygon selection: 12 reaches.
+- No missing or unexpected reaches in the earlier independent
+  geographic subset comparisons.
+
+### Limitations
+
+- Current geographic implementation targets CONUS.
+- Other NWM domains require domain-specific CRS and validation.
+- Point distances are projected distances, not exact geodesic
+  distances.
+- Nearest-channel selection does not establish hydrologic
+  connectivity or guarantee correct gage association.
+- Geographic search-envelope completeness has not been
+  established for all CONUS locations.
+- Bounding boxes crossing the antimeridian are unsupported.
+- Compatibility across all historical NWM versions is unverified.
+- Spatial selection is not yet connected to operational
+  streamflow retrieval.
+
+### Next
+
+- Review the final implementation and tests.
+- Integrate reach selection with operational NWM retrieval.
+- Continue Kerchunk-first access, native fallback, and caching
+  according to docs/ROADMAP.md.
