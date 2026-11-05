@@ -1,0 +1,501 @@
+
+"""Tests for validated operational NWM product specifications."""
+
+import pytest
+
+from streamflow_getter.operational_nwm import ForecastConfig
+
+
+def test_medium_range_member1_source_identity():
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_mem1",
+        domain="conus",
+    )
+
+    assert config.filename(1) == (
+        "nwm.t00z.medium_range.channel_rt_1.f001.conus.nc"
+    )
+
+    assert config.native_url(1).endswith(
+        "/nwm.20260419/medium_range_mem1/"
+        "nwm.t00z.medium_range.channel_rt_1.f001.conus.nc"
+    )
+
+    assert config.reference_path(1).endswith(
+        "/nwm.20260419/medium_range_mem1/"
+        "nwm.t00z.medium_range.channel_rt_1.f001.conus.nc.json"
+    )
+
+
+@pytest.mark.parametrize("cycle", [0, 6, 12, 18])
+def test_medium_range_member1_valid_cycles(cycle):
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=cycle,
+        product="medium_range_mem1",
+    )
+
+    assert config.cycle == cycle
+
+
+@pytest.mark.parametrize("cycle", [1, 3, 9, 23])
+def test_medium_range_member1_invalid_cycles(cycle):
+    with pytest.raises(ValueError, match="cycle"):
+        ForecastConfig(
+            date="2026-04-19",
+            cycle=cycle,
+            product="medium_range_mem1",
+        )
+
+
+@pytest.mark.parametrize("hour", [1, 6, 120, 240])
+def test_medium_range_member1_valid_hours(hour):
+    config = ForecastConfig(
+        product="medium_range_mem1",
+    )
+
+    assert f"f{hour:03d}" in config.filename(hour)
+
+
+@pytest.mark.parametrize("hour", [0, 241, -1])
+def test_medium_range_member1_invalid_hours(hour):
+    config = ForecastConfig(
+        product="medium_range_mem1",
+    )
+
+    with pytest.raises(ValueError, match="hour"):
+        config.filename(hour)
+
+
+def test_medium_range_member1_analysis_t0():
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_mem1",
+    )
+
+    assert config.analysis_filename() == (
+        "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
+    )
+
+    assert config.analysis_native_url().endswith(
+        "/nwm.20260419/analysis_assim/"
+        "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
+    )
+
+
+def test_short_range_configuration_unchanged():
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+    )
+
+    assert config.product == "short_range"
+    assert config.filename(1) == (
+        "nwm.t00z.short_range.channel_rt.f001.conus.nc"
+    )
+
+
+def test_medium_range_member1_forecast_source():
+    """Preserve ensemble identity in operational source resolution."""
+    from streamflow_getter.operational_nwm import (
+        resolve_operational_source,
+    )
+
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_mem1",
+    )
+
+    source = resolve_operational_source(config, 1)
+
+    assert source["source_product"] == "medium_range_mem1"
+    assert source["lead_hour"] == 1
+    assert source["filename"] == (
+        "nwm.t00z.medium_range.channel_rt_1.f001.conus.nc"
+    )
+    assert source["native_url"] == config.native_url(1)
+    assert source["reference_path"] == config.reference_path(1)
+
+
+def test_medium_range_member1_analysis_source():
+    """Preserve analysis t0 identity and source pairing."""
+    from streamflow_getter.operational_nwm import (
+        resolve_operational_source,
+    )
+
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_mem1",
+    )
+
+    source = resolve_operational_source(config, 0)
+
+    assert source["source_product"] == "analysis_assim"
+    assert source["lead_hour"] == 0
+    assert source["filename"] == (
+        "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
+    )
+    assert source["native_url"] == config.analysis_native_url()
+    assert source["reference_path"] == config.analysis_reference_path()
+
+
+def test_medium_range_member1_series_with_t0(monkeypatch):
+    """Preserve analysis t0 and medium-range forecast identity."""
+    import pandas as pd
+
+    from streamflow_getter import operational_nwm
+
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_mem1",
+    )
+
+    calls = []
+
+    def fake_fetch(config, hour, reach_ids, **kwargs):
+        calls.append(hour)
+
+        valid_time = pd.Timestamp(
+            "2026-04-19T00:00:00"
+        ) + pd.Timedelta(hours=hour)
+
+        return {
+            "forecast_date": config.date,
+            "forecast_cycle": config.cycle,
+            "product": (
+                "analysis_assim"
+                if hour == 0
+                else config.product
+            ),
+            "domain": config.domain,
+            "lead_hour": hour,
+            "method": "kerchunk",
+            "valid_time": str(valid_time),
+            "reference_time": (
+                "2026-04-18T21:00:00"
+                if hour == 0
+                else "2026-04-19T00:00:00"
+            ),
+            "streamflow_m3s": {3586192: 0.41},
+            "reference_json_bytes": 100,
+        }
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "fetch_operational_forecast",
+        fake_fetch,
+    )
+
+    frame = operational_nwm.fetch_operational_series(
+        config,
+        [3586192],
+        1,
+        2,
+        include_t0=True,
+    )
+
+    assert calls == [0, 1, 2]
+    assert list(frame["lead_hour"]) == [0, 1, 2]
+    assert list(frame["product"]) == [
+        "analysis_assim",
+        "medium_range_mem1",
+        "medium_range_mem1",
+    ]
+    assert list(frame["feature_id"]) == [3586192] * 3
+
+
+def test_medium_range_member1_series_without_t0(monkeypatch):
+    """Allow medium-range forecasts without analysis t0."""
+    from streamflow_getter import operational_nwm
+
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_mem1",
+    )
+
+    calls = []
+
+    def fake_fetch(config, hour, reach_ids, **kwargs):
+        calls.append(hour)
+
+        return {
+            "forecast_date": config.date,
+            "forecast_cycle": config.cycle,
+            "product": config.product,
+            "domain": config.domain,
+            "lead_hour": hour,
+            "method": "kerchunk",
+            "valid_time": f"2026-04-19T{hour:02d}:00:00",
+            "reference_time": "2026-04-19T00:00:00",
+            "streamflow_m3s": {3586192: 0.41},
+            "reference_json_bytes": 100,
+        }
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "fetch_operational_forecast",
+        fake_fetch,
+    )
+
+    frame = operational_nwm.fetch_operational_series(
+        config,
+        [3586192],
+        1,
+        2,
+        include_t0=False,
+    )
+
+    assert calls == [1, 2]
+    assert list(frame["lead_hour"]) == [1, 2]
+    assert set(frame["product"]) == {"medium_range_mem1"}
+
+
+@pytest.mark.parametrize(
+    "start_hour,end_hour",
+    [
+        (1, 241),
+        (239, 241),
+        (241, 241),
+    ],
+)
+def test_medium_range_invalid_series_range_before_fetch(
+    monkeypatch, start_hour, end_hour
+):
+    """Reject unsupported lead hours before remote retrieval."""
+    from streamflow_getter import operational_nwm
+
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_mem1",
+    )
+
+    def unexpected_fetch(*args, **kwargs):
+        raise AssertionError(
+            "Remote retrieval must not run for invalid lead hours"
+        )
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "fetch_operational_forecast",
+        unexpected_fetch,
+    )
+
+    with pytest.raises(ValueError, match="Forecast hour"):
+        operational_nwm.fetch_operational_series(
+            config,
+            [3586192],
+            start_hour,
+            end_hour,
+            include_t0=True,
+        )
+
+
+def test_medium_range_member1_cache_isolation(
+    tmp_path, monkeypatch
+):
+    """Cache medium-range forecast and analysis t0 separately."""
+    import json
+    from unittest.mock import MagicMock
+
+    import fsspec
+    import numpy as np
+    import s3fs
+    import xarray as xr
+
+    from streamflow_getter import reference_cache
+    from streamflow_getter.operational_nwm import (
+        read_kerchunk_forecast,
+    )
+
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_mem1",
+    )
+
+    def make_reference(url):
+        return {
+            "version": 1,
+            "refs": {
+                ".zgroup": "{}",
+                "feature_id/.zarray": "{}",
+                "feature_id/0": [url, 0, 100],
+                "streamflow/.zarray": "{}",
+                "streamflow/0": [url, 100, 200],
+            },
+        }
+
+    s3 = MagicMock()
+
+    def open_reference(path, mode):
+        if path == config.analysis_reference_path():
+            url = config.analysis_native_url()
+        else:
+            assert path == config.reference_path(1)
+            url = config.native_url(1)
+
+        context = MagicMock()
+        context.__enter__.return_value.read.return_value = (
+            json.dumps(make_reference(url)).encode()
+        )
+        return context
+
+    s3.open.side_effect = open_reference
+
+    monkeypatch.setattr(
+        s3fs, "S3FileSystem", lambda **kwargs: s3
+    )
+
+    monkeypatch.setattr(
+        reference_cache,
+        "fetch_remote_metadata",
+        lambda *args, **kwargs: {
+            "reference_etag": "etag-1",
+            "source_generation": "gen-1",
+        },
+    )
+
+    filesystem = MagicMock()
+    filesystem.get_mapper.return_value = {}
+
+    monkeypatch.setattr(
+        fsspec,
+        "filesystem",
+        lambda *args, **kwargs: filesystem,
+    )
+
+    def open_dataset(*args, **kwargs):
+        # Determine source identity from the reference.
+        reference = kwargs.get("fo")
+        hour = open_dataset.calls % 2
+        open_dataset.calls += 1
+
+        valid_time = np.datetime64(
+            "2026-04-19T00:00:00"
+        ) + np.timedelta64(hour, "h")
+
+        reference_time = np.datetime64(
+            "2026-04-18T21:00:00"
+            if hour == 0
+            else "2026-04-19T00:00:00"
+        )
+
+        ds = xr.Dataset(
+            {
+                "streamflow": (
+                    "feature_id",
+                    [0.41],
+                ),
+            },
+            coords={
+                "feature_id": [3586192],
+                "time": [valid_time],
+                "reference_time": [reference_time],
+            },
+        )
+
+        context = MagicMock()
+        context.__enter__.return_value = ds
+        return context
+
+    open_dataset.calls = 0
+
+    monkeypatch.setattr(
+        xr, "open_zarr", open_dataset
+    )
+
+    read_kerchunk_forecast(
+        config, 0, [3586192], cache_dir=tmp_path
+    )
+
+    read_kerchunk_forecast(
+        config, 1, [3586192], cache_dir=tmp_path
+    )
+
+    analysis_cache = (
+        tmp_path
+        / config.date_folder
+        / "analysis_assim"
+        / f"{config.analysis_filename()}.cache.json"
+    )
+
+    forecast_cache = (
+        tmp_path
+        / config.date_folder
+        / "medium_range_mem1"
+        / f"{config.filename(1)}.cache.json"
+    )
+
+    assert analysis_cache.exists()
+    assert forecast_cache.exists()
+    assert analysis_cache != forecast_cache
+    assert s3.open.call_count == 2
+
+
+def test_medium_range_member1_native_fallback(monkeypatch):
+    """Use native fallback for a recoverable Kerchunk access failure."""
+    from streamflow_getter import operational_nwm
+
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_mem1",
+    )
+
+    calls = []
+
+    def fail_kerchunk(config, hour, reach_ids):
+        calls.append(("kerchunk", config.product, hour))
+        raise OSError("Kerchunk reference unavailable")
+
+    def fake_native(config, hour, reach_ids):
+        calls.append(("native", config.product, hour))
+
+        return {
+            "forecast_date": config.date,
+            "forecast_cycle": config.cycle,
+            "product": config.product,
+            "domain": config.domain,
+            "lead_hour": hour,
+            "method": "native_remote",
+            "valid_time": "2026-04-19T01:00:00",
+            "reference_time": "2026-04-19T00:00:00",
+            "streamflow_m3s": {3586192: 0.41},
+            "reference_json_bytes": 0,
+        }
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "read_kerchunk_forecast",
+        fail_kerchunk,
+    )
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "read_native_forecast",
+        fake_native,
+    )
+
+    result = operational_nwm.fetch_operational_forecast(
+        config,
+        1,
+        [3586192],
+    )
+
+    assert calls == [
+        ("kerchunk", "medium_range_mem1", 1),
+        ("native", "medium_range_mem1", 1),
+    ]
+
+    assert result["method"] == "native_remote"
+    assert result["product"] == "medium_range_mem1"
+    assert result["streamflow_m3s"][3586192] == 0.41
+    assert "OSError" in result["fallback_reason"]

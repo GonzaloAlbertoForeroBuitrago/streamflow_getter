@@ -1078,3 +1078,89 @@ No forecast data was downloaded or output file created.
 - Commit the polygon CLI milestone.
 - Reassess remaining roadmap priorities with James before
   expanding functionality.
+
+
+
+## Operational NWM medium-range member 1 configuration — November 5, 2026
+
+### Objective
+
+Extend the existing operational NWM backend to support a
+validated medium-range CONUS ensemble member while preserving
+short-range behavior and reusing the Kerchunk/native readers.
+
+### Implementation
+
+Modules:
+- src/streamflow_getter/operational_nwm.py
+- tests/test_operational_product_config.py
+
+Changes:
+- Added immutable ProductSpec configuration.
+- Added validated medium_range_mem1 source conventions.
+- Preserved short_range as the default product.
+- Validated medium-range cycles at 00, 06, 12, and 18 UTC.
+- Validated medium-range forecast hours f001–f240.
+- Preserved ensemble-member identity in output and cache paths.
+- Reused analysis_assim tm00 for the tested analysis t0.
+- Rejected invalid forecast ranges before remote retrieval.
+- Reused existing Kerchunk-first and native-fallback logic.
+
+### Real-data validation
+
+Reference:
+- Date: 2026-04-19
+- Cycle: t00z
+- Domain: CONUS
+- Product: medium_range_mem1
+- NWM feature ID: 3586192
+
+Source conventions:
+- Directory: medium_range_mem1
+- Filename product: medium_range
+- Channel family: channel_rt_1
+
+Analysis t0:
+- Valid time: 2026-04-19 00:00 UTC
+- Reference time: 2026-04-18 21:00 UTC
+
+Forecast f001:
+- Valid time: 2026-04-19 01:00 UTC
+- Reference time: 2026-04-19 00:00 UTC
+- Kerchunk streamflow: 0.40999999083578587 m3/s
+- Native streamflow: 0.40999999083578587 m3/s
+
+Live retrieval:
+- Analysis t0, f001, and f002 succeeded using Kerchunk.
+- Three time-series rows returned.
+- Forecast and analysis feature-ID arrays matched.
+- No source-identity or timestamp validation errors.
+
+### Automated validation
+
+- 343 complete repository tests passed.
+- 27 product-configuration tests passed.
+- Invalid cycles and forecast hours rejected.
+- Invalid forecast ranges rejected before remote retrieval.
+- Forecast and analysis source identities tested.
+- Cache isolation tested.
+- Recoverable Kerchunk access failure triggered mocked native fallback.
+- Existing short-range regression tests passed.
+- Git whitespace validation passed.
+
+### Limitations
+
+- Live validation covered one date, cycle, reach, and two forecast hours.
+- The full 240-hour forecast was not retrieved.
+- Other ensemble members are not yet enabled.
+- The CLI does not yet expose operational product selection.
+- Historical model-version compatibility remains unverified.
+- Cached retrieval failures still propagate without native fallback.
+- Additional domains and no-DA analysis pairings require validation.
+
+### Next
+
+- Review and commit this product-configuration milestone.
+- Add validated operational product selection to the CLI.
+- Extend support incrementally to other NWM products and ensembles.
+- Continue following the original roadmap coordination gates.

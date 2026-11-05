@@ -47,6 +47,66 @@ Install the optional spatial dependencies:
 
     uv sync --extra spatial
 
+
+### Operational NWM product configuration
+
+The Python library currently supports these validated operational
+NWM configurations:
+
+| Product | Domain | Cycles (UTC) | Forecast leads |
+|---|---|---|---|
+| `short_range` | CONUS | 00–23 hourly | f001–f018 |
+| `medium_range_mem1` | CONUS | 00, 06, 12, 18 | f001–f240 |
+
+The `medium_range_mem1` configuration uses:
+
+- NOAA directory: `medium_range_mem1`
+- Filename product: `medium_range`
+- Channel family: `channel_rt_1`
+- Analysis t0 source: `analysis_assim`
+
+Example Python usage:
+
+    from streamflow_getter.operational_nwm import (
+        ForecastConfig,
+        fetch_operational_series,
+    )
+
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_mem1",
+        domain="conus",
+    )
+
+    frame = fetch_operational_series(
+        config,
+        [3586192],
+        start_hour=1,
+        end_hour=2,
+        include_t0=True,
+    )
+
+    print(frame)
+
+The medium-range configuration has been validated against real NOAA
+data for April 19, 2026, cycle t00z, feature ID 3586192,
+including analysis t0 and forecast hours f001–f002.
+
+Kerchunk-first retrieval succeeded for all three time steps.
+The native NetCDF reader returned the same streamflow value as
+Kerchunk for f001.
+
+Product-specific cycle and forecast-hour validation prevents
+unsupported requests from reaching remote retrieval.
+
+The command-line interface currently defaults to short-range
+CONUS and does not yet expose product selection.
+
+Other ensemble members, domains, and forecast products require
+separate validation before being enabled.
+
+
 ### Geographic point selection
 
 Example:

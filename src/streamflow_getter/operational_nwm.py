@@ -8,8 +8,37 @@ import numpy as np
 
 
 @dataclass(frozen=True)
+class ProductSpec:
+    """Validated source conventions for an operational NWM product."""
+
+    directory: str
+    filename_product: str
+    channel_family: str
+    cycles: tuple[int, ...]
+    max_hour: int
+
+
+PRODUCT_SPECS = {
+    "short_range": ProductSpec(
+        directory="short_range",
+        filename_product="short_range",
+        channel_family="channel_rt",
+        cycles=tuple(range(24)),
+        max_hour=18,
+    ),
+    "medium_range_mem1": ProductSpec(
+        directory="medium_range_mem1",
+        filename_product="medium_range",
+        channel_family="channel_rt_1",
+        cycles=(0, 6, 12, 18),
+        max_hour=240,
+    ),
+}
+
+
+@dataclass(frozen=True)
 class ForecastConfig:
-    """Identify one operational NWM short-range CONUS forecast cycle."""
+    """Identify a supported operational NWM forecast cycle."""
 
     date: str = "2026-04-19"
     cycle: int = 0
@@ -27,10 +56,22 @@ class ForecastConfig:
             raise ValueError("cycle must be an integer")
         if not 0 <= self.cycle <= 23:
             raise ValueError("cycle must be between 0 and 23")
-        if self.product != "short_range":
-            raise ValueError("Only short_range is currently supported")
+        if self.product not in PRODUCT_SPECS:
+            raise ValueError(
+                f"Unsupported operational NWM product: {self.product}"
+            )
+
         if self.domain != "conus":
             raise ValueError("Only the CONUS domain is currently supported")
+
+        if self.cycle not in PRODUCT_SPECS[self.product].cycles:
+            raise ValueError(
+                f"Unsupported cycle {self.cycle} for {self.product}"
+            )
+
+    @property
+    def spec(self) -> ProductSpec:
+        return PRODUCT_SPECS[self.product]
 
     @property
     def date_folder(self) -> str:
@@ -41,26 +82,32 @@ class ForecastConfig:
         return f"t{self.cycle:02d}z"
 
     def filename(self, hour: int) -> str:
-        """Build a validated short-range channel_rt filename."""
+        """Build a validated operational channel forecast filename."""
         if isinstance(hour, bool) or not isinstance(hour, int):
             raise ValueError("Forecast lead hour must be an integer")
-        if hour < 1:
-            raise ValueError("Forecast lead hour must be positive")
+
+        if not 1 <= hour <= self.spec.max_hour:
+            raise ValueError(
+                f"Forecast hour must be between 1 and "
+                f"{self.spec.max_hour} for {self.product}"
+            )
+
         return (
-            f"nwm.{self.cycle_name}.{self.product}."
-            f"channel_rt.f{hour:03d}.{self.domain}.nc"
+            f"nwm.{self.cycle_name}.{self.spec.filename_product}."
+            f"{self.spec.channel_family}.f{hour:03d}.{self.domain}.nc"
         )
+
 
     def native_url(self, hour: int) -> str:
         return (
             "https://storage.googleapis.com/national-water-model/"
-            f"{self.date_folder}/{self.product}/{self.filename(hour)}"
+            f"{self.date_folder}/{self.spec.directory}/{self.filename(hour)}"
         )
 
     def reference_path(self, hour: int) -> str:
         return (
             "ciroh-nwm-zarr-copy/national-water-model/"
-            f"{self.date_folder}/{self.product}/{self.filename(hour)}.json"
+            f"{self.date_folder}/{self.spec.directory}/{self.filename(hour)}.json"
         )
 
 
@@ -433,6 +480,10 @@ def fetch_operational_series(
 
     if start_hour < 1 or end_hour < start_hour:
         raise ValueError("Invalid forecast hour range")
+
+    # Validate the complete requested range before remote access.
+    config.filename(start_hour)
+    config.filename(end_hour)
 
     if not isinstance(include_t0, bool):
         raise ValueError("include_t0 must be a boolean")
