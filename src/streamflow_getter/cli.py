@@ -26,11 +26,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="NWM retrospective, CONUS (hourly, 1979-)",
     )
     p.add_argument(
-        "--reach", type=int, action="append", default=[],
+        "--reach",
+        type=int,
+        action="append",
+        default=[],
         help="feature_id (COMID); repeat for several",
     )
     p.add_argument(
-        "--gage", action="append", default=[],
+        "--gage",
+        action="append",
+        default=[],
         help="USGS gage ID, e.g. 01646500; repeat for several",
     )
     p.add_argument(
@@ -53,18 +58,22 @@ def build_parser() -> argparse.ArgumentParser:
     operational.add_argument("--date", required=True)
     operational.add_argument("--cycle", type=int, default=0)
     operational.add_argument(
-        "--reach", type=int, action="append", default=[],
+        "--reach",
+        type=int,
+        action="append",
+        default=[],
         help="NWM feature ID; repeat for several reaches",
     )
     operational.add_argument(
-        "--gage", action="append", default=[],
+        "--gage",
+        action="append",
+        default=[],
         help="USGS gage ID; preserve leading zeros",
     )
     operational.add_argument(
         "--routelink",
         help="Path to local RouteLink NetCDF for gage resolution",
     )
-
     operational.add_argument(
         "--point",
         type=float,
@@ -72,25 +81,38 @@ def build_parser() -> argparse.ArgumentParser:
         metavar=("LONGITUDE", "LATITUDE"),
         help="Select the nearest NWM channel to a geographic point",
     )
-
+    operational.add_argument(
+        "--bbox",
+        type=float,
+        nargs=4,
+        metavar=("WEST", "SOUTH", "EAST", "NORTH"),
+        help="Select NWM reaches intersecting a geographic bounding box",
+    )
     operational.add_argument(
         "--hydrofabric",
         help="Path to the NWM channel hydrofabric geodatabase",
     )
-
     operational.add_argument(
         "--max-distance-m",
         type=float,
         default=500.0,
         help="Maximum point-to-channel distance in meters (default: 500)",
     )
-
-
     operational.add_argument(
-        "--start-hour", type=int, default=1,
+        "--max-reaches",
+        type=int,
+        default=100,
+        help="Maximum reaches allowed per operational request (default: 100)",
     )
     operational.add_argument(
-        "--end-hour", type=int, default=18,
+        "--start-hour",
+        type=int,
+        default=1,
+    )
+    operational.add_argument(
+        "--end-hour",
+        type=int,
+        default=18,
     )
     operational.add_argument(
         "--no-t0",
@@ -138,7 +160,10 @@ def main(argv: list[str] | None = None) -> int:
             ForecastConfig,
             fetch_operational_series,
         )
-        from streamflow_getter.output import resolve_output_format, write_timeseries
+        from streamflow_getter.output import (
+            resolve_output_format,
+            write_timeseries,
+        )
 
         config = ForecastConfig(
             date=args.date,
@@ -162,14 +187,14 @@ def main(argv: list[str] | None = None) -> int:
             )
 
         # Validate reach-selection arguments before remote NWM access.
-        if not (args.reach or args.gage or args.point):
+        if not (args.reach or args.gage or args.point or args.bbox):
             raise ValueError(
-                "Provide at least one --reach, --gage, or --point"
+                "Provide at least one --reach, --gage, --point, or --bbox"
             )
 
-        if args.point and not args.hydrofabric:
+        if (args.point or args.bbox) and not args.hydrofabric:
             raise ValueError(
-                "--hydrofabric is required when using --point"
+                "--hydrofabric is required for geographic selection"
             )
 
         if args.point and (
@@ -180,9 +205,14 @@ def main(argv: list[str] | None = None) -> int:
                 "max_distance_m must be positive and finite"
             )
 
-        if args.hydrofabric and not args.point:
+        if args.hydrofabric and not (args.point or args.bbox):
             raise ValueError(
-                "--hydrofabric requires --point"
+                "--hydrofabric requires --point or --bbox"
+            )
+
+        if args.max_reaches < 1:
+            raise ValueError(
+                "max_reaches must be a positive integer"
             )
 
         if args.gage and not args.routelink:
@@ -197,6 +227,34 @@ def main(argv: list[str] | None = None) -> int:
 
         reaches = list(args.reach)
 
+        # Resolve geographic bounding-box selections locally.
+        if args.bbox:
+            from streamflow_getter.spatial_resolution import reaches_in_bbox
+
+            selected_reaches = reaches_in_bbox(
+                args.hydrofabric,
+                tuple(args.bbox),
+            )
+
+            if not selected_reaches:
+                raise ValueError(
+                    "No NWM reaches found within the bounding box"
+                )
+
+            if len(selected_reaches) > args.max_reaches:
+                raise ValueError(
+                    f"Bounding box selected {len(selected_reaches)} reaches; "
+                    f"maximum allowed is {args.max_reaches}"
+                )
+
+            reaches.extend(selected_reaches)
+
+            print(
+                f"Selected {len(selected_reaches)} NWM reaches "
+                "from geographic bounding box"
+            )
+
+        # Resolve the nearest NWM channel to a geographic point.
         if args.point:
             from streamflow_getter.spatial_resolution import (
                 load_nearby_reaches,
@@ -226,7 +284,6 @@ def main(argv: list[str] | None = None) -> int:
                 )
 
             selected = candidates[0]
-
             reaches.append(selected["feature_id"])
 
             print(
@@ -234,6 +291,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"at {selected['distance_m']:.2f} m"
             )
 
+        # Resolve USGS gages through the local RouteLink index.
         if args.gage:
             from streamflow_getter.reach_resolution import (
                 load_gage_index,
@@ -244,6 +302,7 @@ def main(argv: list[str] | None = None) -> int:
             resolved = resolve_gages(args.gage, index)
             reaches.extend(resolved.values())
 
+        # Validate the combined reach selection.
         if any(reach <= 0 for reach in reaches):
             raise ValueError(
                 "Reach IDs must be positive integers"
@@ -254,6 +313,13 @@ def main(argv: list[str] | None = None) -> int:
                 "Duplicate NWM feature IDs are not allowed"
             )
 
+        if args.bbox and len(reaches) > args.max_reaches:
+            raise ValueError(
+                f"Request contains {len(reaches)} reaches; "
+                f"maximum allowed is {args.max_reaches}"
+            )
+
+        # Retrieve operational NWM streamflow after local validation.
         frame = fetch_operational_series(
             config,
             reaches,

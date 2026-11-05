@@ -73,6 +73,49 @@ Operational retrieval is currently limited to short-range CONUS. Other products,
 
 
 
+### Geographic bounding-box selection
+
+The operational CLI can select all NWM channel reaches intersecting
+a geographic bounding box.
+
+Coordinates must be provided in EPSG:4326 as:
+
+    --bbox WEST SOUTH EAST NORTH
+
+Example:
+
+    streamflow-getter nwm-operational \
+      --date 2026-04-19 \
+      --cycle 0 \
+      --bbox -99.35 30.05 -99.30 30.09 \
+      --hydrofabric /path/to/NWM_v3_hydrofabric.gdb \
+      --max-reaches 100 \
+      --start-hour 1 \
+      --end-hour 1 \
+      --out bbox_forecast.csv
+
+The selection uses actual NWM hydrofabric channel geometries.
+All intersecting reaches are returned; selections are not silently
+truncated.
+
+
+The default maximum is 100 reaches for requests involving `--bbox`,
+including requests that combine bounding-box selection with other
+reach-selection methods. This is a provisional CLI safety limit,
+not a benchmarked NWM retrieval capacity.
+
+Use `--max-reaches` to configure the limit. Requests exceeding the
+limit are rejected rather than silently truncated.
+
+Requests without `--bbox` retain their previous reach-count behavior.
+
+
+Bounding-box selection can be combined with `--reach`, `--gage`,
+and `--point`. Duplicate feature IDs are rejected.
+
+The geographic implementation currently supports CONUS.
+
+
 ## Design
 
 - **CLI first.** Core logic lives in a Python library; the CLI is a thin

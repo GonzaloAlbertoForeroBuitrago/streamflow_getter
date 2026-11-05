@@ -920,3 +920,79 @@ during this geographic integration test.
 - Perform final regression and source-diff checks.
 - Commit the validated geographic point CLI milestone.
 - Continue with geographic bounding-box and polygon CLI selection.
+
+
+
+## Operational NWM bounding-box CLI integration — November 5, 2026
+
+### Objective
+
+Expose existing hydrofabric bounding-box reach selection through
+the operational NWM CLI, following docs/ROADMAP.md.
+
+### Implementation
+
+- Added `--bbox WEST SOUTH EAST NORTH`.
+- Reused `reaches_in_bbox()` from spatial_resolution.py.
+- Preserved `--reach`, `--gage`, and `--point`.
+- Required `--hydrofabric` for geographic selection.
+- Added configurable `--max-reaches` (default: 100).
+- Applied the configurable reach limit to requests involving
+  --bbox, including combined reach-selection methods.
+- Preserved the previous reach-count behavior for requests
+  without --bbox.
+- Rejected empty selections, duplicate IDs, and invalid coordinates.
+- Preserved validation before remote NWM retrieval.
+- Kept spatial dependencies optional.
+
+### Real-data validation
+
+Dataset: NWM v3 CONUS channel hydrofabric.
+
+Bounding box:
+- West: -99.35
+- South: 30.05
+- East: -99.30
+- North: 30.09
+
+Results:
+- 19 NWM reaches selected.
+- 19 unique feature IDs.
+- Known USGS-associated NWM reach 3586192 included.
+- Real hydrofabric-to-CLI integration passed.
+
+The NWM retrieval function was mocked during this integration
+test. No remote forecast data was downloaded.
+
+### Automated validation
+
+- 297 complete repository tests passed in both standard and
+  spatial environments.
+- Verified that the bbox limit does not restrict existing
+  direct-reach requests.
+- Successful multiple-reach selection tested.
+- Empty selections rejected.
+- Per-bbox and combined reach limits tested.
+- Duplicate combined selections rejected.
+- Invalid bounding-box coordinates rejected.
+- Remote retrieval protection tested for invalid selections.
+- Git whitespace validation passed.
+
+### Limitations
+
+- Geographic selection currently supports CONUS.
+- The default 100-reach limit is provisional and has not been
+  established through retrieval performance benchmarks.
+- Large geographic selections may require additional performance
+  and memory validation.
+- No live end-to-end NWM retrieval using --bbox has been performed.
+- Polygon selection is available in the Python library but not
+  yet exposed in the operational CLI.
+- Compatibility across NWM versions remains unverified.
+
+### Next
+
+- Review documentation and final source changes.
+- Verify standard and spatial test environments.
+- Commit the bounding-box CLI milestone.
+- Continue with polygon selection following James's roadmap.

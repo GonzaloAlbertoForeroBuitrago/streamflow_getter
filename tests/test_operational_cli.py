@@ -432,7 +432,7 @@ def test_operational_cli_requires_reach_selection(tmp_path):
     """Reject requests without any reach-selection method."""
     with pytest.raises(
         ValueError,
-        match=r"Provide at least one --reach, --gage, or --point",
+        match=r"Provide at least one --reach, --gage, --point, or --bbox",
     ):
         main([
             "nwm-operational",
@@ -879,3 +879,252 @@ def test_point_errors_never_fetch(
 
     with pytest.raises(ValueError):
         main(arguments)
+
+
+def test_operational_cli_bbox_parser():
+    parser = build_parser()
+
+    args = parser.parse_args([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--bbox", "-99.35", "30.05", "-99.30", "30.09",
+        "--hydrofabric", "NWM_v3_hydrofabric.gdb",
+        "--out", "forecast.csv",
+    ])
+
+    assert args.bbox == [-99.35, 30.05, -99.30, 30.09]
+    assert args.hydrofabric == "NWM_v3_hydrofabric.gdb"
+    assert args.max_reaches == 100
+
+
+def test_operational_cli_bbox_custom_limit():
+    parser = build_parser()
+
+    args = parser.parse_args([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--bbox", "-99.35", "30.05", "-99.30", "30.09",
+        "--max-reaches", "25",
+        "--out", "forecast.csv",
+    ])
+
+    assert args.max_reaches == 25
+
+
+
+@pytest.mark.parametrize(
+    "selected_ids,maximum,expected_error",
+    [
+        ([101, 102, 103], 100, None),
+        ([], 100, "No NWM reaches found"),
+        ([101, 102, 103], 2, "maximum allowed"),
+    ],
+)
+def test_operational_cli_bbox_selection(
+    tmp_path,
+    monkeypatch,
+    mock_operational,
+    selected_ids,
+    maximum,
+    expected_error,
+):
+    """Validate bbox selection before operational NWM retrieval."""
+    from streamflow_getter import (
+        operational_nwm,
+        spatial_resolution,
+    )
+
+    calls, _ = mock_operational
+
+    def fake_bbox(path, bbox):
+        assert path == "test.gdb"
+        assert bbox == (-99.35, 30.05, -99.30, 30.09)
+        return selected_ids
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "reaches_in_bbox",
+        fake_bbox,
+    )
+
+    if expected_error is not None:
+        def unexpected_fetch(*args, **kwargs):
+            raise AssertionError("Remote NWM retrieval must not run")
+
+        monkeypatch.setattr(
+            operational_nwm,
+            "fetch_operational_series",
+            unexpected_fetch,
+        )
+
+    arguments = [
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--bbox", "-99.35", "30.05", "-99.30", "30.09",
+        "--hydrofabric", "test.gdb",
+        "--max-reaches", str(maximum),
+        "--out", str(tmp_path / "forecast.csv"),
+    ]
+
+    if expected_error is not None:
+        with pytest.raises(ValueError, match=expected_error):
+            main(arguments)
+    else:
+        assert main(arguments) == 0
+        assert calls["reaches"] == selected_ids
+
+
+def test_operational_cli_bbox_combined_reaches(
+    tmp_path, monkeypatch, mock_operational
+):
+    """Combine bbox and explicit reaches before retrieval."""
+    from streamflow_getter import spatial_resolution
+
+    calls, _ = mock_operational
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "reaches_in_bbox",
+        lambda *args, **kwargs: [101, 102, 103],
+    )
+
+    result = main([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--bbox", "-99.35", "30.05", "-99.30", "30.09",
+        "--hydrofabric", "test.gdb",
+        "--reach", "104",
+        "--out", str(tmp_path / "forecast.csv"),
+    ])
+
+    assert result == 0
+    assert calls["reaches"] == [104, 101, 102, 103]
+
+
+def test_operational_cli_bbox_duplicate_reach(
+    tmp_path, monkeypatch
+):
+    """Reject duplicate IDs before remote retrieval."""
+    from streamflow_getter import (
+        operational_nwm,
+        spatial_resolution,
+    )
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "reaches_in_bbox",
+        lambda *args, **kwargs: [101, 102],
+    )
+
+    def unexpected_fetch(*args, **kwargs):
+        raise AssertionError("Remote NWM retrieval must not run")
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "fetch_operational_series",
+        unexpected_fetch,
+    )
+
+    with pytest.raises(ValueError, match="Duplicate"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--bbox", "-99.35", "30.05", "-99.30", "30.09",
+            "--hydrofabric", "test.gdb",
+            "--reach", "101",
+            "--out", str(tmp_path / "forecast.csv"),
+        ])
+
+
+def test_operational_cli_bbox_total_limit(
+    tmp_path, monkeypatch
+):
+    """Apply the reach limit to the combined request."""
+    from streamflow_getter import (
+        operational_nwm,
+        spatial_resolution,
+    )
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "reaches_in_bbox",
+        lambda *args, **kwargs: [101, 102, 103],
+    )
+
+    def unexpected_fetch(*args, **kwargs):
+        raise AssertionError("Remote NWM retrieval must not run")
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "fetch_operational_series",
+        unexpected_fetch,
+    )
+
+    with pytest.raises(ValueError, match="maximum allowed"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--bbox", "-99.35", "30.05", "-99.30", "30.09",
+            "--hydrofabric", "test.gdb",
+            "--reach", "104",
+            "--max-reaches", "3",
+            "--out", str(tmp_path / "forecast.csv"),
+        ])
+
+
+
+@pytest.mark.parametrize(
+    "bbox",
+    [
+        (-99.30, 30.05, -99.35, 30.09),  # Reversed west/east
+        (-99.35, 30.09, -99.30, 30.05),  # Reversed south/north
+        (-200.0, 30.05, -99.30, 30.09), # Invalid longitude
+        (-99.35, -100.0, -99.30, 30.09),# Invalid latitude
+        (float("nan"), 30.05, -99.30, 30.09),
+        (-99.35, 30.05, float("inf"), 30.09),
+    ],
+)
+def test_operational_cli_bbox_invalid_coordinates(
+    tmp_path, monkeypatch, bbox
+):
+    """Reject invalid bbox coordinates before remote NWM access."""
+    from streamflow_getter import operational_nwm
+
+    def unexpected_fetch(*args, **kwargs):
+        raise AssertionError("Remote NWM retrieval must not run")
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "fetch_operational_series",
+        unexpected_fetch,
+    )
+
+    arguments = [
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--bbox", *(str(value) for value in bbox),
+        "--hydrofabric", str(tmp_path),
+        "--out", str(tmp_path / "forecast.csv"),
+    ]
+
+    with pytest.raises(ValueError):
+        main(arguments)
+
+
+def test_operational_cli_limit_does_not_change_direct_reaches(
+    tmp_path, mock_operational
+):
+    """Preserve direct-reach requests without geographic bbox limits."""
+    calls, _ = mock_operational
+
+    arguments = [
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--max-reaches", "1",
+        "--reach", "101",
+        "--reach", "102",
+        "--out", str(tmp_path / "forecast.csv"),
+    ]
+
+    assert main(arguments) == 0
+    assert calls["reaches"] == [101, 102]
