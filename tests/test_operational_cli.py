@@ -1357,3 +1357,93 @@ def test_operational_cli_polygon_combined_reach_limit(
             "--max-reaches", "3",
             "--out", str(tmp_path / "forecast.csv"),
         ])
+
+
+def test_operational_cli_product_parser():
+    """Preserve the default and accept the validated medium-range product."""
+    parser = build_parser()
+
+    default = parser.parse_args([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--reach", "3586192",
+        "--out", "forecast.csv",
+    ])
+
+    assert default.product == "short_range"
+
+    medium = parser.parse_args([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--product", "medium_range_mem1",
+        "--reach", "3586192",
+        "--out", "medium.csv",
+    ])
+
+    assert medium.product == "medium_range_mem1"
+
+
+def test_operational_cli_medium_range_config(mock_operational):
+    """Pass the selected product to the existing retrieval backend."""
+    calls, _ = mock_operational
+
+    main([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--cycle", "6",
+        "--product", "medium_range_mem1",
+        "--reach", "3586192",
+        "--start-hour", "1",
+        "--end-hour", "2",
+        "--out", "medium.csv",
+    ])
+
+    assert calls["config"].product == "medium_range_mem1"
+    assert calls["config"].cycle == 6
+    assert calls["start_hour"] == 1
+    assert calls["end_hour"] == 2
+
+
+@pytest.mark.parametrize("cycle", [1, 3, 9, 23])
+def test_operational_cli_medium_range_invalid_cycle(
+    mock_operational, cycle
+):
+    """Reject unsupported medium-range cycles before retrieval."""
+    calls, _ = mock_operational
+
+    with pytest.raises(ValueError, match="cycle"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--cycle", str(cycle),
+            "--product", "medium_range_mem1",
+            "--reach", "3586192",
+            "--out", "medium.csv",
+        ])
+
+    assert "reaches" not in calls
+
+
+@pytest.mark.parametrize("start_hour,end_hour", [
+    (1, 241),
+    (239, 241),
+    (241, 241),
+])
+def test_operational_cli_medium_range_invalid_hours(
+    mock_operational, start_hour, end_hour
+):
+    """Reject unsupported forecast hours before retrieval."""
+    calls, _ = mock_operational
+
+    with pytest.raises(ValueError, match="Forecast hour"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--product", "medium_range_mem1",
+            "--reach", "3586192",
+            "--start-hour", str(start_hour),
+            "--end-hour", str(end_hour),
+            "--out", "medium.csv",
+        ])
+
+    assert "reaches" not in calls

@@ -107,6 +107,41 @@ Other ensemble members, domains, and forecast products require
 separate validation before being enabled.
 
 
+### Operational NWM CLI product selection
+
+The `nwm-operational` command supports two validated CONUS
+product configurations:
+
+- `short_range` (default): hourly cycles, f001–f018.
+- `medium_range_mem1`: cycles 00, 06, 12, and 18 UTC,
+  f001–f240.
+
+Example: retrieve medium-range member 1 streamflow:
+
+```bash
+uv run --locked --extra operational streamflow-getter nwm-operational \
+  --date 2026-04-19 \
+  --cycle 0 \
+  --product medium_range_mem1 \
+  --reach 3586192 \
+  --start-hour 1 \
+  --end-hour 2 \
+  --out medium_range.csv
+```
+
+Analysis `t0` is included by default. Use `--no-t0` to exclude it.
+
+The CLI validates product-specific cycles and forecast-hour
+ranges before retrieval.
+
+Real-data validation was completed for April 19, 2026,
+cycle t00z, NWM feature ID 3586192. The installed CLI
+successfully retrieved analysis t0, f001, and f002 through
+Kerchunk and wrote three CSV records with validated timestamps.
+
+Other medium-range ensemble members, domains, and forecast
+products are not yet supported.
+
 ### Geographic point selection
 
 Example:

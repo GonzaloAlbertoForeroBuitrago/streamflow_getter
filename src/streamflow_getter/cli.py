@@ -51,12 +51,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", required=True, help="output CSV path")
 
     # Operational NWM short-range CONUS retrieval.
+
     operational = sub.add_parser(
         "nwm-operational",
-        help="Operational NWM short-range CONUS forecasts",
+        help="Operational NWM CONUS forecasts",
     )
     operational.add_argument("--date", required=True)
     operational.add_argument("--cycle", type=int, default=0)
+    operational.add_argument(
+        "--product",
+        choices=["short_range", "medium_range_mem1"],
+        default="short_range",
+        help="Operational NWM product (default: short_range)",
+    )
+
     operational.add_argument(
         "--reach",
         type=int,
@@ -172,10 +180,13 @@ def main(argv: list[str] | None = None) -> int:
             write_timeseries,
         )
 
+
         config = ForecastConfig(
             date=args.date,
             cycle=args.cycle,
+            product=args.product,
         )
+
 
         # Reject invalid forecast-hour ranges before remote access.
         if args.start_hour < 1 or args.end_hour < args.start_hour:
@@ -183,6 +194,12 @@ def main(argv: list[str] | None = None) -> int:
                 "Invalid forecast hour range: start_hour must be "
                 "positive and end_hour must not precede start_hour"
             )
+
+
+        # Validate product-specific forecast hours before remote access.
+        config.filename(args.start_hour)
+        config.filename(args.end_hour)
+
 
         # Validate output before starting remote retrieval.
         resolve_output_format(args.out, args.output_format)

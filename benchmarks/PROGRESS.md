@@ -1164,3 +1164,64 @@ Live retrieval:
 - Add validated operational product selection to the CLI.
 - Extend support incrementally to other NWM products and ensembles.
 - Continue following the original roadmap coordination gates.
+
+
+## Operational NWM product CLI integration — November 5, 2026
+
+### Objective
+
+Expose the validated medium_range_mem1 configuration through
+the operational CLI without duplicating the retrieval backend.
+
+### Implementation
+
+- Added --product to nwm-operational.
+- Preserved short_range as the default.
+- Added medium_range_mem1 as a supported choice.
+- Passed product selection into ForecastConfig.
+- Validated product-specific cycles and forecast hours.
+- Reused existing reach selection, Kerchunk retrieval,
+  native fallback, and CSV/Parquet output.
+
+### Real-data validation
+
+Configuration:
+- Date: 2026-04-19
+- Cycle: t00z
+- Product: medium_range_mem1
+- Domain: CONUS
+- NWM feature ID: 3586192
+- Forecast leads: analysis t0, f001, f002
+
+Results:
+- Installed CLI execution succeeded.
+- Three CSV records generated.
+- All records retrieved using Kerchunk.
+- Analysis and forecast product identities preserved.
+- Valid times and reference times verified.
+- Streamflow values were finite.
+- Temporary output directory cleaned automatically.
+
+### Automated validation
+
+- 352 complete repository tests passed.
+- Unsupported medium-range cycles rejected.
+- Unsupported forecast hours rejected before retrieval.
+- Existing short-range CLI behavior preserved.
+- Python compilation passed.
+- Git whitespace validation passed.
+
+### Limitations
+
+- Real CLI validation covered one date, cycle, reach,
+  and two forecast hours.
+- Other ensemble members and domains remain unsupported.
+- Full 240-hour retrieval has not been validated.
+- Cached retrieval errors still propagate rather than
+  automatically triggering native fallback.
+
+### Next
+
+- Review and commit the CLI product-selection milestone.
+- Continue validating additional operational NWM products.
+- Preserve the original roadmap's coordination requirements.
