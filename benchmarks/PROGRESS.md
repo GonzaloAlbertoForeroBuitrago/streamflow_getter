@@ -835,3 +835,88 @@ to CSV workflow passed.
 - Extend geographic CLI selection using existing spatial
   resolution functions.
 - Validate compatibility across NWM versions.
+
+## Operational NWM geographic point CLI integration — November 5, 2026
+
+### Objective
+
+Expose existing NWM hydrofabric point-to-reach resolution through
+the operational CLI, following docs/ROADMAP.md and the geographic
+selection approach established in jameshalgren/troute-lab.
+
+### Implementation
+
+Modules:
+- src/streamflow_getter/cli.py
+- src/streamflow_getter/spatial_resolution.py (reused, unchanged)
+
+CLI arguments:
+- --point LONGITUDE LATITUDE
+- --hydrofabric PATH
+- --max-distance-m DISTANCE (default: 500)
+
+Behavior:
+- Resolve geographic coordinates to the nearest NWM channel.
+- Use actual hydrofabric channel geometries.
+- Calculate distances using the CONUS projected CRS.
+- Select the nearest candidate within the requested radius.
+- Reuse existing spatial-resolution functions.
+- Preserve direct --reach and RouteLink-based --gage selection.
+- Support combined reach-selection methods.
+- Reject duplicate feature IDs.
+- Validate invalid search radii before accessing the hydrofabric.
+- Resolve geographic selections before remote NWM retrieval.
+
+### Real-data validation
+
+Dataset:
+- NOAA NWM v3 channel hydrofabric
+- Layer: nwm_reaches_conus
+- CRS: EPSG:4269
+
+Reference location:
+- USGS station: 08165500
+- Longitude: -99.3217121935161
+- Latitude: 30.0699307434853
+
+Results:
+- Selected NWM feature ID: 3586192
+- Point-to-channel distance: approximately 98.34 m
+- Selection agrees with the previously verified RouteLink association.
+
+The operational CLI geographic-selection path was tested using
+the real hydrofabric with remote forecast retrieval mocked.
+
+No remote NWM retrieval or output-file publication was performed
+during this geographic integration test.
+
+### Automated validation
+
+- 279 complete repository tests passed with the spatial extra.
+- Invalid search radii (zero, negative, NaN, infinity) rejected.
+- Missing hydrofabric arguments rejected.
+- No-candidate selection rejected.
+- Duplicate point/reach selection rejected.
+- Combined point/gage selection tested.
+- Git whitespace validation passed.
+
+### Limitations
+
+- Operational geographic point selection currently supports CONUS.
+- Nearest geographic reach is not necessarily the correct
+  hydrologic reach near confluences or parallel channels.
+- Automatic nearest-reach selection uses distance and feature-ID
+  ordering; it does not independently validate hydrologic topology.
+- Geographic point selection has not yet undergone a live
+  end-to-end NWM forecast retrieval.
+- Bounding-box and polygon selection remain available in the
+  Python library but are not exposed in the operational CLI.
+- Compatibility across historical NWM versions remains unverified.
+
+### Next
+
+- Review CLI argument validation and combined selection behavior.
+- Add operational CLI documentation to README.md.
+- Perform final regression and source-diff checks.
+- Commit the validated geographic point CLI milestone.
+- Continue with geographic bounding-box and polygon CLI selection.

@@ -1,6 +1,7 @@
 """Command-line interface for streamflow_getter."""
 
 import argparse
+import math
 from pathlib import Path
 
 from streamflow_getter import __version__, nwm
@@ -63,6 +64,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--routelink",
         help="Path to local RouteLink NetCDF for gage resolution",
     )
+
+    operational.add_argument(
+        "--point",
+        type=float,
+        nargs=2,
+        metavar=("LONGITUDE", "LATITUDE"),
+        help="Select the nearest NWM channel to a geographic point",
+    )
+
+    operational.add_argument(
+        "--hydrofabric",
+        help="Path to the NWM channel hydrofabric geodatabase",
+    )
+
+    operational.add_argument(
+        "--max-distance-m",
+        type=float,
+        default=500.0,
+        help="Maximum point-to-channel distance in meters (default: 500)",
+    )
+
+
     operational.add_argument(
         "--start-hour", type=int, default=1,
     )
@@ -138,10 +161,28 @@ def main(argv: list[str] | None = None) -> int:
                 f"Output already exists: {destination_path}"
             )
 
-        # Resolve gages locally before requesting NWM data.
-        if not (args.reach or args.gage):
+        # Validate reach-selection arguments before remote NWM access.
+        if not (args.reach or args.gage or args.point):
             raise ValueError(
-                "Provide at least one --reach or --gage"
+                "Provide at least one --reach, --gage, or --point"
+            )
+
+        if args.point and not args.hydrofabric:
+            raise ValueError(
+                "--hydrofabric is required when using --point"
+            )
+
+        if args.point and (
+            not math.isfinite(args.max_distance_m)
+            or args.max_distance_m <= 0
+        ):
+            raise ValueError(
+                "max_distance_m must be positive and finite"
+            )
+
+        if args.hydrofabric and not args.point:
+            raise ValueError(
+                "--hydrofabric requires --point"
             )
 
         if args.gage and not args.routelink:
@@ -155,6 +196,43 @@ def main(argv: list[str] | None = None) -> int:
             )
 
         reaches = list(args.reach)
+
+        if args.point:
+            from streamflow_getter.spatial_resolution import (
+                load_nearby_reaches,
+                nearest_reaches,
+            )
+
+            longitude, latitude = args.point
+
+            nearby = load_nearby_reaches(
+                args.hydrofabric,
+                longitude,
+                latitude,
+                max_distance_m=args.max_distance_m,
+            )
+
+            candidates = nearest_reaches(
+                nearby,
+                longitude,
+                latitude,
+                max_distance_m=args.max_distance_m,
+                limit=1,
+            )
+
+            if not candidates:
+                raise ValueError(
+                    "No NWM reaches found within the maximum distance"
+                )
+
+            selected = candidates[0]
+
+            reaches.append(selected["feature_id"])
+
+            print(
+                f"Selected NWM reach {selected['feature_id']} "
+                f"at {selected['distance_m']:.2f} m"
+            )
 
         if args.gage:
             from streamflow_getter.reach_resolution import (

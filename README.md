@@ -36,6 +36,43 @@ streamflow-getter nwm --gage 01646500 --version 2.1 \
 Flags may change. Output columns: `time` (UTC), `feature_id`, `streamflow` (m³/s).
 Background on the NWM network and data: [docs/nwm-notes.md](docs/nwm-notes.md).
 
+
+## Operational NWM — short-range CONUS
+
+The `nwm-operational` command retrieves NWM short-range CONUS streamflow forecasts. It uses Kerchunk first, with controlled native NetCDF fallback. Analysis `t0` is included by default.
+
+The command supports direct NWM feature IDs, USGS gage IDs through RouteLink, and geographic point selection.
+
+Install the optional spatial dependencies:
+
+    uv sync --extra spatial
+
+### Geographic point selection
+
+Example:
+
+    streamflow-getter nwm-operational \
+      --date 2026-04-19 \
+      --cycle 0 \
+      --point -99.3217121935161 30.0699307434853 \
+      --hydrofabric /path/to/NWM_v3_hydrofabric.gdb \
+      --max-distance-m 500 \
+      --start-hour 1 \
+      --end-hour 1 \
+      --out forecast.csv
+
+Point coordinates are longitude and latitude in EPSG:4326. The command selects the nearest NWM channel within the specified maximum distance, using actual CONUS hydrofabric geometries.
+
+The nearest geographic channel is not necessarily the correct hydrologic reach, particularly near confluences.
+
+Direct selection using `--reach` and USGS station selection using `--gage` are also supported. Gage selection requires `--routelink PATH`.
+
+CSV and Parquet outputs are supported. Use `--no-t0` to exclude the analysis-assimilation initial timestep.
+
+Operational retrieval is currently limited to short-range CONUS. Other products, domains, and historical model-version compatibility remain under development.
+
+
+
 ## Design
 
 - **CLI first.** Core logic lives in a Python library; the CLI is a thin

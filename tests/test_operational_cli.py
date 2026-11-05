@@ -427,14 +427,19 @@ def test_cli_rejects_invalid_hours_before_fetch(
 
 
 
-def test_operational_cli_requires_reach_or_gage(tmp_path):
+
+def test_operational_cli_requires_reach_selection(tmp_path):
     """Reject requests without any reach-selection method."""
-    with pytest.raises(ValueError, match="--reach or --gage"):
+    with pytest.raises(
+        ValueError,
+        match=r"Provide at least one --reach, --gage, or --point",
+    ):
         main([
             "nwm-operational",
             "--date", "2026-04-19",
             "--out", str(tmp_path / "forecast.csv"),
         ])
+
 
 
 def test_operational_cli_gage_resolution(
@@ -610,3 +615,267 @@ def test_operational_cli_missing_routelink_before_fetch(
             "--routelink", str(tmp_path / "missing.nc"),
             "--out", str(tmp_path / "forecast.csv"),
         ])
+
+def test_operational_cli_point_parser():
+    parser = build_parser()
+
+    args = parser.parse_args([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--point", "-99.321712", "30.069931",
+        "--hydrofabric", "NWM_v3_hydrofabric.gdb",
+        "--out", "forecast.csv",
+    ])
+
+    assert args.point == [-99.321712, 30.069931]
+    assert args.hydrofabric == "NWM_v3_hydrofabric.gdb"
+    assert args.max_distance_m == 500.0
+
+
+def test_operational_cli_point_custom_distance():
+    parser = build_parser()
+
+    args = parser.parse_args([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--point", "-99.321712", "30.069931",
+        "--hydrofabric", "NWM_v3_hydrofabric.gdb",
+        "--max-distance-m", "1000",
+        "--out", "forecast.csv",
+    ])
+
+    assert args.max_distance_m == 1000.0
+
+
+
+def test_operational_cli_point_resolution(
+    tmp_path, monkeypatch, mock_operational
+):
+    """Resolve a geographic point before operational retrieval."""
+    from streamflow_getter import spatial_resolution
+
+    calls, _ = mock_operational
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "load_nearby_reaches",
+        lambda *args, **kwargs: "mocked-geometries",
+    )
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "nearest_reaches",
+        lambda *args, **kwargs: [
+            {"feature_id": 3586192, "distance_m": 98.34}
+        ],
+    )
+
+    result = main([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--point", "-99.321712", "30.069931",
+        "--hydrofabric", "test.gdb",
+        "--out", str(tmp_path / "forecast.csv"),
+    ])
+
+    assert result == 0
+    assert calls["reaches"] == [3586192]
+
+
+def test_operational_cli_point_requires_hydrofabric(tmp_path):
+    """Reject geographic selection without a hydrofabric."""
+    with pytest.raises(ValueError, match="--hydrofabric is required"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--point", "-99.321712", "30.069931",
+            "--out", str(tmp_path / "forecast.csv"),
+        ])
+
+
+def test_operational_cli_point_no_candidates(
+    tmp_path, monkeypatch
+):
+    """Reject unmatched points before remote retrieval."""
+    from streamflow_getter import spatial_resolution
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "load_nearby_reaches",
+        lambda *args, **kwargs: "mocked-geometries",
+    )
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "nearest_reaches",
+        lambda *args, **kwargs: [],
+    )
+
+    with pytest.raises(ValueError, match="No NWM reaches found"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--point", "-99.321712", "30.069931",
+            "--hydrofabric", "test.gdb",
+            "--out", str(tmp_path / "forecast.csv"),
+        ])
+
+
+
+@pytest.mark.parametrize(
+    "distance",
+    ["0", "-10", "nan", "inf"],
+)
+def test_operational_cli_point_invalid_distance(
+    tmp_path, distance
+):
+    """Reject invalid search radii before remote retrieval."""
+    with pytest.raises(ValueError, match="positive"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--point", "-99.321712", "30.069931",
+            "--hydrofabric", str(tmp_path / "missing.gdb"),
+            "--max-distance-m", distance,
+            "--out", str(tmp_path / "forecast.csv"),
+        ])
+
+
+def test_operational_cli_hydrofabric_without_point(tmp_path):
+    """Reject unused hydrofabric arguments."""
+    with pytest.raises(ValueError, match="--hydrofabric requires"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--reach", "3586192",
+            "--hydrofabric", "test.gdb",
+            "--out", str(tmp_path / "forecast.csv"),
+        ])
+
+
+def test_operational_cli_point_duplicate_reach(
+    tmp_path, monkeypatch, mock_operational
+):
+    """Reject a point resolving to an explicitly selected reach."""
+    from streamflow_getter import spatial_resolution
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "load_nearby_reaches",
+        lambda *args, **kwargs: "mocked-geometries",
+    )
+    monkeypatch.setattr(
+        spatial_resolution,
+        "nearest_reaches",
+        lambda *args, **kwargs: [
+            {"feature_id": 3586192, "distance_m": 98.34}
+        ],
+    )
+
+    with pytest.raises(ValueError, match="Duplicate"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--reach", "3586192",
+            "--point", "-99.321712", "30.069931",
+            "--hydrofabric", "test.gdb",
+            "--out", str(tmp_path / "forecast.csv"),
+        ])
+
+
+def test_operational_cli_point_and_gage(
+    tmp_path, monkeypatch, mock_operational
+):
+    """Combine geographic and USGS selections."""
+    from streamflow_getter import (
+        spatial_resolution,
+        reach_resolution,
+    )
+
+    calls, _ = mock_operational
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "load_nearby_reaches",
+        lambda *args, **kwargs: "mocked-geometries",
+    )
+    monkeypatch.setattr(
+        spatial_resolution,
+        "nearest_reaches",
+        lambda *args, **kwargs: [
+            {"feature_id": 3586192, "distance_m": 98.34}
+        ],
+    )
+    monkeypatch.setattr(
+        reach_resolution,
+        "load_gage_index",
+        lambda path: {"01646500": 4512772},
+    )
+
+    result = main([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--point", "-99.321712", "30.069931",
+        "--hydrofabric", "test.gdb",
+        "--gage", "01646500",
+        "--routelink", "RouteLink.nc",
+        "--out", str(tmp_path / "forecast.csv"),
+    ])
+
+    assert result == 0
+    assert calls["reaches"] == [3586192, 4512772]
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    ["invalid_radius", "no_candidates", "duplicate_reach"],
+)
+def test_point_errors_never_fetch(
+    tmp_path, monkeypatch, scenario
+):
+    """Geographic selection errors must not trigger remote NWM retrieval."""
+    from streamflow_getter import operational_nwm, spatial_resolution
+
+    def unexpected_fetch(*args, **kwargs):
+        raise AssertionError("Remote NWM retrieval must not run")
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "fetch_operational_series",
+        unexpected_fetch,
+    )
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "load_nearby_reaches",
+        lambda *args, **kwargs: "mocked-geometries",
+    )
+
+    candidates = (
+        []
+        if scenario == "no_candidates"
+        else [{"feature_id": 3586192, "distance_m": 98.34}]
+    )
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "nearest_reaches",
+        lambda *args, **kwargs: candidates,
+    )
+
+    arguments = [
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--point", "-99.321712", "30.069931",
+        "--hydrofabric", "test.gdb",
+        "--out", str(tmp_path / "forecast.csv"),
+    ]
+
+    if scenario == "invalid_radius":
+        arguments.extend(["--max-distance-m", "-10"])
+
+    if scenario == "duplicate_reach":
+        arguments.extend(["--reach", "3586192"])
+
+    with pytest.raises(ValueError):
+        main(arguments)
