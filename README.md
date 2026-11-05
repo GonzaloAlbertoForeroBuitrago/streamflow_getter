@@ -53,10 +53,16 @@ Install the optional spatial dependencies:
 The Python library currently supports these validated operational
 NWM configurations:
 
+
 | Product | Domain | Cycles (UTC) | Forecast leads |
 |---|---|---|---|
 | `short_range` | CONUS | 00–23 hourly | f001–f018 |
 | `medium_range_mem1` | CONUS | 00, 06, 12, 18 | f001–f240 |
+| `medium_range_mem2` | CONUS | 00, 06, 12, 18 | f001–f204 |
+| `medium_range_mem3` | CONUS | 00, 06, 12, 18 | f001–f204 |
+| `medium_range_mem4` | CONUS | 00, 06, 12, 18 | f001–f204 |
+| `medium_range_mem5` | CONUS | 00, 06, 12, 18 | f001–f204 |
+| `medium_range_mem6` | CONUS | 00, 06, 12, 18 | f001–f204 |
 
 The `medium_range_mem1` configuration uses:
 
@@ -317,3 +323,31 @@ git switch main && git pull
 ```
 
 Keep branches short-lived and PRs small.
+
+Example
+
+
+Medium-range ensemble members 1–6 are supported through the
+same Kerchunk-first retrieval backend, with native NetCDF fallback
+for supported access failures. Each member retains its product
+identity in output records and cache paths.
+
+For April 19, 2026, native NOAA files and CIROH Kerchunk references
+were confirmed for all six members. Members 2–6 were individually
+validated at f001 against both Kerchunk and native NetCDF using
+feature ID 3586192. The installed CLI was additionally validated
+for member 2 using analysis t0, f001, and f002.
+
+These checks do not establish full 204-hour or 240-hour retrieval
+coverage, compatibility across all historical NWM versions, or
+equivalence between ensemble members.
+
+
+uv run --locked --extra operational streamflow-getter nwm-operational \
+  --date 2026-04-19 \
+  --cycle 0 \
+  --product medium_range_mem2 \
+  --reach 3586192 \
+  --start-hour 1 \
+  --end-hour 2 \
+  --out medium_range_mem2.csv

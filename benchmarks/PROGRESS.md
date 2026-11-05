@@ -1225,3 +1225,87 @@ Results:
 - Review and commit the CLI product-selection milestone.
 - Continue validating additional operational NWM products.
 - Preserve the original roadmap's coordination requirements.
+
+
+## Operational NWM medium-range ensemble expansion — November 5, 2026
+
+### Objective
+
+Extend validated operational NWM support from medium_range_mem1
+to medium_range_mem2 through medium_range_mem6 without changing
+the existing retrieval backend.
+
+### Implementation
+
+- Added ProductSpec configurations for members 2–6.
+- Preserved short_range and medium_range_mem1 behavior.
+- Enabled all six members through the --product CLI argument.
+- Used validated forecast cycles 00, 06, 12, and 18 UTC.
+- Preserved the 240-hour horizon for member 1.
+- Applied the 204-hour horizon to members 2–6.
+- Reused Kerchunk-first retrieval, native fallback,
+  source validation, timestamp validation, and caching.
+- Preserved ensemble-member identity in output and cache paths.
+
+### Real-data validation
+
+Date: 2026-04-19
+Cycle: t00z
+Domain: CONUS
+Feature ID: 3586192
+
+Native NOAA objects and CIROH Kerchunk references were
+confirmed available for all six ensemble members.
+
+Members 2–6 were tested individually at f001 using the
+existing read_kerchunk_forecast and read_native_forecast
+functions.
+
+For each member:
+- Kerchunk retrieval succeeded.
+- Native NetCDF retrieval succeeded.
+- Streamflow values matched.
+- Valid times matched.
+- Reference times matched.
+- Product and forecast lead identities were preserved.
+
+All five members returned approximately 0.41 m3/s at the
+tested reach and forecast hour.
+
+### CLI integration
+
+The installed CLI successfully retrieved medium_range_mem2
+with analysis t0, f001, and f002.
+
+- Three CSV records generated.
+- All three records used Kerchunk.
+- Valid and reference timestamps verified.
+- Product and feature identities verified.
+- Streamflow values finite.
+
+### Automated validation
+
+- 412 repository tests passed.
+- 77 product-configuration tests passed.
+- 87 operational CLI tests passed.
+- Product-specific forecast horizons validated.
+- Invalid forecast hours rejected before retrieval.
+- Existing short-range and member 1 tests passed.
+- Git whitespace validation passed.
+
+### Limitations
+
+- Real-data comparisons covered one date, cycle, reach,
+  and forecast hour per additional member.
+- CLI real-data validation covered member 2 only.
+- Complete 204-hour and 240-hour forecasts were not retrieved.
+- Historical model-version compatibility remains unverified.
+- Additional operational products and domains remain pending.
+- Cached retrieval errors do not automatically trigger
+  native fallback.
+
+### Next
+
+- Complete documentation review and commit this milestone.
+- Continue original roadmap operational-product coverage.
+- Validate additional forecast families and domains separately.

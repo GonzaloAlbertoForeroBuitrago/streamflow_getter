@@ -18,6 +18,7 @@ class ProductSpec:
     max_hour: int
 
 
+
 PRODUCT_SPECS = {
     "short_range": ProductSpec(
         directory="short_range",
@@ -33,7 +34,43 @@ PRODUCT_SPECS = {
         cycles=(0, 6, 12, 18),
         max_hour=240,
     ),
+    "medium_range_mem2": ProductSpec(
+        directory="medium_range_mem2",
+        filename_product="medium_range",
+        channel_family="channel_rt_2",
+        cycles=(0, 6, 12, 18),
+        max_hour=204,
+    ),
+    "medium_range_mem3": ProductSpec(
+        directory="medium_range_mem3",
+        filename_product="medium_range",
+        channel_family="channel_rt_3",
+        cycles=(0, 6, 12, 18),
+        max_hour=204,
+    ),
+    "medium_range_mem4": ProductSpec(
+        directory="medium_range_mem4",
+        filename_product="medium_range",
+        channel_family="channel_rt_4",
+        cycles=(0, 6, 12, 18),
+        max_hour=204,
+    ),
+    "medium_range_mem5": ProductSpec(
+        directory="medium_range_mem5",
+        filename_product="medium_range",
+        channel_family="channel_rt_5",
+        cycles=(0, 6, 12, 18),
+        max_hour=204,
+    ),
+    "medium_range_mem6": ProductSpec(
+        directory="medium_range_mem6",
+        filename_product="medium_range",
+        channel_family="channel_rt_6",
+        cycles=(0, 6, 12, 18),
+        max_hour=204,
+    ),
 }
+
 
 
 @dataclass(frozen=True)

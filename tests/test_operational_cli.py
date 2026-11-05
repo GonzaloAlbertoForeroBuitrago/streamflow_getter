@@ -1447,3 +1447,50 @@ def test_operational_cli_medium_range_invalid_hours(
         ])
 
     assert "reaches" not in calls
+
+
+@pytest.mark.parametrize("member", range(2, 7))
+def test_operational_cli_additional_medium_range_members(
+    mock_operational, member
+):
+    """Pass each supported ensemble member to the retrieval backend."""
+    calls, _ = mock_operational
+    product = f"medium_range_mem{member}"
+
+    main([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--cycle", "0",
+        "--product", product,
+        "--reach", "3586192",
+        "--start-hour", "1",
+        "--end-hour", "2",
+        "--out", "medium.csv",
+    ])
+
+    assert calls["config"].product == product
+    assert calls["config"].spec.max_hour == 204
+    assert calls["start_hour"] == 1
+    assert calls["end_hour"] == 2
+
+
+@pytest.mark.parametrize("member", range(2, 7))
+def test_operational_cli_additional_members_reject_hour_205(
+    mock_operational, member
+):
+    """Reject unsupported lead hours before remote retrieval."""
+    calls, _ = mock_operational
+
+    with pytest.raises(ValueError, match="Forecast hour"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--cycle", "0",
+            "--product", f"medium_range_mem{member}",
+            "--reach", "3586192",
+            "--start-hour", "1",
+            "--end-hour", "205",
+            "--out", "medium.csv",
+        ])
+
+    assert "reaches" not in calls

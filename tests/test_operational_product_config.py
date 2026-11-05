@@ -499,3 +499,62 @@ def test_medium_range_member1_native_fallback(monkeypatch):
     assert result["product"] == "medium_range_mem1"
     assert result["streamflow_m3s"][3586192] == 0.41
     assert "OSError" in result["fallback_reason"]
+
+
+@pytest.mark.parametrize("member", range(2, 7))
+def test_additional_medium_range_member_configuration(member):
+    product = f"medium_range_mem{member}"
+
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product=product,
+    )
+
+    assert config.spec.directory == product
+    assert config.spec.filename_product == "medium_range"
+    assert config.spec.channel_family == f"channel_rt_{member}"
+    assert config.spec.max_hour == 204
+
+    assert config.filename(1) == (
+        f"nwm.t00z.medium_range.channel_rt_{member}.f001.conus.nc"
+    )
+
+    assert config.filename(204) == (
+        f"nwm.t00z.medium_range.channel_rt_{member}.f204.conus.nc"
+    )
+
+
+@pytest.mark.parametrize("member", range(2, 7))
+def test_additional_medium_range_member_rejects_hour_205(member):
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product=f"medium_range_mem{member}",
+    )
+
+    with pytest.raises(ValueError, match="Forecast hour"):
+        config.filename(205)
+
+
+@pytest.mark.parametrize("member", range(2, 7))
+@pytest.mark.parametrize("cycle", [0, 6, 12, 18])
+def test_additional_medium_range_member_valid_cycles(member, cycle):
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=cycle,
+        product=f"medium_range_mem{member}",
+    )
+
+    assert config.cycle == cycle
+
+
+@pytest.mark.parametrize("member", range(2, 7))
+@pytest.mark.parametrize("cycle", [1, 3, 9, 23])
+def test_additional_medium_range_member_invalid_cycles(member, cycle):
+    with pytest.raises(ValueError, match="cycle"):
+        ForecastConfig(
+            date="2026-04-19",
+            cycle=cycle,
+            product=f"medium_range_mem{member}",
+        )

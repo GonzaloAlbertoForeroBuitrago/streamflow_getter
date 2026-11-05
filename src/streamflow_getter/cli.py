@@ -58,12 +58,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     operational.add_argument("--date", required=True)
     operational.add_argument("--cycle", type=int, default=0)
+
     operational.add_argument(
         "--product",
-        choices=["short_range", "medium_range_mem1"],
+        choices=[
+            "short_range",
+            "medium_range_mem1",
+            "medium_range_mem2",
+            "medium_range_mem3",
+            "medium_range_mem4",
+            "medium_range_mem5",
+            "medium_range_mem6",
+        ],
         default="short_range",
         help="Operational NWM product (default: short_range)",
     )
+
 
     operational.add_argument(
         "--reach",
