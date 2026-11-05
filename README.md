@@ -116,6 +116,49 @@ and `--point`. Duplicate feature IDs are rejected.
 The geographic implementation currently supports CONUS.
 
 
+### Geographic polygon selection
+
+The operational CLI supports selecting NWM reaches intersecting
+a GeoJSON Polygon or MultiPolygon.
+
+Example:
+
+    streamflow-getter nwm-operational \
+      --date 2026-04-19 \
+      --cycle 0 \
+      --polygon /path/to/region.geojson \
+      --hydrofabric /path/to/NWM_v3_hydrofabric.gdb \
+      --max-reaches 100 \
+      --start-hour 1 \
+      --end-hour 1 \
+      --out polygon_forecast.csv
+
+Supported GeoJSON inputs:
+- Polygon geometry
+- MultiPolygon geometry
+- GeoJSON Feature containing a Polygon or MultiPolygon
+- FeatureCollection containing exactly one polygonal Feature
+
+The GeoJSON file must contain geographic longitude/latitude
+coordinates in EPSG:4326. Coordinate bounds and polygon validity
+are checked, but the original coordinate reference system cannot
+be independently verified from coordinate values alone.
+
+The command selects all NWM channel reaches intersecting the
+polygon using the existing channel hydrofabric.
+
+The default maximum is 100 reaches for requests involving
+`--bbox` or `--polygon`, including combined selections.
+This is a provisional CLI safeguard, not a benchmarked NWM
+retrieval limit. Use `--max-reaches` to configure it.
+
+Requests exceeding the limit are rejected without truncation.
+Duplicate NWM feature IDs are rejected.
+
+Geographic selection currently supports CONUS.
+
+
+
 ## Design
 
 - **CLI first.** Core logic lives in a Python library; the CLI is a thin

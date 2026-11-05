@@ -318,3 +318,91 @@ def reaches_in_polygon(
         geometry_crs=polygon_crs,
         layer=layer,
     )
+
+
+
+def load_geojson_polygon(path):
+    """Load one valid Polygon or MultiPolygon from GeoJSON.
+
+    Accepts a GeoJSON geometry, Feature, or FeatureCollection
+    containing exactly one feature.
+
+    Coordinates must be geographic longitude/latitude (EPSG:4326).
+    """
+    import json
+
+    from shapely.geometry import MultiPolygon, Polygon, shape
+
+    path = Path(path)
+
+    if not path.is_file():
+        raise FileNotFoundError(f"GeoJSON file not found: {path}")
+
+    with path.open("r", encoding="utf-8") as file:
+        data = json.load(file)
+
+    if not isinstance(data, dict):
+        raise ValueError("GeoJSON root must be an object")
+
+    geojson_type = data.get("type")
+
+    if geojson_type == "FeatureCollection":
+        features = data.get("features")
+
+        if not isinstance(features, list) or len(features) != 1:
+            raise ValueError(
+                "GeoJSON FeatureCollection must contain exactly one feature"
+            )
+
+        feature = features[0]
+
+        if not isinstance(feature, dict) or feature.get("type") != "Feature":
+            raise ValueError("Invalid GeoJSON feature")
+
+        geometry_data = feature.get("geometry")
+
+    elif geojson_type == "Feature":
+        geometry_data = data.get("geometry")
+
+    else:
+        geometry_data = data
+
+    if not isinstance(geometry_data, dict):
+        raise ValueError("GeoJSON geometry must be an object")
+
+    if geometry_data.get("type") not in ("Polygon", "MultiPolygon"):
+        raise ValueError(
+            "GeoJSON geometry must be Polygon or MultiPolygon"
+        )
+
+    try:
+        polygon = shape(geometry_data)
+    except (TypeError, ValueError, KeyError, IndexError) as exc:
+        raise ValueError("Invalid GeoJSON polygon geometry") from exc
+
+    if not isinstance(polygon, (Polygon, MultiPolygon)):
+        raise ValueError("Expected Polygon or MultiPolygon")
+
+    if polygon.is_empty or not polygon.is_valid:
+        raise ValueError("Polygon must be nonempty and valid")
+
+    # Validate geographic coordinate bounds for WGS84 input.
+    minx, miny, maxx, maxy = polygon.bounds
+
+    if not all(
+        math.isfinite(value)
+        for value in (minx, miny, maxx, maxy)
+    ):
+        raise ValueError(
+            "GeoJSON coordinates must be finite"
+        )
+
+    if not (
+        -180 <= minx <= maxx <= 180
+        and -90 <= miny <= maxy <= 90
+    ):
+        raise ValueError(
+            "GeoJSON coordinates must be valid longitude/latitude"
+        )
+
+    return polygon

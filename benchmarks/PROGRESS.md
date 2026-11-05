@@ -996,3 +996,85 @@ test. No remote forecast data was downloaded.
 - Verify standard and spatial test environments.
 - Commit the bounding-box CLI milestone.
 - Continue with polygon selection following James's roadmap.
+
+
+
+## Operational NWM GeoJSON polygon CLI integration — November 5, 2026
+
+### Objective
+
+Expose polygon-based NWM reach selection through the operational
+CLI, following docs/ROADMAP.md and reusing existing hydrofabric
+geographic-selection functions.
+
+### Implementation
+
+Modules:
+- src/streamflow_getter/spatial_resolution.py
+- src/streamflow_getter/cli.py
+
+Features:
+- Added reusable load_geojson_polygon().
+- Supported Polygon and MultiPolygon geometries.
+- Supported Feature and single-feature FeatureCollection inputs.
+- Validated polygon geometry and geographic coordinate bounds.
+- Added --polygon GEOJSON_PATH to the operational CLI.
+- Reused reaches_in_polygon() for hydrofabric intersection.
+- Preserved existing --reach, --gage, --point, and --bbox methods.
+- Extended the provisional reach-count safeguard to requests
+  involving --bbox or --polygon.
+- Rejected empty selections and duplicate feature IDs.
+- Preserved validation before remote NWM retrieval.
+
+### Real-data validation
+
+Dataset:
+- NOAA NWM v3 CONUS channel hydrofabric.
+
+Reference polygon:
+- West: -99.35
+- South: 30.05
+- East: -99.30
+- North: 30.09
+
+Results:
+- 19 NWM reaches selected.
+- 19 unique feature IDs.
+- NWM feature ID 3586192 included.
+- GeoJSON-to-hydrofabric-to-CLI integration passed.
+
+Remote NWM retrieval was mocked during the integration test.
+No forecast data was downloaded or output file created.
+
+### Automated validation
+
+- 316 complete repository tests passed.
+- GeoJSON geometry, Feature, and FeatureCollection tested.
+- Polygon and MultiPolygon tested.
+- Missing files and unsupported geometries rejected.
+- Self-intersecting polygons rejected.
+- Out-of-range longitude/latitude coordinates rejected.
+- Malformed JSON rejected before remote NWM retrieval.
+- Empty polygon selections and reach-limit violations tested.
+- Duplicate selections rejected.
+- Remote retrieval protection tested for invalid selections.
+- Git whitespace validation passed.
+
+### Limitations
+
+- Operational polygon selection currently supports CONUS.
+- GeoJSON input requires EPSG:4326 longitude/latitude.
+- Numeric coordinate validation does not prove source CRS.
+- FeatureCollections with multiple features are not supported.
+- The 100-reach default is provisional and not benchmarked.
+- No live end-to-end NWM forecast retrieval using --polygon
+  has been performed.
+- Historical NWM version compatibility remains unverified.
+
+### Next
+
+- Verify standard and spatial test environments.
+- Review complete source and documentation changes.
+- Commit the polygon CLI milestone.
+- Reassess remaining roadmap priorities with James before
+  expanding functionality.

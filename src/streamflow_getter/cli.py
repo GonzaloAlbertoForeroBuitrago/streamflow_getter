@@ -88,6 +88,13 @@ def build_parser() -> argparse.ArgumentParser:
         metavar=("WEST", "SOUTH", "EAST", "NORTH"),
         help="Select NWM reaches intersecting a geographic bounding box",
     )
+
+    operational.add_argument(
+        "--polygon",
+        metavar="GEOJSON_PATH",
+        help="Select NWM reaches intersecting a GeoJSON Polygon or MultiPolygon",
+    )
+
     operational.add_argument(
         "--hydrofabric",
         help="Path to the NWM channel hydrofabric geodatabase",
@@ -187,12 +194,18 @@ def main(argv: list[str] | None = None) -> int:
             )
 
         # Validate reach-selection arguments before remote NWM access.
-        if not (args.reach or args.gage or args.point or args.bbox):
+        if not (
+            args.reach or args.gage or args.point
+            or args.bbox or args.polygon
+        ):
             raise ValueError(
-                "Provide at least one --reach, --gage, --point, or --bbox"
+                "Provide at least one --reach, --gage, "
+                "--point, --bbox, or --polygon"
             )
 
-        if (args.point or args.bbox) and not args.hydrofabric:
+        if (
+            args.point or args.bbox or args.polygon
+        ) and not args.hydrofabric:
             raise ValueError(
                 "--hydrofabric is required for geographic selection"
             )
@@ -205,9 +218,11 @@ def main(argv: list[str] | None = None) -> int:
                 "max_distance_m must be positive and finite"
             )
 
-        if args.hydrofabric and not (args.point or args.bbox):
+        if args.hydrofabric and not (
+            args.point or args.bbox or args.polygon
+        ):
             raise ValueError(
-                "--hydrofabric requires --point or --bbox"
+                "--hydrofabric requires --point, --bbox, or --polygon"
             )
 
         if args.max_reaches < 1:
@@ -253,6 +268,42 @@ def main(argv: list[str] | None = None) -> int:
                 f"Selected {len(selected_reaches)} NWM reaches "
                 "from geographic bounding box"
             )
+
+
+
+        # Resolve GeoJSON polygon selections locally.
+        if args.polygon:
+            from streamflow_getter.spatial_resolution import (
+                load_geojson_polygon,
+                reaches_in_polygon,
+            )
+
+            polygon = load_geojson_polygon(args.polygon)
+
+            selected_reaches = reaches_in_polygon(
+                args.hydrofabric,
+                polygon,
+            )
+
+            if not selected_reaches:
+                raise ValueError(
+                    "No NWM reaches found within the polygon"
+                )
+
+            if len(selected_reaches) > args.max_reaches:
+                raise ValueError(
+                    f"Polygon selected {len(selected_reaches)} reaches; "
+                    f"maximum allowed is {args.max_reaches}"
+                )
+
+            reaches.extend(selected_reaches)
+
+            print(
+                f"Selected {len(selected_reaches)} NWM reaches "
+                "from GeoJSON polygon"
+            )
+
+
 
         # Resolve the nearest NWM channel to a geographic point.
         if args.point:
@@ -313,7 +364,7 @@ def main(argv: list[str] | None = None) -> int:
                 "Duplicate NWM feature IDs are not allowed"
             )
 
-        if args.bbox and len(reaches) > args.max_reaches:
+        if (args.bbox or args.polygon) and len(reaches) > args.max_reaches:
             raise ValueError(
                 f"Request contains {len(reaches)} reaches; "
                 f"maximum allowed is {args.max_reaches}"

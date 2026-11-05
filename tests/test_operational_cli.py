@@ -432,7 +432,7 @@ def test_operational_cli_requires_reach_selection(tmp_path):
     """Reject requests without any reach-selection method."""
     with pytest.raises(
         ValueError,
-        match=r"Provide at least one --reach, --gage, --point, or --bbox",
+        match=r"Provide at least one --reach, --gage, --point, --bbox, or --polygon",
     ):
         main([
             "nwm-operational",
@@ -1128,3 +1128,232 @@ def test_operational_cli_limit_does_not_change_direct_reaches(
 
     assert main(arguments) == 0
     assert calls["reaches"] == [101, 102]
+
+
+def test_operational_cli_polygon_parser():
+    """Parse a polygon selection without loading geographic data."""
+    parser = build_parser()
+
+    args = parser.parse_args([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--polygon", "region.geojson",
+        "--hydrofabric", "NWM_v3_hydrofabric.gdb",
+        "--out", "forecast.csv",
+    ])
+
+    assert args.polygon == "region.geojson"
+    assert args.hydrofabric == "NWM_v3_hydrofabric.gdb"
+    assert args.max_reaches == 100
+
+
+
+@pytest.mark.parametrize(
+    "selected_ids,maximum,expected_error",
+    [
+        ([101, 102, 103], 100, None),
+        ([], 100, "No NWM reaches found"),
+        ([101, 102, 103], 2, "maximum allowed"),
+    ],
+)
+def test_operational_cli_polygon_selection(
+    tmp_path,
+    monkeypatch,
+    mock_operational,
+    selected_ids,
+    maximum,
+    expected_error,
+):
+    """Validate polygon selection before remote NWM retrieval."""
+    from shapely.geometry import box
+
+    from streamflow_getter import (
+        operational_nwm,
+        spatial_resolution,
+    )
+
+    calls, _ = mock_operational
+    polygon = box(-99.35, 30.05, -99.30, 30.09)
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "load_geojson_polygon",
+        lambda path: polygon,
+    )
+
+    def fake_polygon_selection(path, geometry):
+        assert path == "test.gdb"
+        assert geometry.equals(polygon)
+        return selected_ids
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "reaches_in_polygon",
+        fake_polygon_selection,
+    )
+
+    if expected_error is not None:
+        def unexpected_fetch(*args, **kwargs):
+            raise AssertionError("Remote NWM retrieval must not run")
+
+        monkeypatch.setattr(
+            operational_nwm,
+            "fetch_operational_series",
+            unexpected_fetch,
+        )
+
+    arguments = [
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--polygon", "region.geojson",
+        "--hydrofabric", "test.gdb",
+        "--max-reaches", str(maximum),
+        "--out", str(tmp_path / "forecast.csv"),
+    ]
+
+    if expected_error is not None:
+        with pytest.raises(ValueError, match=expected_error):
+            main(arguments)
+    else:
+        assert main(arguments) == 0
+        assert calls["reaches"] == selected_ids
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    ["missing_file", "invalid_geometry", "duplicate_reach"],
+)
+def test_operational_cli_polygon_errors_never_fetch(
+    tmp_path, monkeypatch, scenario
+):
+    """Reject invalid polygon selections before remote NWM access."""
+    import json
+
+    from streamflow_getter import operational_nwm, spatial_resolution
+
+    def unexpected_fetch(*args, **kwargs):
+        raise AssertionError("Remote NWM retrieval must not run")
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "fetch_operational_series",
+        unexpected_fetch,
+    )
+
+    polygon_path = tmp_path / "region.geojson"
+
+    if scenario == "missing_file":
+        expected_error = FileNotFoundError
+
+    elif scenario == "invalid_geometry":
+        polygon_path.write_text(json.dumps({
+            "type": "Point",
+            "coordinates": [-99.32, 30.07],
+        }))
+        expected_error = ValueError
+
+    else:
+        from shapely.geometry import box
+
+        polygon_path.write_text(json.dumps({
+            "type": "Polygon",
+            "coordinates": [[
+                [-99.35, 30.05],
+                [-99.30, 30.05],
+                [-99.30, 30.09],
+                [-99.35, 30.09],
+                [-99.35, 30.05],
+            ]],
+        }))
+
+        monkeypatch.setattr(
+            spatial_resolution,
+            "reaches_in_polygon",
+            lambda *args, **kwargs: [3586192],
+        )
+        expected_error = ValueError
+
+    arguments = [
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--polygon", str(polygon_path),
+        "--hydrofabric", "test.gdb",
+        "--out", str(tmp_path / "forecast.csv"),
+    ]
+
+    if scenario == "duplicate_reach":
+        arguments.extend(["--reach", "3586192"])
+
+    with pytest.raises(expected_error):
+        main(arguments)
+
+
+def test_operational_cli_polygon_malformed_json_never_fetch(
+    tmp_path, monkeypatch
+):
+    """Reject malformed GeoJSON before remote NWM retrieval."""
+    from streamflow_getter import operational_nwm
+
+    def unexpected_fetch(*args, **kwargs):
+        raise AssertionError("Remote NWM retrieval must not run")
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "fetch_operational_series",
+        unexpected_fetch,
+    )
+
+    polygon_path = tmp_path / "invalid.geojson"
+    polygon_path.write_text(
+        '{"type": "Polygon", "coordinates": [',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--polygon", str(polygon_path),
+            "--hydrofabric", "test.gdb",
+            "--out", str(tmp_path / "forecast.csv"),
+        ])
+
+
+def test_operational_cli_polygon_combined_reach_limit(
+    tmp_path, monkeypatch
+):
+    """Enforce the regional limit on combined polygon selections."""
+    from shapely.geometry import box
+    from streamflow_getter import operational_nwm, spatial_resolution
+
+    def unexpected_fetch(*args, **kwargs):
+        raise AssertionError("Remote NWM retrieval must not run")
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "fetch_operational_series",
+        unexpected_fetch,
+    )
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "load_geojson_polygon",
+        lambda path: box(-99.35, 30.05, -99.30, 30.09),
+    )
+
+    monkeypatch.setattr(
+        spatial_resolution,
+        "reaches_in_polygon",
+        lambda *args, **kwargs: [101, 102, 103],
+    )
+
+    with pytest.raises(ValueError, match="maximum allowed"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--polygon", "region.geojson",
+            "--hydrofabric", "test.gdb",
+            "--reach", "104",
+            "--max-reaches", "3",
+            "--out", str(tmp_path / "forecast.csv"),
+        ])

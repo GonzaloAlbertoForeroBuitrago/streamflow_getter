@@ -492,3 +492,218 @@ def test_loader_rejects_incompatible_crs(tmp_path, monkeypatch, selector):
                 path,
                 box(-99.335, 30.065, -99.315, 30.075),
             )
+
+
+def test_load_geojson_polygon_geometry(tmp_path):
+    import json
+
+    from streamflow_getter.spatial_resolution import load_geojson_polygon
+
+    path = tmp_path / "polygon.geojson"
+    path.write_text(json.dumps({
+        "type": "Polygon",
+        "coordinates": [[
+            [-99.35, 30.05],
+            [-99.30, 30.05],
+            [-99.30, 30.09],
+            [-99.35, 30.09],
+            [-99.35, 30.05],
+        ]],
+    }))
+
+    polygon = load_geojson_polygon(path)
+
+    assert polygon.geom_type == "Polygon"
+    assert polygon.is_valid
+
+
+def test_load_geojson_polygon_feature(tmp_path):
+    import json
+
+    from streamflow_getter.spatial_resolution import load_geojson_polygon
+
+    path = tmp_path / "feature.geojson"
+    path.write_text(json.dumps({
+        "type": "Feature",
+        "properties": {},
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [[
+                [-99.35, 30.05],
+                [-99.30, 30.05],
+                [-99.30, 30.09],
+                [-99.35, 30.09],
+                [-99.35, 30.05],
+            ]],
+        },
+    }))
+
+    polygon = load_geojson_polygon(path)
+
+    assert polygon.geom_type == "Polygon"
+
+
+def test_load_geojson_polygon_missing_file(tmp_path):
+    from streamflow_getter.spatial_resolution import load_geojson_polygon
+
+    with pytest.raises(FileNotFoundError, match="not found"):
+        load_geojson_polygon(tmp_path / "missing.geojson")
+
+
+def test_load_geojson_polygon_rejects_point(tmp_path):
+    import json
+
+    from streamflow_getter.spatial_resolution import load_geojson_polygon
+
+    path = tmp_path / "point.geojson"
+    path.write_text(json.dumps({
+        "type": "Point",
+        "coordinates": [-99.32, 30.07],
+    }))
+
+    with pytest.raises(ValueError, match="Polygon"):
+        load_geojson_polygon(path)
+
+
+def test_load_geojson_polygon_feature_collection(tmp_path):
+    """Accept a FeatureCollection containing exactly one polygon."""
+    import json
+
+    from streamflow_getter.spatial_resolution import load_geojson_polygon
+
+    path = tmp_path / "collection.geojson"
+    path.write_text(json.dumps({
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "properties": {},
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [[
+                    [-99.35, 30.05],
+                    [-99.30, 30.05],
+                    [-99.30, 30.09],
+                    [-99.35, 30.09],
+                    [-99.35, 30.05],
+                ]],
+            },
+        }],
+    }))
+
+    polygon = load_geojson_polygon(path)
+
+    assert polygon.geom_type == "Polygon"
+    assert polygon.is_valid
+
+
+def test_load_geojson_polygon_multipolygon(tmp_path):
+    """Accept a valid MultiPolygon geometry."""
+    import json
+
+    from streamflow_getter.spatial_resolution import load_geojson_polygon
+
+    ring_a = [
+        [-99.35, 30.05],
+        [-99.30, 30.05],
+        [-99.30, 30.09],
+        [-99.35, 30.09],
+        [-99.35, 30.05],
+    ]
+
+    ring_b = [
+        [-99.45, 30.05],
+        [-99.40, 30.05],
+        [-99.40, 30.09],
+        [-99.45, 30.09],
+        [-99.45, 30.05],
+    ]
+
+    path = tmp_path / "multipolygon.geojson"
+    path.write_text(json.dumps({
+        "type": "MultiPolygon",
+        "coordinates": [
+            [ring_a],
+            [ring_b],
+        ],
+    }))
+
+    polygon = load_geojson_polygon(path)
+
+    assert polygon.geom_type == "MultiPolygon"
+    assert len(polygon.geoms) == 2
+    assert polygon.is_valid
+
+
+def test_load_geojson_polygon_rejects_multiple_features(tmp_path):
+    """Reject FeatureCollections containing multiple features."""
+    import json
+
+    from streamflow_getter.spatial_resolution import load_geojson_polygon
+
+    path = tmp_path / "multiple.geojson"
+    path.write_text(json.dumps({
+        "type": "FeatureCollection",
+        "features": [
+            {"type": "Feature", "properties": {}, "geometry": None},
+            {"type": "Feature", "properties": {}, "geometry": None},
+        ],
+    }))
+
+    with pytest.raises(ValueError, match="exactly one"):
+        load_geojson_polygon(path)
+
+
+def test_load_geojson_polygon_rejects_invalid_geometry(tmp_path):
+    """Reject self-intersecting polygons."""
+    import json
+
+    from streamflow_getter.spatial_resolution import load_geojson_polygon
+
+    path = tmp_path / "invalid.geojson"
+    path.write_text(json.dumps({
+        "type": "Polygon",
+        "coordinates": [[
+            [0, 0],
+            [1, 1],
+            [1, 0],
+            [0, 1],
+            [0, 0],
+        ]],
+    }))
+
+    with pytest.raises(ValueError, match="valid"):
+        load_geojson_polygon(path)
+
+
+@pytest.mark.parametrize(
+    "ring",
+    [
+        [
+            [200, 30], [201, 30],
+            [201, 31], [200, 31], [200, 30],
+        ],
+        [
+            [-99, 95], [-98, 95],
+            [-98, 96], [-99, 96], [-99, 95],
+        ],
+    ],
+)
+def test_load_geojson_polygon_invalid_geographic_bounds(
+    tmp_path, ring
+):
+    """Reject polygons outside valid geographic coordinate bounds."""
+    import json
+
+    from streamflow_getter.spatial_resolution import load_geojson_polygon
+
+    path = tmp_path / "invalid_bounds.geojson"
+    path.write_text(
+        json.dumps({
+            "type": "Polygon",
+            "coordinates": [ring],
+        }),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="longitude/latitude"):
+        load_geojson_polygon(path)
