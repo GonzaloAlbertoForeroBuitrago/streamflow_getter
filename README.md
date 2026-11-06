@@ -65,6 +65,7 @@ NWM configurations:
 | `medium_range_mem6` | CONUS | 00, 06, 12, 18 | f001–f204 |
 | `medium_range_blend` | CONUS | 00, 06, 12, 18 | f001–f240 |
 | `medium_range_no_da` | CONUS | 00, 06, 12, 18 | f003–f240, every 3 hours |
+| `long_range_mem1` | CONUS | 00, 06, 12, 18 | f006–f720, every 6 hours |
 
 
 The `medium_range_mem1` configuration uses:
@@ -114,6 +115,45 @@ CONUS and does not yet expose product selection.
 
 Other ensemble members, domains, and forecast products require
 separate validation before being enabled.
+
+
+#### Long-range ensemble member 1
+
+The `long_range_mem1` product supports CONUS forecasts
+initialized at 00, 06, 12, and 18 UTC.
+
+Forecast leads are available every six hours from
+f006 through f720 (30 days).
+
+The CLI currently includes `analysis_assim` at t0 by
+default. This analysis pairing has been verified for
+technical compatibility but has not yet been confirmed
+as the scientifically intended initialization source
+for the long-range ensemble.
+
+Example:
+
+```bash
+uv run --locked --extra operational streamflow-getter nwm-operational \
+  --date 2026-04-19 \
+  --cycle 0 \
+  --product long_range_mem1 \
+  --reach 3586192 \
+  --start-hour 1 \
+  --end-hour 12 \
+  --out long_range_mem1.csv
+```
+
+The inclusive forecast window selects f006 and f012,
+plus analysis t0 by default.
+
+Real-data validation confirmed matching Kerchunk/native
+streamflow and timestamps at f006, and successful CLI
+retrieval of t0, f006, and f012.
+
+The f720 source was confirmed available, but its data
+were not retrieved. Full-horizon and historical-version
+compatibility remain unverified.
 
 
 #### Medium-range without data assimilation

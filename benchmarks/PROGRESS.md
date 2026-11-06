@@ -1475,3 +1475,67 @@ Feature ID: 3586192
 - Review and commit medium-range no-DA support.
 - Continue operational NWM product coverage, including
   validation of long-range ensemble products.
+
+
+## Operational NWM long-range member 1 — November 5, 2026
+
+### Objective
+
+Enable `long_range_mem1` using the existing operational
+NWM Kerchunk-first retrieval backend and six-hourly
+forecast scheduling.
+
+### Implementation
+
+- Registered `long_range_mem1` in `PRODUCT_SPECS`.
+- Configured CONUS cycles 00, 06, 12, and 18 UTC.
+- Configured forecast leads f006–f720 at six-hour intervals.
+- Used `long_range_mem1` as the source directory.
+- Used `long_range` as the filename product.
+- Used `channel_rt_1` as the channel file family.
+- Enabled the product in the operational CLI.
+- Reused existing Kerchunk/native retrieval and validation.
+- Added configuration and CLI regression tests.
+- Retained `analysis_assim` as the provisional t0 source.
+
+### Real-data validation
+
+Date: 2026-04-19
+Cycle: t00z
+Domain: CONUS
+Feature ID: 3586192
+
+- NOAA native and CIROH Kerchunk sources available
+  for f006, f012, and f720.
+- Kerchunk/native streamflow matched at f006.
+- Forecast f006 valid time: 2026-04-19 06:00 UTC.
+- Forecast f006 reference time: 2026-04-19 00:00 UTC.
+- Installed CLI retrieved analysis t0, f006, and f012.
+- Three CSV records generated using Kerchunk.
+- Product identities and timestamps verified.
+- Streamflow: t0 = 0.41, f006 = 0.33,
+  f012 = 0.23 m³/s.
+
+### Automated validation
+
+- 499 repository tests passed.
+- 120 product configuration tests passed.
+- 93 operational CLI tests passed.
+- Python compilation passed.
+- Git whitespace check clean.
+
+### Limitations
+
+- Real-data retrieval covered one date, cycle, and reach.
+- Native comparison was performed for f006 only.
+- The f720 source exists but was not retrieved.
+- `analysis_assim` t0 pairing remains scientifically
+  unverified for the long-range ensemble.
+- Complete 720-hour retrieval remains unverified.
+- Historical model-version compatibility remains unverified.
+
+### Next
+
+- Review and commit long-range member 1 support.
+- Investigate long-range ensemble analysis conventions.
+- Continue validation of additional long-range members.

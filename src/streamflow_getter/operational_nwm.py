@@ -90,6 +90,15 @@ PRODUCT_SPECS = {
         analysis_product="analysis_assim_no_da",
     ),
 
+    "long_range_mem1": ProductSpec(
+        directory="long_range_mem1",
+        filename_product="long_range",
+        channel_family="channel_rt_1",
+        cycles=(0, 6, 12, 18),
+        max_hour=720,
+        lead_step_hours=6,
+        analysis_product="analysis_assim",
+    ),
 }
 
 @dataclass(frozen=True)

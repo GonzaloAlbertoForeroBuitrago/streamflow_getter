@@ -1573,3 +1573,44 @@ def test_operational_cli_medium_range_no_da_empty_window(
         ])
 
     assert "reaches" not in calls
+
+
+def test_operational_cli_long_range_mem1(mock_operational):
+    calls, _ = mock_operational
+
+    main([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--cycle", "0",
+        "--product", "long_range_mem1",
+        "--reach", "3586192",
+        "--start-hour", "1",
+        "--end-hour", "24",
+        "--out", "long_range.csv",
+    ])
+
+    assert calls["config"].product == "long_range_mem1"
+    assert calls["config"].spec.max_hour == 720
+    assert calls["config"].forecast_hours(1, 24) == [
+        6, 12, 18, 24
+    ]
+
+
+def test_operational_cli_long_range_mem1_empty_window(
+    mock_operational,
+):
+    calls, _ = mock_operational
+
+    with pytest.raises(ValueError, match="No available forecast leads"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--cycle", "0",
+            "--product", "long_range_mem1",
+            "--reach", "3586192",
+            "--start-hour", "1",
+            "--end-hour", "5",
+            "--out", "long_range.csv",
+        ])
+
+    assert "reaches" not in calls

@@ -10,7 +10,6 @@ from streamflow_getter.operational_nwm import (
     resolve_operational_source,
 )
 
-
 def test_medium_range_member1_source_identity():
     config = ForecastConfig(
         date="2026-04-19",
@@ -723,4 +722,93 @@ def test_medium_range_no_da_forecast_source():
     assert source["source_product"] == "medium_range_no_da"
     assert source["filename"] == (
         "nwm.t00z.medium_range_no_da.channel_rt.f003.conus.nc"
+    )
+
+
+def test_long_range_mem1_configuration():
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="long_range_mem1",
+    )
+
+    assert config.spec.directory == "long_range_mem1"
+    assert config.spec.filename_product == "long_range"
+    assert config.spec.channel_family == "channel_rt_1"
+    assert config.spec.max_hour == 720
+    assert config.spec.lead_step_hours == 6
+
+    assert config.forecast_hours(1, 24) == [6, 12, 18, 24]
+    assert config.forecast_hours(7, 24) == [12, 18, 24]
+
+    assert config.filename(6) == (
+        "nwm.t00z.long_range.channel_rt_1.f006.conus.nc"
+    )
+    assert config.filename(720) == (
+        "nwm.t00z.long_range.channel_rt_1.f720.conus.nc"
+    )
+
+
+@pytest.mark.parametrize("cycle", [0, 6, 12, 18])
+def test_long_range_mem1_valid_cycles(cycle):
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=cycle,
+        product="long_range_mem1",
+    )
+
+    assert config.cycle == cycle
+
+
+@pytest.mark.parametrize("cycle", [1, 3, 9, 23])
+def test_long_range_mem1_invalid_cycles(cycle):
+    with pytest.raises(ValueError, match="cycle"):
+        ForecastConfig(
+            date="2026-04-19",
+            cycle=cycle,
+            product="long_range_mem1",
+        )
+
+
+@pytest.mark.parametrize("hour", [1, 3, 7, 11, 721])
+def test_long_range_mem1_invalid_hours(hour):
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="long_range_mem1",
+    )
+
+    with pytest.raises(ValueError, match="Forecast hour"):
+        config.filename(hour)
+
+
+def test_long_range_mem1_source_paths():
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="long_range_mem1",
+    )
+
+    source = resolve_operational_source(config, 6)
+
+    assert source["source_product"] == "long_range_mem1"
+    assert source["filename"] == (
+        "nwm.t00z.long_range.channel_rt_1.f006.conus.nc"
+    )
+    assert "/long_range_mem1/" in source["native_url"]
+    assert "/long_range_mem1/" in source["reference_path"]
+
+
+def test_long_range_mem1_analysis_source():
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="long_range_mem1",
+    )
+
+    source = resolve_operational_source(config, 0)
+
+    assert source["source_product"] == "analysis_assim"
+    assert source["filename"] == (
+        "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
     )
