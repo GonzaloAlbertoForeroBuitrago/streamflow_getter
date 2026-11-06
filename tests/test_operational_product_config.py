@@ -812,3 +812,104 @@ def test_long_range_mem1_analysis_source():
     assert source["filename"] == (
         "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
     )
+
+
+@pytest.mark.parametrize("member", [2, 3, 4])
+def test_long_range_ensemble_configuration(member):
+    product = f"long_range_mem{member}"
+
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product=product,
+    )
+
+    assert config.spec.directory == product
+    assert config.spec.filename_product == "long_range"
+    assert config.spec.channel_family == f"channel_rt_{member}"
+    assert config.spec.max_hour == 720
+    assert config.spec.lead_step_hours == 6
+    assert config.spec.analysis_product == "analysis_assim"
+
+    assert config.forecast_hours(1, 24) == [6, 12, 18, 24]
+    assert config.forecast_hours(7, 24) == [12, 18, 24]
+
+    assert config.filename(6) == (
+        f"nwm.t00z.long_range.channel_rt_{member}.f006.conus.nc"
+    )
+
+    assert config.filename(720) == (
+        f"nwm.t00z.long_range.channel_rt_{member}.f720.conus.nc"
+    )
+
+
+@pytest.mark.parametrize("member", [2, 3, 4])
+@pytest.mark.parametrize("cycle", [0, 6, 12, 18])
+def test_long_range_ensemble_valid_cycles(member, cycle):
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=cycle,
+        product=f"long_range_mem{member}",
+    )
+
+    assert config.cycle == cycle
+
+
+@pytest.mark.parametrize("member", [2, 3, 4])
+@pytest.mark.parametrize("cycle", [1, 3, 9, 23])
+def test_long_range_ensemble_invalid_cycles(member, cycle):
+    with pytest.raises(ValueError, match="cycle"):
+        ForecastConfig(
+            date="2026-04-19",
+            cycle=cycle,
+            product=f"long_range_mem{member}",
+        )
+
+
+@pytest.mark.parametrize("member", [2, 3, 4])
+@pytest.mark.parametrize("hour", [1, 3, 7, 11, 721])
+def test_long_range_ensemble_invalid_hours(member, hour):
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product=f"long_range_mem{member}",
+    )
+
+    with pytest.raises(ValueError, match="Forecast hour"):
+        config.filename(hour)
+
+
+@pytest.mark.parametrize("member", [2, 3, 4])
+def test_long_range_ensemble_forecast_source(member):
+    product = f"long_range_mem{member}"
+
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product=product,
+    )
+
+    source = resolve_operational_source(config, 6)
+
+    assert source["source_product"] == product
+    assert source["filename"] == (
+        f"nwm.t00z.long_range.channel_rt_{member}.f006.conus.nc"
+    )
+    assert f"/{product}/" in source["native_url"]
+    assert f"/{product}/" in source["reference_path"]
+
+
+@pytest.mark.parametrize("member", [2, 3, 4])
+def test_long_range_ensemble_analysis_source(member):
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product=f"long_range_mem{member}",
+    )
+
+    source = resolve_operational_source(config, 0)
+
+    assert source["source_product"] == "analysis_assim"
+    assert source["filename"] == (
+        "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
+    )

@@ -1539,3 +1539,79 @@ Feature ID: 3586192
 - Review and commit long-range member 1 support.
 - Investigate long-range ensemble analysis conventions.
 - Continue validation of additional long-range members.
+
+
+## Operational NWM long-range ensemble members 2–4 — November 5, 2026
+
+### Objective
+
+Enable long-range ensemble members 2, 3, and 4 using
+the existing Kerchunk-first operational NWM backend.
+
+### Implementation
+
+- Registered `long_range_mem2`, `long_range_mem3`,
+  and `long_range_mem4` in `PRODUCT_SPECS`.
+- Configured CONUS cycles 00, 06, 12, and 18 UTC.
+- Configured six-hourly forecast leads f006–f720.
+- Used `long_range` as the filename product.
+- Used `channel_rt_2`, `channel_rt_3`, and `channel_rt_4`.
+- Enabled all three products in the operational CLI.
+- Reused existing source resolution, forecast scheduling,
+  Kerchunk/native retrieval, and output handling.
+- Added parameterized configuration and CLI tests.
+
+### Source availability
+
+Date: 2026-04-19
+Domain: CONUS
+
+- Members 2–4 were present in NOAA native storage
+  and CIROH Kerchunk references.
+- Verified f006, f012, f120, f360, f540, and f720
+  for cycles 00, 06, 12, and 18 UTC.
+- Members 5 and 6 were not found for this date.
+
+### Real-data validation
+
+Date: 2026-04-19
+Cycle: t00z
+Feature ID: 3586192
+
+- Kerchunk/native comparisons passed at f006
+  for members 2, 3, and 4.
+- f006 streamflow: approximately 0.33 m³/s
+  for all three members.
+- Forecast f006 valid time: 06:00 UTC.
+- Forecast f006 reference time: 00:00 UTC.
+- Installed CLI retrieved analysis t0, f006, and f012
+  for all three members.
+- All nine CLI records used Kerchunk.
+- Streamflow values: t0 = 0.41, f006 = 0.33,
+  f012 = 0.23 m³/s for the tested reach.
+- Product identities and timestamps verified.
+
+### Automated validation
+
+- 553 repository tests passed.
+- 168 product configuration tests passed.
+- 99 operational CLI tests passed.
+- Python compilation passed.
+- Git whitespace check clean.
+
+### Limitations
+
+- Real-data retrieval covered one date, cycle, and reach.
+- Native comparisons covered f006 only.
+- Sampled file availability does not establish complete
+  coverage of every lead through f720.
+- `analysis_assim` t0 pairing remains scientifically
+  unverified for long-range ensemble members.
+- Full-horizon retrieval and historical-version
+  compatibility remain unverified.
+
+### Next
+
+- Review and commit long-range ensemble members 2–4.
+- Investigate long-range analysis pairing conventions.
+- Continue the remaining operational NWM roadmap tasks.

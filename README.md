@@ -66,6 +66,9 @@ NWM configurations:
 | `medium_range_blend` | CONUS | 00, 06, 12, 18 | f001–f240 |
 | `medium_range_no_da` | CONUS | 00, 06, 12, 18 | f003–f240, every 3 hours |
 | `long_range_mem1` | CONUS | 00, 06, 12, 18 | f006–f720, every 6 hours |
+| `long_range_mem2` | CONUS | 00, 06, 12, 18 | f006–f720, every 6 hours |
+| `long_range_mem3` | CONUS | 00, 06, 12, 18 | f006–f720, every 6 hours |
+| `long_range_mem4` | CONUS | 00, 06, 12, 18 | f006–f720, every 6 hours |
 
 
 The `medium_range_mem1` configuration uses:
@@ -115,6 +118,55 @@ CONUS and does not yet expose product selection.
 
 Other ensemble members, domains, and forecast products require
 separate validation before being enabled.
+
+
+
+#### Long-range ensemble members 2–4
+
+The operational NWM CLI also supports `long_range_mem2`,
+`long_range_mem3`, and `long_range_mem4` for CONUS.
+
+Each product uses:
+- Forecast cycles 00, 06, 12, and 18 UTC.
+- Six-hourly forecast leads f006–f720 (30 days).
+- A product-specific directory and channel file family.
+- Kerchunk-first retrieval with native NetCDF fallback.
+
+Example for member 2:
+
+```bash
+uv run --locked --extra operational streamflow-getter nwm-operational \
+  --date 2026-04-19 \
+  --cycle 0 \
+  --product long_range_mem2 \
+  --reach 3586192 \
+  --start-hour 1 \
+  --end-hour 12 \
+  --out long_range_mem2.csv
+```
+
+Replace `long_range_mem2` with `long_range_mem3` or
+`long_range_mem4` to retrieve another member.
+
+The requested forecast window selects f006 and f012.
+The CLI also includes analysis t0 by default.
+
+Real-data validation confirmed:
+- NOAA native NetCDF and CIROH Kerchunk availability
+  at selected forecast hours through f720.
+- Matching Kerchunk/native streamflow and timestamps
+  at f006 for all three members.
+- Successful CLI retrieval of t0, f006, and f012
+  for each member.
+- Correct product identities, timestamps, and
+  finite streamflow values.
+
+The `analysis_assim` t0 pairing is technically functional
+but remains scientifically unverified for the long-range
+ensemble. Use `--no-t0` to retrieve forecast leads only.
+
+Complete 720-hour retrieval and historical-version
+compatibility remain unverified.
 
 
 #### Long-range ensemble member 1

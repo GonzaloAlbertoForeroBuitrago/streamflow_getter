@@ -99,6 +99,36 @@ PRODUCT_SPECS = {
         lead_step_hours=6,
         analysis_product="analysis_assim",
     ),
+
+
+    "long_range_mem2": ProductSpec(
+        directory="long_range_mem2",
+        filename_product="long_range",
+        channel_family="channel_rt_2",
+        cycles=(0, 6, 12, 18),
+        max_hour=720,
+        lead_step_hours=6,
+        analysis_product="analysis_assim",
+    ),
+    "long_range_mem3": ProductSpec(
+        directory="long_range_mem3",
+        filename_product="long_range",
+        channel_family="channel_rt_3",
+        cycles=(0, 6, 12, 18),
+        max_hour=720,
+        lead_step_hours=6,
+        analysis_product="analysis_assim",
+    ),
+    "long_range_mem4": ProductSpec(
+        directory="long_range_mem4",
+        filename_product="long_range",
+        channel_family="channel_rt_4",
+        cycles=(0, 6, 12, 18),
+        max_hour=720,
+        lead_step_hours=6,
+        analysis_product="analysis_assim",
+    ),
+
 }
 
 @dataclass(frozen=True)
