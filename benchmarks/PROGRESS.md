@@ -1309,3 +1309,48 @@ with analysis t0, f001, and f002.
 - Complete documentation review and commit this milestone.
 - Continue original roadmap operational-product coverage.
 - Validate additional forecast families and domains separately.
+
+
+
+## Operational NWM forecast scheduling — November 5, 2026
+
+### Objective
+
+Support product-specific forecast lead intervals while
+preserving existing hourly operational NWM behavior.
+
+### Implementation
+
+- Added lead_step_hours to ProductSpec.
+- Preserved hourly scheduling as the default.
+- Added schedule-aware forecast lead selection.
+- Validated individual forecast-hour alignment.
+- Updated operational CLI forecast-window validation.
+- Ensured series retrieval selects available leads only.
+- Preserved optional analysis t0 handling.
+
+### Automated validation
+
+- 450 repository tests passed.
+- 38 forecast-scheduling tests passed.
+- Hourly, three-hourly, and six-hourly schedules tested.
+- Invalid lead hours and empty windows rejected.
+- Three-hourly series retrieval verified using a mock.
+- Existing short-range and medium-range ensemble tests passed.
+- Git whitespace validation passed.
+
+### Limitations
+
+- No additional NOAA forecast products were enabled.
+- Three-hour and six-hour schedules were tested using
+  temporary product configurations.
+- Subhourly products are not yet supported.
+- Real-data validation of additional product families
+  remains pending.
+
+### Next
+
+- Commit the scheduling milestone.
+- Validate medium_range_blend source conventions.
+- Validate medium_range_no_da with analysis_assim_no_da.
+- Validate long-range products and ensemble schedules.

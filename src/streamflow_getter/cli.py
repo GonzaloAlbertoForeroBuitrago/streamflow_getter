@@ -207,8 +207,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
         # Validate product-specific forecast hours before remote access.
-        config.filename(args.start_hour)
-        config.filename(args.end_hour)
+        config.forecast_hours(args.start_hour, args.end_hour)
 
 
         # Validate output before starting remote retrieval.

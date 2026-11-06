@@ -113,6 +113,37 @@ Other ensemble members, domains, and forecast products require
 separate validation before being enabled.
 
 
+
+### Operational forecast lead scheduling
+
+Operational NWM forecast requests use inclusive forecast-hour
+windows. The library selects only the forecast leads available
+for the configured product.
+
+ProductSpec includes `lead_step_hours`, defaulting to 1 hour.
+This preserves the behavior of existing short-range and
+medium-range ensemble products.
+
+The scheduling interface also supports products with longer
+forecast intervals:
+
+- Hourly: 1, 2, 3, 4, ...
+- Three-hourly: 3, 6, 9, 12, ...
+- Six-hourly: 6, 12, 18, 24, ...
+
+For example, a three-hourly product requested over hours
+4 through 12 selects f006, f009, and f012.
+
+Individual forecast filenames must use valid scheduled leads.
+Requests containing no available forecast leads are rejected.
+
+Analysis t0 remains optional and is included by default.
+
+Three-hour and six-hour scheduling have been validated using
+temporary product configurations and automated tests.
+Additional operational products are not enabled by this change.
+
+
 ### Operational NWM CLI product selection
 
 The `nwm-operational` command supports two validated CONUS

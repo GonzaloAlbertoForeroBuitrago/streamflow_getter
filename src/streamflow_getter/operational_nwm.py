@@ -16,6 +16,7 @@ class ProductSpec:
     channel_family: str
     cycles: tuple[int, ...]
     max_hour: int
+    lead_step_hours: int = 1
 
 
 
@@ -71,8 +72,6 @@ PRODUCT_SPECS = {
     ),
 }
 
-
-
 @dataclass(frozen=True)
 class ForecastConfig:
     """Identify a supported operational NWM forecast cycle."""
@@ -118,6 +117,39 @@ class ForecastConfig:
     def cycle_name(self) -> str:
         return f"t{self.cycle:02d}z"
 
+
+    def forecast_hours(self, start_hour: int, end_hour: int) -> list[int]:
+        """Select available forecast leads within an inclusive hour window."""
+        if (
+            isinstance(start_hour, bool)
+            or not isinstance(start_hour, int)
+            or isinstance(end_hour, bool)
+            or not isinstance(end_hour, int)
+        ):
+            raise ValueError("Forecast hours must be integers")
+
+        if start_hour < 1 or end_hour < start_hour:
+            raise ValueError("Invalid forecast hour range")
+
+        if end_hour > self.spec.max_hour:
+            raise ValueError(
+                f"Forecast hour must not exceed {self.spec.max_hour} "
+                f"for {self.product}"
+            )
+
+        step = self.spec.lead_step_hours
+        if isinstance(step, bool) or not isinstance(step, int) or step < 1:
+            raise ValueError("Forecast lead step must be a positive integer")
+        first = ((start_hour + step - 1) // step) * step
+
+        if first > end_hour:
+            raise ValueError(
+                "No available forecast leads in the requested hour range"
+            )
+
+        return list(range(first, end_hour + 1, step))
+
+
     def filename(self, hour: int) -> str:
         """Build a validated operational channel forecast filename."""
         if isinstance(hour, bool) or not isinstance(hour, int):
@@ -129,10 +161,22 @@ class ForecastConfig:
                 f"{self.spec.max_hour} for {self.product}"
             )
 
+        step = self.spec.lead_step_hours
+
+        if isinstance(step, bool) or not isinstance(step, int) or step < 1:
+            raise ValueError("Forecast lead step must be a positive integer")
+
+        if hour % step != 0:
+            raise ValueError(
+                f"Forecast hour must be a multiple of "
+                f"{step} for {self.product}"
+            )
+
         return (
             f"nwm.{self.cycle_name}.{self.spec.filename_product}."
             f"{self.spec.channel_family}.f{hour:03d}.{self.domain}.nc"
         )
+
 
 
     def native_url(self, hour: int) -> str:
@@ -210,7 +254,6 @@ class ForecastConfig:
             raise ValueError(f"Incorrect forecast valid time for f{hour:03d}")
 
 
-
 def resolve_operational_source(
     config: ForecastConfig,
     hour: int,
@@ -238,7 +281,6 @@ def resolve_operational_source(
         "reference_path": config.reference_path(hour),
         "lead_hour": hour,
     }
-
 
 def extract_streamflow(ds, reach_ids: list[int]) -> dict[int, float]:
     """Extract one-timestep streamflow by exact NWM feature ID.
@@ -295,7 +337,6 @@ def extract_streamflow(ds, reach_ids: list[int]) -> dict[int, float]:
     if not np.isfinite(flows).all():
         raise ValueError("Non-finite streamflow values found")
     return {reach: float(flow) for reach, flow in zip(requested, flows)}
-
 
 def read_kerchunk_forecast(
     config: ForecastConfig,
@@ -518,9 +559,10 @@ def fetch_operational_series(
     if start_hour < 1 or end_hour < start_hour:
         raise ValueError("Invalid forecast hour range")
 
-    # Validate the complete requested range before remote access.
-    config.filename(start_hour)
-    config.filename(end_hour)
+
+    # Select only available forecast leads before remote access.
+    hours = config.forecast_hours(start_hour, end_hour)
+
 
     if not isinstance(include_t0, bool):
         raise ValueError("include_t0 must be a boolean")
@@ -542,8 +584,6 @@ def fetch_operational_series(
 
     if len(requested) != len(set(requested)):
         raise ValueError("Duplicate reach IDs are not allowed")
-
-    hours = list(range(start_hour, end_hour + 1))
 
     if include_t0:
         hours.insert(0, 0)
