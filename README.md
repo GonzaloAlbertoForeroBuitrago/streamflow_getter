@@ -64,6 +64,7 @@ NWM configurations:
 | `medium_range_mem5` | CONUS | 00, 06, 12, 18 | f001–f204 |
 | `medium_range_mem6` | CONUS | 00, 06, 12, 18 | f001–f204 |
 | `medium_range_blend` | CONUS | 00, 06, 12, 18 | f001–f240 |
+| `medium_range_no_da` | CONUS | 00, 06, 12, 18 | f003–f240, every 3 hours |
 
 
 The `medium_range_mem1` configuration uses:
@@ -114,6 +115,46 @@ CONUS and does not yet expose product selection.
 Other ensemble members, domains, and forecast products require
 separate validation before being enabled.
 
+
+#### Medium-range without data assimilation
+
+The `medium_range_no_da` product supports CONUS forecasts
+initialized at 00, 06, 12, and 18 UTC.
+
+Forecast leads are available every three hours from
+f003 through f240.
+
+Unlike other currently supported products, its default
+analysis t0 source is `analysis_assim_no_da`, rather than
+`analysis_assim`.
+
+Example:
+
+```bash
+uv run --locked --extra operational streamflow-getter nwm-operational \
+  --date 2026-04-19 \
+  --cycle 0 \
+  --product medium_range_no_da \
+  --reach 3586192 \
+  --start-hour 1 \
+  --end-hour 6 \
+  --out medium_range_no_da.csv
+```
+
+The inclusive forecast window selects only available leads.
+For this example, the output contains analysis t0, f003,
+and f006.
+
+Real-data validation confirmed:
+
+- NOAA native NetCDF and CIROH Kerchunk availability.
+- Matching streamflow values for analysis t0 and f003.
+- Correct no-DA analysis source selection.
+- Successful CLI retrieval of t0, f003, and f006.
+- Correct product identities and timestamps.
+
+Full 240-hour retrieval and historical NWM version
+compatibility remain unverified.
 
 
 ### Operational forecast lead scheduling

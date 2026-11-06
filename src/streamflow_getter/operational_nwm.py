@@ -17,6 +17,7 @@ class ProductSpec:
     cycles: tuple[int, ...]
     max_hour: int
     lead_step_hours: int = 1
+    analysis_product: str = "analysis_assim"
 
 
 
@@ -78,6 +79,17 @@ PRODUCT_SPECS = {
         max_hour=240,
         lead_step_hours=1,
     ),
+
+    "medium_range_no_da": ProductSpec(
+        directory="medium_range_no_da",
+        filename_product="medium_range_no_da",
+        channel_family="channel_rt",
+        cycles=(0, 6, 12, 18),
+        max_hour=240,
+        lead_step_hours=3,
+        analysis_product="analysis_assim_no_da",
+    ),
+
 }
 
 @dataclass(frozen=True)
@@ -200,28 +212,30 @@ class ForecastConfig:
         )
 
 
+
     def analysis_filename(self) -> str:
-        """Build the CONUS analysis_assim tm00 filename."""
+        """Build the configured CONUS analysis t0 filename."""
         return (
-            f"nwm.{self.cycle_name}.analysis_assim."
+            f"nwm.{self.cycle_name}.{self.spec.analysis_product}."
             f"channel_rt.tm00.{self.domain}.nc"
         )
 
     def analysis_native_url(self) -> str:
-        """Return the native analysis_assim source URL."""
+        """Return the configured native analysis t0 URL."""
         return (
             "https://storage.googleapis.com/national-water-model/"
-            f"{self.date_folder}/analysis_assim/"
+            f"{self.date_folder}/{self.spec.analysis_product}/"
             f"{self.analysis_filename()}"
         )
 
     def analysis_reference_path(self) -> str:
-        """Return the CIROH Kerchunk reference path for analysis t0."""
+        """Return the configured CIROH analysis t0 reference."""
         return (
             "ciroh-nwm-zarr-copy/national-water-model/"
-            f"{self.date_folder}/analysis_assim/"
+            f"{self.date_folder}/{self.spec.analysis_product}/"
             f"{self.analysis_filename()}.json"
         )
+
 
     def validate_analysis_timestamps(
         self,
@@ -275,7 +289,7 @@ def resolve_operational_source(
 
     if hour == 0:
         return {
-            "source_product": "analysis_assim",
+            "source_product": config.spec.analysis_product,
             "filename": config.analysis_filename(),
             "native_url": config.analysis_native_url(),
             "reference_path": config.analysis_reference_path(),
@@ -637,9 +651,8 @@ def fetch_operational_series(
                 result["reference_time"],
             )
 
-
         expected_product = (
-            "analysis_assim" if hour == 0 else config.product
+            config.spec.analysis_product if hour == 0 else config.product
         )
 
         if result["product"] != expected_product:

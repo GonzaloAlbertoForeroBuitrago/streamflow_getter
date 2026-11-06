@@ -3,7 +3,12 @@
 
 import pytest
 
-from streamflow_getter.operational_nwm import ForecastConfig
+
+from streamflow_getter.operational_nwm import (
+    ForecastConfig,
+    ProductSpec,
+    resolve_operational_source,
+)
 
 
 def test_medium_range_member1_source_identity():
@@ -631,4 +636,91 @@ def test_medium_range_blend_source_paths():
 
     assert config.reference_path(1).endswith(
         f"/nwm.20260419/medium_range_blend/{filename}.json"
+    )
+
+
+def test_medium_range_no_da_configuration():
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_no_da",
+    )
+
+    assert config.spec.directory == "medium_range_no_da"
+    assert config.spec.filename_product == "medium_range_no_da"
+    assert config.spec.channel_family == "channel_rt"
+    assert config.spec.max_hour == 240
+    assert config.spec.lead_step_hours == 3
+    assert config.spec.analysis_product == "analysis_assim_no_da"
+
+    assert config.forecast_hours(1, 12) == [3, 6, 9, 12]
+    assert config.forecast_hours(4, 12) == [6, 9, 12]
+
+    assert config.filename(3) == (
+        "nwm.t00z.medium_range_no_da.channel_rt.f003.conus.nc"
+    )
+
+
+@pytest.mark.parametrize("cycle", [0, 6, 12, 18])
+def test_medium_range_no_da_valid_cycles(cycle):
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=cycle,
+        product="medium_range_no_da",
+    )
+
+    assert config.cycle == cycle
+
+
+@pytest.mark.parametrize("cycle", [1, 3, 9, 23])
+def test_medium_range_no_da_invalid_cycles(cycle):
+    with pytest.raises(ValueError, match="cycle"):
+        ForecastConfig(
+            date="2026-04-19",
+            cycle=cycle,
+            product="medium_range_no_da",
+        )
+
+
+@pytest.mark.parametrize("hour", [1, 2, 4, 5, 241])
+def test_medium_range_no_da_invalid_hours(hour):
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_no_da",
+    )
+
+    with pytest.raises(ValueError, match="Forecast hour"):
+        config.filename(hour)
+
+
+def test_medium_range_no_da_analysis_source():
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_no_da",
+    )
+
+    source = resolve_operational_source(config, 0)
+
+    assert source["source_product"] == "analysis_assim_no_da"
+    assert source["filename"] == (
+        "nwm.t00z.analysis_assim_no_da.channel_rt.tm00.conus.nc"
+    )
+    assert "/analysis_assim_no_da/" in source["native_url"]
+    assert "/analysis_assim_no_da/" in source["reference_path"]
+
+
+def test_medium_range_no_da_forecast_source():
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_no_da",
+    )
+
+    source = resolve_operational_source(config, 3)
+
+    assert source["source_product"] == "medium_range_no_da"
+    assert source["filename"] == (
+        "nwm.t00z.medium_range_no_da.channel_rt.f003.conus.nc"
     )

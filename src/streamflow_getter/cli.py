@@ -70,6 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
             "medium_range_mem5",
             "medium_range_mem6",
             "medium_range_blend",
+            "medium_range_no_da",
         ],
         default="short_range",
         help="Operational NWM product (default: short_range)",

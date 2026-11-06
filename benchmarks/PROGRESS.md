@@ -1411,3 +1411,67 @@ Feature ID: 3586192
 - Review and commit medium_range_blend support.
 - Validate medium_range_no_da and its analysis pairing.
 - Continue validating long-range products separately.
+
+
+## Operational NWM medium-range no-DA — November 5, 2026
+
+### Objective
+
+Enable `medium_range_no_da` with the correct
+`analysis_assim_no_da` t0 source and three-hourly
+forecast scheduling.
+
+### Implementation
+
+- Added `analysis_product` to `ProductSpec`, defaulting
+  to `analysis_assim` for backward compatibility.
+- Registered `medium_range_no_da` for CONUS.
+- Configured cycles 00, 06, 12, and 18 UTC.
+- Configured forecast leads f003–f240 at three-hour intervals.
+- Configured `analysis_assim_no_da` as the analysis t0 source.
+- Updated analysis filename, native URL, Kerchunk reference
+  path, source resolution, and series product validation.
+- Enabled `medium_range_no_da` in the operational CLI.
+- Added configuration, source-selection, and CLI tests.
+
+### Real-data validation
+
+Date: 2026-04-19
+Cycle: t00z
+Domain: CONUS
+Feature ID: 3586192
+
+- NOAA native and CIROH Kerchunk sources available
+  for analysis t0, f003, and f006.
+- Kerchunk/native streamflow matched for analysis t0
+  and forecast f003.
+- Analysis t0 valid time: 2026-04-19 00:00 UTC.
+- Analysis t0 reference time: 2026-04-18 21:00 UTC.
+- Forecast f003 valid time: 2026-04-19 03:00 UTC.
+- Forecast f003 reference time: 2026-04-19 00:00 UTC.
+- Installed CLI retrieved analysis t0, f003, and f006.
+- Three CSV records generated using Kerchunk.
+- Product identities and timestamps verified.
+- All three streamflow values approximately 0.30 m³/s.
+
+### Automated validation
+
+- 481 repository tests passed.
+- 104 product configuration tests passed.
+- 91 operational CLI tests passed.
+- Git whitespace check clean.
+
+### Limitations
+
+- Real-data validation covered one date, cycle, and reach.
+- Native comparison was performed for t0 and f003;
+  f006 was retrieved through the CLI using Kerchunk.
+- Complete 240-hour retrieval remains unverified.
+- Historical model-version compatibility remains unverified.
+- Regional domains and other NWM products remain pending.
+
+### Next
+
+- Review and commit medium-range no-DA support.
+- Continue operational NWM product coverage, including
+  validation of long-range ensemble products.

@@ -1534,3 +1534,42 @@ def test_operational_cli_medium_range_blend_rejects_hour_241(
         ])
 
     assert "reaches" not in calls
+
+
+def test_operational_cli_medium_range_no_da(mock_operational):
+    calls, _ = mock_operational
+
+    main([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--cycle", "0",
+        "--product", "medium_range_no_da",
+        "--reach", "3586192",
+        "--start-hour", "4",
+        "--end-hour", "12",
+        "--out", "no_da.csv",
+    ])
+
+    assert calls["config"].product == "medium_range_no_da"
+    assert calls["config"].spec.analysis_product == "analysis_assim_no_da"
+    assert calls["config"].forecast_hours(4, 12) == [6, 9, 12]
+
+
+def test_operational_cli_medium_range_no_da_empty_window(
+    mock_operational,
+):
+    calls, _ = mock_operational
+
+    with pytest.raises(ValueError, match="No available forecast leads"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--cycle", "0",
+            "--product", "medium_range_no_da",
+            "--reach", "3586192",
+            "--start-hour", "1",
+            "--end-hour", "2",
+            "--out", "no_da.csv",
+        ])
+
+    assert "reaches" not in calls
