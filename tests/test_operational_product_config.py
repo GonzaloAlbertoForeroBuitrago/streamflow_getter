@@ -558,3 +558,77 @@ def test_additional_medium_range_member_invalid_cycles(member, cycle):
             cycle=cycle,
             product=f"medium_range_mem{member}",
         )
+
+
+def test_medium_range_blend_configuration():
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_blend",
+    )
+
+    assert config.spec.directory == "medium_range_blend"
+    assert config.spec.filename_product == "medium_range_blend"
+    assert config.spec.channel_family == "channel_rt"
+    assert config.spec.max_hour == 240
+    assert config.spec.lead_step_hours == 1
+
+    assert config.filename(1) == (
+        "nwm.t00z.medium_range_blend.channel_rt.f001.conus.nc"
+    )
+
+    assert config.filename(240) == (
+        "nwm.t00z.medium_range_blend.channel_rt.f240.conus.nc"
+    )
+
+
+@pytest.mark.parametrize("cycle", [0, 6, 12, 18])
+def test_medium_range_blend_valid_cycles(cycle):
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=cycle,
+        product="medium_range_blend",
+    )
+
+    assert config.cycle == cycle
+
+
+@pytest.mark.parametrize("cycle", [1, 3, 9, 23])
+def test_medium_range_blend_invalid_cycles(cycle):
+    with pytest.raises(ValueError, match="cycle"):
+        ForecastConfig(
+            date="2026-04-19",
+            cycle=cycle,
+            product="medium_range_blend",
+        )
+
+
+def test_medium_range_blend_rejects_hour_241():
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_blend",
+    )
+
+    with pytest.raises(ValueError, match="Forecast hour"):
+        config.filename(241)
+
+
+def test_medium_range_blend_source_paths():
+    config = ForecastConfig(
+        date="2026-04-19",
+        cycle=0,
+        product="medium_range_blend",
+    )
+
+    filename = (
+        "nwm.t00z.medium_range_blend.channel_rt.f001.conus.nc"
+    )
+
+    assert config.native_url(1).endswith(
+        f"/nwm.20260419/medium_range_blend/{filename}"
+    )
+
+    assert config.reference_path(1).endswith(
+        f"/nwm.20260419/medium_range_blend/{filename}.json"
+    )

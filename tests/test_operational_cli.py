@@ -1494,3 +1494,43 @@ def test_operational_cli_additional_members_reject_hour_205(
         ])
 
     assert "reaches" not in calls
+
+
+def test_operational_cli_medium_range_blend(mock_operational):
+    calls, _ = mock_operational
+
+    main([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--cycle", "0",
+        "--product", "medium_range_blend",
+        "--reach", "3586192",
+        "--start-hour", "1",
+        "--end-hour", "2",
+        "--out", "blend.csv",
+    ])
+
+    assert calls["config"].product == "medium_range_blend"
+    assert calls["config"].spec.max_hour == 240
+    assert calls["start_hour"] == 1
+    assert calls["end_hour"] == 2
+
+
+def test_operational_cli_medium_range_blend_rejects_hour_241(
+    mock_operational,
+):
+    calls, _ = mock_operational
+
+    with pytest.raises(ValueError, match="Forecast hour"):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--cycle", "0",
+            "--product", "medium_range_blend",
+            "--reach", "3586192",
+            "--start-hour", "1",
+            "--end-hour", "241",
+            "--out", "blend.csv",
+        ])
+
+    assert "reaches" not in calls

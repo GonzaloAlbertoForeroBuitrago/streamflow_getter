@@ -70,6 +70,14 @@ PRODUCT_SPECS = {
         cycles=(0, 6, 12, 18),
         max_hour=204,
     ),
+    "medium_range_blend": ProductSpec(
+        directory="medium_range_blend",
+        filename_product="medium_range_blend",
+        channel_family="channel_rt",
+        cycles=(0, 6, 12, 18),
+        max_hour=240,
+        lead_step_hours=1,
+    ),
 }
 
 @dataclass(frozen=True)

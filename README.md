@@ -63,6 +63,8 @@ NWM configurations:
 | `medium_range_mem4` | CONUS | 00, 06, 12, 18 | f001–f204 |
 | `medium_range_mem5` | CONUS | 00, 06, 12, 18 | f001–f204 |
 | `medium_range_mem6` | CONUS | 00, 06, 12, 18 | f001–f204 |
+| `medium_range_blend` | CONUS | 00, 06, 12, 18 | f001–f240 |
+
 
 The `medium_range_mem1` configuration uses:
 
@@ -178,6 +180,40 @@ Kerchunk and wrote three CSV records with validated timestamps.
 
 Other medium-range ensemble members, domains, and forecast
 products are not yet supported.
+
+
+#### Medium-range blend
+
+The `medium_range_blend` product is supported for CONUS
+forecasts with cycles at 00, 06, 12, and 18 UTC and hourly
+forecast leads f001–f240.
+
+Example:
+
+```bash
+uv run --locked --extra operational streamflow-getter nwm-operational \
+  --date 2026-04-19 \
+  --cycle 0 \
+  --product medium_range_blend \
+  --reach 3586192 \
+  --start-hour 1 \
+  --end-hour 2 \
+  --out medium_range_blend.csv
+```
+
+Analysis `t0` is included by default from `analysis_assim`.
+
+Real-data validation for April 19, 2026, cycle t00z,
+feature ID 3586192, confirmed agreement between Kerchunk
+and native NetCDF at f001.
+
+The installed CLI also successfully retrieved analysis t0,
+f001, and f002, producing three CSV records with verified
+timestamps and product identities.
+
+Full 240-hour retrieval and compatibility across historical
+NWM versions have not yet been validated.
+
 
 ### Geographic point selection
 

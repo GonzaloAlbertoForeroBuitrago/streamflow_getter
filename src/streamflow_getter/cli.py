@@ -69,11 +69,11 @@ def build_parser() -> argparse.ArgumentParser:
             "medium_range_mem4",
             "medium_range_mem5",
             "medium_range_mem6",
+            "medium_range_blend",
         ],
         default="short_range",
         help="Operational NWM product (default: short_range)",
     )
-
 
     operational.add_argument(
         "--reach",

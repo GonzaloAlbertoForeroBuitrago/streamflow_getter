@@ -1354,3 +1354,60 @@ preserving existing hourly operational NWM behavior.
 - Validate medium_range_blend source conventions.
 - Validate medium_range_no_da with analysis_assim_no_da.
 - Validate long-range products and ensemble schedules.
+
+
+## Operational NWM medium-range blend — November 5, 2026
+
+### Objective
+
+Enable the validated medium_range_blend operational NWM
+product using the existing Kerchunk-first retrieval backend.
+
+### Implementation
+
+- Added medium_range_blend to ProductSpec configuration.
+- Enabled product selection through the operational CLI.
+- Configured CONUS cycles 00, 06, 12, and 18 UTC.
+- Configured hourly forecast leads f001–f240.
+- Preserved default analysis_assim t0 handling.
+- Reused existing Kerchunk/native retrieval, timestamp
+  validation, caching, and CSV/Parquet output.
+- Added product configuration and CLI regression tests.
+
+### Real-data validation
+
+Date: 2026-04-19
+Cycle: t00z
+Domain: CONUS
+Feature ID: 3586192
+
+- NOAA native NetCDF source available.
+- CIROH Kerchunk reference available.
+- Kerchunk and native streamflow matched at f001.
+- Forecast valid and reference times matched.
+- Installed CLI retrieved analysis t0, f001, and f002.
+- Three CSV records generated using Kerchunk.
+- Product identities and timestamps verified.
+- Streamflow values were finite.
+
+### Automated validation
+
+- 463 repository tests passed.
+- 88 product configuration tests passed.
+- 89 operational CLI tests passed.
+- Python compilation passed.
+- Git whitespace validation passed.
+
+### Limitations
+
+- Real-data validation covered one date, cycle, reach,
+  and two forecast hours.
+- Complete 240-hour retrieval remains unverified.
+- Historical model-version compatibility remains unverified.
+- Additional NWM products and regional domains remain pending.
+
+### Next
+
+- Review and commit medium_range_blend support.
+- Validate medium_range_no_da and its analysis pairing.
+- Continue validating long-range products separately.
