@@ -12,7 +12,7 @@ The objectives are to:
 - Evaluate multi-reach retrieval and reference caching.
 - Provide reproducible evidence for future operational implementation.
 
-The experiments are conducted on the development branch `benchmark/nwm-kerchunk-native`. Production integration and pull-request preparation are postponed until development and validation are complete.
+These benchmarks provide reproducible validation of operational NWM retrieval methods. Changes to production behavior are validated separately through the test suite.
 
 ## 2. Reference Dataset
 
@@ -58,17 +58,13 @@ Accounted response-body bytes do not include all HTTP metadata requests or proto
 | `compare_nwm_access.py` | Initial retrieval comparison |
 | `cache_experiment.py` | Same-process and separate-process retrieval experiments |
 | `reference_cache_experiment.py` | Reference-cache performance experiments |
-| `reference_validation.py` | Kerchunk reference validation |
-| `cache_freshness.py` | Remote metadata comparison |
-| `cache_manifest.py` | Cache integrity and persistence |
-| `reference_cache.py` | Freshness-aware reference loading |
 | `live_cache_integration.py` | Live cache integration verification |
 | `test_reference_validation.py` | Reference-validation tests |
 | `test_reference_cache.py` | Cache loading and recovery tests |
 | `test_cache_manifest.py` | Cache integrity and persistence tests |
 | `test_cache_freshness.py` | Metadata freshness tests |
 
-The reference-cache implementation remains experimental and is not integrated into the production retrieval package.
+Reference caching and validation are implemented in `src/streamflow_getter/reference_cache.py` and `src/streamflow_getter/reference_validation.py`. The benchmark tests exercise these production modules.
 
 ## 5. Environment and Dependencies
 

@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from reference_cache import load_fresh_reference
-from cache_manifest import create_cache_record, save_cache_record
+from streamflow_getter.reference_cache import load_fresh_reference
+from streamflow_getter.reference_cache import create_cache_record, save_cache_record
 
 
 URL = "https://example.org/data.nc"
@@ -201,7 +201,7 @@ def test_fresh_loader_replaces_corrupt_record(
 
     assert result == valid_reference
 
-    from cache_manifest import load_cache_record
+    from streamflow_getter.reference_cache import load_cache_record
 
     assert load_cache_record(path, URL) is not None
 

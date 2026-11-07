@@ -1,4 +1,4 @@
-"""Live integration test for the experimental NWM reference cache."""
+"""Live integration test for the operational NWM reference cache."""
 
 import json
 import time
@@ -10,7 +10,7 @@ import numpy as np
 import s3fs
 import xarray as xr
 
-from reference_cache import load_fresh_reference
+from streamflow_getter.reference_cache import load_fresh_reference
 
 DATE = "20260419"
 PRODUCT = "short_range"

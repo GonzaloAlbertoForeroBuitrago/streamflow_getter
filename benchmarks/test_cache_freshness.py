@@ -2,7 +2,7 @@
 
 import pytest
 
-from cache_freshness import compare_metadata
+from streamflow_getter.reference_cache import compare_metadata
 
 
 @pytest.fixture

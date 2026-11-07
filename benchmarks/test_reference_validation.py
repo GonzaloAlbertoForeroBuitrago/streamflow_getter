@@ -2,7 +2,7 @@
 
 import pytest
 
-from reference_validation import (
+from streamflow_getter.reference_validation import (
     validate_reference,
     valid_source_identity,
 )

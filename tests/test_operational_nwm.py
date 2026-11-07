@@ -1,8 +1,4 @@
 """Tests for operational NWM forecast configuration and extraction."""
-
-import sys
-from pathlib import Path
-
 import numpy as np
 import pytest
 import xarray as xr
@@ -12,8 +8,6 @@ from streamflow_getter.operational_nwm import (
     extract_streamflow,
     resolve_operational_source,
 )
-
-
 
 def test_resolve_analysis_t0_source():
     config = ForecastConfig(date="2026-04-19", cycle=0)
@@ -95,20 +89,53 @@ def test_invalid_forecast_hour(hour):
         ForecastConfig().filename(hour)
 
 
-@pytest.mark.parametrize("forecast_date, cycle, hour", [
-    ("2026-04-19", 0, 1), ("2026-04-19", 0, 6),
-    ("2026-04-19", 12, 18), ("2026-04-20", 6, 3),
-])
-def test_forecast_config_matches_benchmark(forecast_date, cycle, hour):
-    benchmark_dir = Path(__file__).resolve().parents[1] / "benchmarks"
-    if str(benchmark_dir) not in sys.path:
-        sys.path.insert(0, str(benchmark_dir))
-    from repeated_benchmark import ForecastConfig as BenchmarkConfig
-    original = BenchmarkConfig(date=forecast_date, cycle=cycle)
-    production = ForecastConfig(date=forecast_date, cycle=cycle)
-    assert production.filename(hour) == original.filename(hour)
-    assert production.native_url(hour) == original.native_url(hour)
-    assert production.reference_path(hour) == original.reference_path(hour)
+@pytest.mark.parametrize(
+    "forecast_date, cycle, hour, filename",
+    [
+        (
+            "2026-04-19",
+            0,
+            1,
+            "nwm.t00z.short_range.channel_rt.f001.conus.nc",
+        ),
+        (
+            "2026-04-19",
+            0,
+            6,
+            "nwm.t00z.short_range.channel_rt.f006.conus.nc",
+        ),
+        (
+            "2026-04-19",
+            12,
+            18,
+            "nwm.t12z.short_range.channel_rt.f018.conus.nc",
+        ),
+        (
+            "2026-04-20",
+            6,
+            3,
+            "nwm.t06z.short_range.channel_rt.f003.conus.nc",
+        ),
+    ],
+)
+def test_forecast_config_source_paths(
+    forecast_date, cycle, hour, filename
+):
+    config = ForecastConfig(date=forecast_date, cycle=cycle)
+
+    date_folder = forecast_date.replace("-", "")
+
+    assert config.filename(hour) == filename
+
+    assert config.native_url(hour) == (
+        "https://storage.googleapis.com/national-water-model/"
+        f"nwm.{date_folder}/short_range/{filename}"
+    )
+
+    assert config.reference_path(hour) == (
+        "ciroh-nwm-zarr-copy/national-water-model/"
+        f"nwm.{date_folder}/short_range/{filename}.json"
+    )
 
 
 @pytest.fixture
@@ -162,24 +189,8 @@ def test_extract_streamflow_invalid_shape():
 
 
 
-def test_extraction_matches_existing_benchmark():
-    """Preserve James's validated batch extraction behavior."""
-    import sys
-    from pathlib import Path
-
-    import numpy as np
-    import xarray as xr
-
-    from streamflow_getter.operational_nwm import extract_streamflow
-
-    benchmark_dir = (
-        Path(__file__).resolve().parents[1] / "benchmarks"
-    )
-
-    sys.path.insert(0, str(benchmark_dir))
-
-    from repeated_benchmark import extract_batch
-
+def test_extract_streamflow_preserves_values_and_order():
+    """Verify exact streamflow values in the requested reach order."""
     ds = xr.Dataset(
         {
             "streamflow": (
@@ -199,21 +210,18 @@ def test_extraction_matches_existing_benchmark():
     )
 
     requested = [14191043, 1122645, 3586192]
-    indices = [3, 0, 1]
+    expected = [16062.71, 7.08, 0.41]
 
-    original = extract_batch(ds, indices, requested)
-    production = extract_streamflow(ds, requested)
+    result = extract_streamflow(ds, requested)
 
-    actual = np.array(list(production.values()))
+    assert list(result) == requested
 
     np.testing.assert_allclose(
-        actual,
-        original,
+        list(result.values()),
+        expected,
         rtol=0,
         atol=0,
     )
-
-    assert list(production) == requested
 
 
 

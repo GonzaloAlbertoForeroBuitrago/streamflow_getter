@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from cache_manifest import (
+from streamflow_getter.reference_cache import (
     create_manifest,
     validate_manifest,
     create_cache_record,

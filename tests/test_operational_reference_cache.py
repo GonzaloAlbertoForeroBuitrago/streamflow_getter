@@ -298,3 +298,102 @@ def test_fetch_remote_metadata_missing_etag(monkeypatch):
             URL,
             s3=s3,
         )
+
+def test_metadata_missing_returns_unknown(metadata):
+    current = metadata.copy()
+    del current["source_generation"]
+
+    assert compare_metadata(metadata, current) == "unknown"
+
+
+def test_source_change_takes_priority_over_reference_change(metadata):
+    current = {
+        **metadata,
+        "reference_etag": "etag-2",
+        "source_generation": "gen-2",
+    }
+
+    assert compare_metadata(metadata, current) == "source_changed"
+
+def test_metadata_change_during_download_rejected(
+    tmp_path, valid_reference, metadata
+):
+    """Reject a reference if remote metadata changes during download."""
+    path = tmp_path / "record.json"
+
+    before = metadata.copy()
+    after = {
+        **metadata,
+        "reference_etag": "etag-changed",
+    }
+
+    snapshots = iter([before, after])
+
+    def metadata_provider():
+        return next(snapshots)
+
+    def downloader():
+        return json.dumps(valid_reference).encode("utf-8")
+
+    with pytest.raises(ValueError, match="changed during download"):
+        load_fresh_reference(
+            path,
+            URL,
+            metadata_provider,
+            downloader,
+        )
+
+    assert not path.exists()
+
+def test_corrupted_cache_is_refreshed(
+    tmp_path, valid_reference, metadata
+):
+    """Replace a corrupted cache with a validated reference."""
+    path = tmp_path / "record.json"
+    path.write_text("{invalid json", encoding="utf-8")
+
+    result = load_fresh_reference(
+        path,
+        URL,
+        lambda: metadata,
+        lambda: json.dumps(valid_reference).encode("utf-8"),
+    )
+
+    assert result == valid_reference
+
+    cached = load_cache_record(path, URL)
+
+    assert cached is not None
+    assert cached["reference"] == valid_reference
+
+def test_wrong_source_cache_is_refreshed(
+    tmp_path, valid_reference, metadata
+):
+    """Replace cached references pointing to an incorrect source."""
+    path = tmp_path / "record.json"
+
+    wrong_reference = json.loads(json.dumps(valid_reference))
+    wrong_reference["refs"]["streamflow/0"][0] = (
+        "https://example.org/wrong.nc"
+    )
+
+    path.write_text(
+        json.dumps({
+            "reference": wrong_reference,
+            "manifest": {},
+        }),
+        encoding="utf-8",
+    )
+
+    result = load_fresh_reference(
+        path,
+        URL,
+        lambda: metadata,
+        lambda: json.dumps(valid_reference).encode("utf-8"),
+    )
+
+    assert result == valid_reference
+
+    cached = load_cache_record(path, URL)
+    assert cached is not None
+    assert cached["reference"] == valid_reference
