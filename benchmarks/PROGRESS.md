@@ -1615,3 +1615,42 @@ Feature ID: 3586192
 - Review and commit long-range ensemble members 2–4.
 - Investigate long-range analysis pairing conventions.
 - Continue the remaining operational NWM roadmap tasks.
+
+
+## Long-range analysis t0 pairing review — November 5, 2026
+
+### Finding
+
+Reviewed the original `docs/ROADMAP.md` and the current
+operational NWM implementation.
+
+The roadmap explicitly requires `analysis_assim` tm00
+as the default t0 source for short-, medium-, and
+long-range forecasts.
+
+It also specifies a shared t0 for ensemble members
+and `analysis_assim_no_da` for no-DA forecast variants.
+
+### Validation
+
+- Long-range members 1–4 use `analysis_assim` at t0.
+- The tested analysis valid time matches the forecast cycle.
+- The analysis reference time is preserved separately.
+- Real NOAA retrievals passed for the tested date and cycle.
+- The CLI supports excluding t0 with `--no-t0`.
+
+### Conclusion
+
+The current source pairing follows the original roadmap.
+No retrieval-code changes are required for this milestone.
+
+The analysis t0 is a shared reference point, not a
+verified representation of each ensemble member's
+internal initialization state.
+
+### Remaining work
+
+- Verify analysis availability and valid times across
+  additional dates and cycles.
+- Verify reuse of a single downloaded t0 across members.
+- Continue the remaining roadmap tasks.
