@@ -23,7 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     # Preserve the existing retrospective command.
     p = sub.add_parser(
         "nwm",
-        help="NWM retrospective, CONUS (hourly, 1979-)",
+        help="NWM retrospective streamflow (CONUS; coverage varies by version)",
     )
     p.add_argument(
         "--reach",
