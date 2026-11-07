@@ -1760,3 +1760,47 @@ This provides evidence of compatibility across the sampled historical configurat
 ### Next
 
 Continue roadmap by expanding historical operational source coverage and investigating model-version and reach-set compatibility.
+
+## Historical long-range Kerchunk/native validation — November 7, 2026
+
+### Objective
+
+Validate historical operational NWM long-range forecasts against native NetCDF sources, following `docs/ROADMAP.md`.
+
+### Test configuration
+
+- Product: `long_range_mem1`
+- Domain: CONUS
+- Forecast cycle: t00z
+- Forecast lead: f006
+- Feature ID: 3586192
+
+### Results
+
+| Date | Kerchunk (m³/s) | Native (m³/s) | Absolute difference |
+|---|---:|---:|---:|
+| 2019-01-01 | 3.519999921321869 | 3.519999921321869 | 0.0 |
+| 2022-01-01 | 0.5999999865889549 | 0.5999999865889549 | 0.0 |
+| 2024-01-01 | 0.6299999859184027 | 0.6299999859184027 | 0.0 |
+
+All three comparisons passed.
+
+Forecast valid times were 06:00 UTC and reference times were 00:00 UTC on the respective dates. Both retrieval methods returned matching timestamps.
+
+### Interpretation
+
+The existing production NWM reader successfully retrieves the sampled historical long-range member 1 files through Kerchunk, with numerical results identical to the native NetCDF reader.
+
+Combined with the earlier short- and medium-range comparisons, this establishes six successful historical Kerchunk/native comparisons across the three major forecast families.
+
+### Limitations
+
+- Only member 1, lead f006, cycle t00z, and one feature ID were tested.
+- Other long-range ensemble members and forecast leads remain unverified historically.
+- Continuous historical product coverage has not been established.
+- Historical reach-set differences require further investigation.
+- Further NWM retrospective development requires consultation with Josh Cunningham.
+
+### Next
+
+Investigate historical operational product availability transitions, particularly medium-range ensembles and medium-range blend, before expanding model-version and reach-set compatibility testing.
