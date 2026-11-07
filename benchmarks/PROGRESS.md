@@ -701,7 +701,7 @@ Module: src/streamflow_getter/output.py
 ### Next
 
 - Review and commit the validated output writer.
-- Review James's CLI architecture and requirements.
+- Review the existing CLI architecture and project requirements.
 - Integrate CSV/Parquet selection into the CLI.
 - Preserve existing retrospective command behavior.
 
@@ -764,7 +764,7 @@ with its existing behavior and help descriptions.
 - Validate the operational CLI with real NWM data.
 - Extend reach selection using existing RouteLink functions.
 - Review operational support across NWM versions.
-- Prepare focused contributions following James's PR workflow.
+- Prepare focused contributions following the established pull-request workflow.
 
 ## Operational USGS gage CLI integration — November 3, 2026
 
@@ -995,7 +995,7 @@ test. No remote forecast data was downloaded.
 - Review documentation and final source changes.
 - Verify standard and spatial test environments.
 - Commit the bounding-box CLI milestone.
-- Continue with polygon selection following James's roadmap.
+- Continue with polygon selection following the project roadmap.
 
 
 
@@ -1076,7 +1076,7 @@ No forecast data was downloaded or output file created.
 - Verify standard and spatial test environments.
 - Review complete source and documentation changes.
 - Commit the polygon CLI milestone.
-- Reassess remaining roadmap priorities with James before
+- Reassess remaining roadmap priorities with the project maintainer before
   expanding functionality.
 
 
@@ -1704,14 +1704,14 @@ All three retrievals used Kerchunk and returned valid time 01:00 UTC and referen
 - The native NetCDF values have not yet been independently compared with the Kerchunk results.
 - Historical reach-set compatibility has not been comprehensively evaluated.
 - Additional forecast products, cycles, domains, and model versions remain unverified.
-- Further NWM retrospective development requires consultation with Josh Cunningham.
+- Further NWM retrospective development requires consultation with the designated NWM retrospective specialist.
 
 ### Next steps
 
 - Compare historical Kerchunk values against native NetCDF sources.
 - Expand sampled operational source coverage by product, date, and domain.
 - Investigate historical reach-set differences.
-- Continue the remaining requirements in James's roadmap.
+- Continue the remaining requirements in the project roadmap.
 
 ## Historical Kerchunk versus native NetCDF validation — November 7, 2026
 
@@ -1755,7 +1755,7 @@ This provides evidence of compatibility across the sampled historical configurat
 - All comparisons used forecast cycle t00z and lead f001.
 - Historical coverage remains sampled rather than exhaustive.
 - Additional products, forecast cycles, domains, and reach-set differences require validation.
-- Further NWM retrospective development remains subject to consultation with Josh Cunningham.
+- Further NWM retrospective development remains subject to consultation with the designated NWM retrospective specialist.
 
 ### Next
 
@@ -1799,7 +1799,7 @@ Combined with the earlier short- and medium-range comparisons, this establishes 
 - Other long-range ensemble members and forecast leads remain unverified historically.
 - Continuous historical product coverage has not been established.
 - Historical reach-set differences require further investigation.
-- Further NWM retrospective development requires consultation with Josh Cunningham.
+- Further NWM retrospective development requires consultation with the designated NWM retrospective specialist.
 
 ### Next
 
@@ -1860,7 +1860,7 @@ Real-data retrieval across the transition was tested for members 1 and 2, leads 
 
 Historical product availability, model-version compatibility, and reach-set changes remain separate investigation tasks.
 
-Further NWM retrospective development remains subject to consultation with Josh Cunningham.
+Further NWM retrospective development remains subject to consultation with the designated NWM retrospective specialist.
 
 
 ## Historical NWM reach-set compatibility — November 7, 2026
@@ -1913,7 +1913,7 @@ The change from int32 to int64 also requires no immediate modification because t
 
 Inspect existing RouteLink resolution logic and identify authoritative historical RouteLink sources before assessing cross-version gage-to-reach compatibility.
 
-Further NWM retrospective development remains subject to consultation with Josh Cunningham.
+Further NWM retrospective development remains subject to consultation with the designated NWM retrospective specialist.
 
 ### RouteLink v3.1.6 compatibility validation
 
@@ -1999,7 +1999,7 @@ The historical operational `feature_id` sets also differ between the sampled 201
 - Availability of all cycles, forecast leads, and ensemble members has not been exhaustively verified.
 - Source observations should not be interpreted as authoritative archive start or end dates.
 - Retrospective NWM and GEOGLOWS coverage remain outside this operational inventory.
-- Further retrospective NWM development requires consultation with Josh Cunningham; GEOGLOWS development requires consultation with Riley Hales.
+- Further retrospective NWM development requires consultation with the designated NWM retrospective specialist; GEOGLOWS development requires consultation with the designated GEOGLOWS specialist.
 
 ### Remaining roadmap work
 
