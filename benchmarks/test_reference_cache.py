@@ -179,7 +179,7 @@ def test_failed_refresh_preserves_valid_record(
             downloader,
         )
 
-    assert path.read_bytes() == original_bytes  
+    assert path.read_bytes() == original_bytes
 
 def test_fresh_loader_replaces_corrupt_record(
     tmp_path, valid_reference
