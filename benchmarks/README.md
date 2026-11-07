@@ -150,7 +150,7 @@ Run the complete test suite:
 uv run --locked pytest -q
 ```
 
-**Last verified result: 67 tests passed**, including 14 benchmark-specific tests.
+**Latest verified result: 638 tests passed (November 7, 2026).**.
 
 The benchmark tests verify batch extraction, feature identity, reach ordering, single-reach compatibility, non-finite value rejection, CSV output structure, streamflow disagreement detection, and timestamp disagreement detection.
 
@@ -174,27 +174,32 @@ Remote reference/source compatibility and concurrent cache refresh remain unreso
 
 See `PROGRESS.md` for experimental measurements and limitations.
 
-## 10. Remaining Development
+## 10. Remaining Validation and Research
 
-Work follows the sequence in `docs/ROADMAP.md`.
+The following capabilities have been implemented:
 
-### Phase 1 — Complete benchmarking
+- Multi-reach retrieval and full 18-hour short-range benchmarking.
+- Kerchunk-first operational retrieval with native NetCDF fallback.
+- Reference caching and integrity validation.
+- USGS gage resolution using RouteLink.
+- Geographic point, bounding-box, and polygon selection.
+- Short-, medium-, and long-range operational product configurations.
+- Analysis t0 integration and CSV/Parquet output.
+- Selected historical Kerchunk/native NetCDF comparisons.
 
-Expand the benchmark to complete forecast cycles, multiple reaches, and periods spanning days or weeks. Improve performance measurement controls and investigate CIROH reference age/version compatibility.
+Remaining research priorities include:
 
-### Phase 2 — Reach resolution
+- Controlled performance measurements across additional dates and cycles.
+- Continuous historical source-availability verification.
+- Version-specific RouteLink and NWM network compatibility.
+- Complete medium- and long-range forecast-horizon validation.
+- Scientific assessment of long-range ensemble initialization.
+- Live end-to-end geographic-selection validation.
+- Additional NWM domains where explicitly authorized.
 
-Implement RouteLink/hydrofabric-based mapping for USGS gages and geographic selections.
+See [PROGRESS.md](PROGRESS.md) for experimental evidence, numerical results, and scientific limitations.
 
-### Phase 3 — Operational retrieval
-
-Integrate Kerchunk-first access, native NetCDF fallback, reference preprocessing and caching, product/domain/ensemble selection, and default `analysis_assim` t0 retrieval.
-
-### Phase 4 — Outputs and compatibility
-
-Add Parquet alongside CSV, preserve forecast reference and valid times, lead time and source product, and validate model-version differences and source coverage.
-
-GEOGLOWS and further NWM retrospective development remain subject to the approval gates in `docs/ROADMAP.md`.
+Further NWM retrospective and GEOGLOWS development must follow the consultation requirements in [the project roadmap](../docs/ROADMAP.md).
 
 ## 11. Development Practices
 

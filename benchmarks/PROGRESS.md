@@ -1,109 +1,133 @@
+# NWM Operational Retrieval — Research and Validation Progress
 
-# NWM Operational Retrieval — Development Progress
+**Last updated:** November 7, 2026
+**Project:** `streamflow_getter`
+**Development branch:** `research/nwm-historical-coverage`
+**Requirements:** [Project roadmap](../docs/ROADMAP.md)
+**Status:** Operational CONUS retrieval implemented; historical compatibility and scientific validation ongoing.
 
-**Last updated:** October 27, 2026  
-**Branch:** `benchmark/nwm-kerchunk-native`  
-**Requirements:** `docs/ROADMAP.md`  
-**Status:** Benchmark development and validation in progress
+## 1. Research overview
 
-## 1. Objective
+This report consolidates the experimental evidence, implemented capabilities, and outstanding limitations for National Water Model (NWM) operational streamflow retrieval.
 
-Develop and evaluate reliable, efficient retrieval of operational National Water Model (NWM) streamflow using Kerchunk references and native NetCDF.
+The research evaluates four retrieval methods, Kerchunk reference caching, NWM feature resolution, operational forecast products, historical model compatibility, and end-to-end data export.
 
-The work focuses on retrieval performance, network transfer, numerical agreement, reach resolution, and reference caching before integration into the operational package.
+The results distinguish three levels of evidence:
 
-## 2. Reference Dataset
+- **Implemented:** functionality exists in the production package.
+- **Automated validation:** behavior has been tested using controlled or mocked inputs.
+- **Real-data validation:** retrieval or processing has been tested using actual NWM data.
+
+Successful retrieval on selected dates does not establish continuous historical coverage, full forecast-horizon compatibility, or hydrologic correctness for every location.
+
+The latest reported complete test suite passed **638 tests** on November 7, 2026.
+
+## 2. Reference dataset and retrieval methods
+
+### 2.1 Reference configuration
 
 | Parameter | Configuration |
 |---|---|
 | Forecast date | 2026-04-19 |
 | Product | `short_range` |
-| Forecast cycle | `t00z` |
+| Cycle | 00 UTC |
 | Domain | CONUS |
-| Variable | `streamflow` (m³/s) |
-| Initial benchmark | `f001`–`f006` |
-| Available forecast horizon | `f001`–`f018` |
-| Available cycles | 24 hourly cycles |
-| Total channel_rt files | 432 |
+| Variable | `streamflow` |
+| Units | m³/s |
+| Forecast leads | f001–f018 |
+| Forecast cycles | 24 hourly cycles |
+| Channel files for the tested date | 432 |
 | Features per file | 2,776,734 |
 
-The reference dataset was verified for the tested forecast date and product.
+### 2.2 Retrieval methods
 
-## 3. Completed Experiments
+Four retrieval approaches were evaluated:
 
-### Experiment 1 — Retrieval Method Comparison
+1. Kerchunk remote references.
+2. Native NetCDF through remote HTTP range requests.
+3. Full native NetCDF download followed by local reading.
+4. Native NetCDF reading from an existing local file.
 
-Four methods were implemented and tested:
+The benchmarks measured elapsed retrieval time and accounted HTTP response-body bytes. The byte measurements do not include all protocol overhead.
 
-1. Kerchunk remote references
-2. Native NetCDF through HTTP range requests
-3. Native NetCDF full download and local read
-4. Native NetCDF local read
+## 3. Retrieval performance
 
-**Repeated benchmark:** Six forecast hours, five trials per method and hour, one reach, 120 retrieval operations.
+### 3.1 Initial repeated benchmark
 
-| Method | Median time |
-|---|---:|
-| Native remote | 0.3554 s |
-| Kerchunk | 0.4753 s |
-| Native download | 0.6416 s |
-| Native local | 0.0600 s |
+Six forecast hours, five trials per method and hour, one NWM reach, and 120 retrieval operations.
 
-Accounted response-body totals across 30 operations per remote method:
+| Method | Median retrieval time | Accounted bytes |
+|---|---:|---:|
+| Native remote | 0.3554 s | 123.89 MB |
+| Kerchunk | 0.4753 s | 79.41 MB |
+| Native download | 0.6416 s | 429.95 MB |
+| Native local | 0.0600 s | 0 |
 
-| Method | Data transferred |
-|---|---:|
-| Kerchunk | 79.41 MB |
-| Native remote | 123.89 MB |
-| Native download | 429.95 MB |
+Byte totals cover 30 operations per remote method.
 
-Native remote was faster in this experiment, while Kerchunk required fewer accounted response-body bytes.
+Native remote retrieval was faster than Kerchunk in this experiment, while Kerchunk required fewer accounted response-body bytes.
 
-### Experiment 2 — Cache Behavior
+### 3.2 Complete 18-hour forecast benchmark
 
-Investigated same-process versus separate-process retrieval and Kerchunk reference caching.
+**Configuration:** April 19, 2026; short-range CONUS; cycle 00 UTC; forecast leads f001–f018; five reaches; four methods; one trial per lead.
 
-| Cache experiment | Median time |
-|---|---:|
-| Same-process native remote | 0.491 s |
-| Separate-process native remote | 0.943 s |
-| Kerchunk without reference cache | 0.434 s |
-| Kerchunk with memory cache | 0.320 s |
-| Kerchunk with disk cache | 0.292 s |
+The experiment produced 72 retrieval operations and 360 streamflow records.
 
-The reference JSON was 7,887 bytes. Caching avoided repeated reference downloads but did not eliminate remote model-data chunk retrieval.
+| Method | Median time | Accounted bytes |
+|---|---:|---:|
+| Native remote | 0.476 s | 74,245,753 |
+| Kerchunk | 0.497 s | 47,558,690 |
+| Native download | 0.545 s | 257,304,483 |
+| Native local | 0.061 s | 0 |
 
-These timings were exploratory; network and cache conditions were not fully controlled.
+All forecast leads passed the numerical and timestamp comparisons. No duplicate records were detected.
 
-### Experiment 3 — Reference Validation and Persistence
+### 3.3 Complete 18-hour benchmark with three trials
 
-Developed an experimental single-record reference-cache implementation with:
+**Configuration:** April 19, 2026; short-range CONUS; 18 forecast leads; five reaches; three trials per lead and method.
 
-- Structural and external byte-range validation
-- Source URL identity verification
-- ETag and GCS generation metadata comparison
-- SHA-256 integrity checks
-- Atomic cache-file replacement
-- Failed-refresh protection
+The experiment produced **216 retrieval operations and 1,080 streamflow records**.
 
-The tested reference contained 32 entries, including seven external byte-range references.
+| Method | Median time | Accounted bytes |
+|---|---:|---:|
+| Kerchunk | 0.482 s | 142,676,070 |
+| Native remote | 0.477 s | 222,737,259 |
+| Native download | 0.536 s | 771,913,449 |
+| Native local | 0.060 s | 0 |
 
-### Experiment 4 — Live Cache Integration
+Kerchunk used approximately 35.9% fewer accounted bytes than native remote retrieval and 81.5% fewer than full native downloads.
 
-Tested against the operational NWM forecast for reach `3586192`, hour `f001`.
+Kerchunk and native remote retrieval had similar median times. The experiment does not establish a statistically controlled speed advantage.
 
-| Execution | Cache retrieval time |
-|---|---:|
-| First (reference downloaded) | 0.748 s |
-| Second (reference reused) | 0.429 s |
+### 3.4 Three-day benchmark
 
-Both executions returned `0.40999999083578587 m³/s`, with valid time `2026-04-19 01:00 UTC` and reference time `2026-04-19 00:00 UTC`.
+**Configuration:** April 19–21, 2026; short-range CONUS; cycle 00 UTC; lead f001; five reaches; four methods; one trial per date.
 
-The experiment verified cross-process reference reuse, not a controlled performance improvement.
+The experiment produced 12 retrieval operations and 60 streamflow records.
 
-### Experiment 5 — Multi-Reach Retrieval
+| Method | Median time | Accounted bytes |
+|---|---:|---:|
+| Kerchunk | 0.608 s | 7,865,304 |
+| Native remote | 0.632 s | 12,313,146 |
+| Native download | 0.501 s | 42,627,027 |
+| Native local | 0.060 s | 0 |
 
-Verified five feature IDs at consistent array indices across six forecast hours.
+Kerchunk used 36.1% fewer accounted bytes than native remote and 81.5% fewer than full native downloads.
+
+All four methods returned matching streamflow and timestamps.
+
+### 3.5 Five-reach benchmark
+
+One forecast lead, one trial, five reaches.
+
+| Method | Elapsed time | Accounted bytes |
+|---|---:|---:|
+| Native download | 0.595 s | 14,324,480 |
+| Native remote | 0.868 s | 4,131,132 |
+| Kerchunk | 0.901 s | 2,648,518 |
+| Native local | 0.059 s | 0 |
+
+The five tested feature IDs were:
 
 | Feature ID | Array index | f001 streamflow (m³/s) |
 |---|---:|---:|
@@ -113,1769 +137,235 @@ Verified five feature IDs at consistent array indices across six forecast hours.
 | 14191043 | 1,500,000 | 16,062.71 |
 | 23610484 | 2,500,000 | 0.01 |
 
-Implemented shared batch extraction for native local, native remote, and Kerchunk readers. The full benchmark also supports native download followed by batch reading.
+These positions apply to the tested reference configuration and must not be assumed valid across historical NWM networks.
 
-**Five-reach benchmark:** One forecast hour, one trial, four methods.
+### 3.6 Benchmark interpretation
 
-| Method | Elapsed time | Accounted bytes |
-|---|---:|---:|
-| Native download | 0.595 s | 14,324,480 |
-| Native remote | 0.868 s | 4,131,132 |
-| Kerchunk | 0.901 s | 2,648,518 |
-| Native local | 0.059 s | 0 |
+The repeated experiments support the conclusion that Kerchunk can substantially reduce accounted data transfer for selected streamflow queries.
 
-All methods returned matching streamflow and forecast timestamps.
+They do not establish that Kerchunk is universally faster, because network conditions, cache state, and remote-service behavior were not fully controlled.
 
-Performance and scientific outputs are separated into:
+Reach-resolution time was excluded from the retrieval benchmarks.
+
+Benchmark output includes:
 
 - `benchmarks/results/repeated_benchmark.csv`
 - `benchmarks/results/repeated_benchmark_flows.csv`
 
-## 4. Automated Validation
+See [Benchmark documentation](README.md) for execution procedures.
 
-**61 tests passed**, including eight benchmark-specific tests.
+## 4. Reference caching and validation
 
-Verified behavior includes batch extraction, feature-ID identity and ordering, single-reach compatibility, non-finite value rejection, CSV output structure, streamflow mismatch detection, and timestamp mismatch detection.
+### 4.1 Cache performance
 
-The existing package tests remain passing.
+| Experiment | Median time |
+|---|---:|
+| Same-process native remote | 0.491 s |
+| Separate-process native remote | 0.943 s |
+| Kerchunk without reference cache | 0.434 s |
+| Kerchunk with memory cache | 0.320 s |
+| Kerchunk with disk cache | 0.292 s |
 
-## 5. Remaining Limitations
+The tested reference JSON contained 7,887 bytes.
 
-- Multi-reach timing has been measured for only one forecast hour and one trial.
-- Full 18-hour cycles and multi-day or multi-week benchmarks remain pending.
-- Network and cache conditions were not fully controlled.
-- Accounted response-body bytes exclude some HTTP metadata and protocol overhead.
-- Reach resolution is excluded from timed retrievals.
-- Remote reference/source version compatibility is not fully established.
-- Concurrent cache refresh and operational cache integration remain untested.
-- RouteLink-based geographic and gage resolution is not implemented.
+Caching avoids repeated reference downloads but does not eliminate retrieval of remote model-data chunks.
 
-## 6. Next Development Priorities
+A separate live experiment returned:
 
-Following `docs/ROADMAP.md`:
+| Execution | Retrieval time |
+|---|---:|
+| First retrieval | 0.748 s |
+| Cached retrieval | 0.429 s |
 
-1. **Complete benchmarking:** Expand to 18 forecast hours, multiple cycles, several reaches, and days/weeks. Investigate reference age/version compatibility and reproducible performance.
-2. **Reach resolution:** Implement RouteLink/hydrofabric mapping for gages and spatial selections.
-3. **Operational retrieval:** Integrate Kerchunk-first access, native NetCDF fallback, reference preprocessing/cache, product selection, ensembles, and default `analysis_assim` t0 handling.
-4. **Outputs and compatibility:** Add Parquet alongside CSV, preserve forecast reference/valid times and lead time, and validate products, domains, and model versions.
+Both returned `0.40999999083578587 m³/s` for feature ID `3586192`, valid at April 19, 2026, 01:00 UTC.
 
-GEOGLOWS and further NWM retrospective development remain subject to the approval gates in `docs/ROADMAP.md`.
+These measurements establish cache reuse, not a controlled performance improvement.
 
-## 7. Development Practices
+### 4.2 Reference validation
 
-Development remains on the current branch. Reuse existing implementations, avoid redundant scripts and unnecessary backup files, maintain automated test coverage, and use Git for version history.
+The production cache and validation implementation supports:
 
-Pull-request preparation is postponed until development and validation are complete.
-
-
-## Complete 18-hour forecast benchmark — 2026-10-27
-
-Configuration:
-- Forecast: 2026-04-19, short_range, t00z, CONUS
-- Forecast hours: f001–f018
-- Reaches: 5
-- Methods: 4
-- Trials: 1
-- Retrieval operations: 72
-- Streamflow records: 360
-
-Results:
-
-| Method | Median time (s) | Accounted bytes |
-|---|---:|---:|
-| Native remote | 0.476 | 74245753 |
-| Kerchunk | 0.497 | 47558690 |
-| Native download | 0.545 | 257304483 |
-| Native local | 0.061 | 0 |
-
-Scientific validation:
-- All 18 forecast hours passed.
-- Streamflow agreement verified for all five reaches.
-- Forecast valid and reference times matched.
-- No duplicate records detected.
-
-Limitations:
-- One forecast cycle and one trial per hour.
-- Reach resolution excluded from timing.
-- Network and cache conditions not controlled.
-- Accounted bytes do not include complete HTTP overhead.
-
-Next:
-- Repeat full-cycle measurements.
-- Expand to multiple forecast cycles and dates.
-- Investigate reference age/version compatibility.
-
-
-## Complete 18-hour benchmark — Three trials (2026-10-27)
-
-Configuration:
-- NWM short_range, CONUS, 2026-04-19, t00z
-- Forecast hours: f001–f018
-- Reaches: 5
-- Trials: 3
-- Methods: Kerchunk, native remote, native download, native local
-
-Validation:
-- 216 retrieval operations
-- 1,080 streamflow records
-- All streamflow and forecast timestamps matched
-- No duplicate records
-- Last automated test suite: 63 passed
-
-| Method | Median (s) | Accounted bytes |
-|---|---:|---:|
-| Kerchunk | 0.482 | 142676070 |
-| Native remote | 0.477 | 222737259 |
-| Native download | 0.536 | 771913449 |
-| Native local | 0.060 | 0 |
-
-Findings:
-- Kerchunk used 35.9% fewer accounted bytes than native remote.
-- Kerchunk used 81.5% fewer than full native downloads.
-- Kerchunk and native remote had similar median retrieval times.
-- Cache and network conditions were not fully controlled.
-- Reach resolution was excluded from timed retrievals.
-
-Next:
-- Extend benchmarking to multiple forecast cycles and dates.
-- Investigate CIROH reference age/version compatibility.
-
-
-
-**Last updated:** October 29, 2026
-
-**Current status:** Configurable multi-reach NWM benchmark validated.
-
-### Latest verified milestone
-
-- Complete 18-hour short-range forecast cycle.
-- Five NWM reaches.
-- Four retrieval methods.
-- Three repeated trials.
-- 216 retrieval operations.
-- 1,080 streamflow records.
-- Numerical agreement across retrieval methods.
-- Forecast date, cycle, and lead-hour validation.
-- Atomic native NetCDF downloads.
-- Configurable forecast paths and output filenames.
-- Complete automated test suite: 64 passed.
-
-### Next priority
-
-Extend validated multi-day benchmarking to longer date ranges
-and repeated trials, then evaluate performance consistency,
-reference compatibility, and cache behavior.
-
-
-
-## Automated three-day benchmark — October 29, 2026
-
-Configuration:
-- Forecast dates: 2026-04-19 through 2026-04-21
-- Product: short_range, CONUS, t00z
-- Forecast hour: f001
-- Reaches: 5
-- Retrieval methods: 4
-- Trials: 1 per date
-
-Validated results:
-- 12 retrieval operations
-- 60 streamflow records
-- Correct forecast reference and valid times
-- Numerical agreement across all four methods
-- No duplicate records
-
-| Method | Median time (s) | Accounted bytes |
-|---|---:|---:|
-| Kerchunk | 0.608 | 7865304 |
-| Native remote | 0.632 | 12313146 |
-| Native download | 0.501 | 42627027 |
-| Native local | 0.060 | 0 |
-
-Findings:
-- Kerchunk transferred 36.1% fewer accounted bytes than native remote.
-- Kerchunk transferred 81.5% fewer than full native downloads.
-- Timing differences remain inconclusive.
-- Cache and network conditions were not fully controlled.
-
-Validation:
-- Multi-day execution and date isolation tested.
-- CSV overwrite protection and ordinary failure cleanup tested.
-- Last automated test suite: 67 passed.
-
-Next:
-- Extend to longer date ranges with repeated trials.
-- Investigate Kerchunk reference freshness and source compatibility.
-- Review benchmark findings before operational integration.
-
-## Kerchunk reference compatibility — October 29, 2026
-
-Reference:
-- Forecast: 2026-04-19, short_range, t00z, f001, CONUS
-- Native source size: 14,324,480 bytes
-- Kerchunk reference size: 7,887 bytes
-- Reference entries: 32
-- External byte ranges: 7
-- Maximum referenced byte boundary: 14,324,480
-
-Validation:
-- Reference structure passed.
-- External source URL identity passed.
-- All external byte ranges fit within the native source.
-- NWM version: v3.0
-- NWM code version: v5.3.0-alpha1
-- Previous Kerchunk/native streamflow comparisons passed.
-
-Limitations:
-- Reference JSON does not expose the original GCS source generation.
-- Exact reference/source generation compatibility is not proven.
-- Valid byte ranges do not guarantee identical source contents.
-- Validation covers the selected forecast and tested reaches.
-- Cache freshness detection does not establish original provenance.
-
-Conclusion:
-The tested reference is structurally valid and consistent with
-the current native source size and selected streamflow values.
-Retain conservative cache invalidation when source metadata changes.
-
-Next:
-- Proceed to operational reach resolution using RouteLink/hydrofabric.
-- Preserve reference compatibility checks for future integration.
-
-## Operational RouteLink reach resolution — October 29, 2026
-
-Source:
-- Repository: jameshalgren/troute-lab
-- Source revision: bb24900e3229851f6e997b037c337a8643471562
-- Dataset: NWM v3.1.6 RouteLink_CONUS.nc
-- File size: 269,369,766 bytes
-- SHA-256: 4957655896f4f27854f893d02fa084f9f79c1cf8e80ce77565a7356dadb6fc0e
-
-Verified dataset:
-- 2,776,734 unique NWM feature IDs.
-- 8,735 unique gage associations.
-- All five benchmark feature IDs found.
-- USGS 08165500 maps to NWM feature_id 3586192.
-- All associated RouteLink coordinates have valid numeric ranges.
-
-Implementation:
-- Added reusable operational gage resolver.
-- Preserves identifiers as exact strings.
-- No automatic leading-zero padding.
-- Detects duplicate feature IDs and ambiguous gage mappings.
-- Rejects noninteger feature IDs.
-- Supports configurable RouteLink NetCDF loading.
-- No permanent geospatial dependencies added.
-
-Validation:
-- Real RouteLink loader passed.
-- Twenty USGS API pilot identifiers matched exactly.
-- Point-to-point geographic distances ranged from 11.6 m to 2932.2 m.
-- Complete automated test suite: 78 passed.
-
-Limitations:
-- Complete geographic and hydrologic association accuracy is not established.
-- RouteLink v3.1.6 compatibility with all operational NWM versions is not proven.
-- Point, bounding-box, and polygon resolution remain pending.
-- NetCDF reading requires an available optional backend.
-
-
-
-## Geographic NWM reach resolution — November 3, 2026
-
-### Objective
-
-Implement the geographic reach-selection functionality requested
-in docs/ROADMAP.md using NWM RouteLink and channel hydrofabric.
-
-### Implementation
-
-Module: src/streamflow_getter/spatial_resolution.py
-
-Supported operations:
-
-- USGS gage resolution through RouteLink
-  (reach_resolution.py).
-- Geographic point selection using projected channel distances.
-- Bounding-box selection using channel-geometry intersection.
-- Polygon and MultiPolygon selection using channel-geometry
-  intersection.
-
-Geographic implementation:
-
-- Input geographic coordinates: EPSG:4326.
-- Verified CONUS hydrofabric CRS: EPSG:4269.
-- Point distance calculations: EPSG:5070.
-- Geographic candidate loading: pyogrio.
-- Exact geometric intersection: GeoPandas/Shapely.
-- Feature-ID validation rejects noninteger and nonpositive IDs.
-- Hydrofabric CRS validation occurs before geographic loading.
-- Spatial dependencies are optional under the `spatial` extra.
-
-### Dataset provenance
-
-Source: jameshalgren/troute-lab
-Dataset: NWM v3.1.6 channel hydrofabric
-
-Local source:
-~/Documents/troute-lab/data/NWM_v3_hydrofabric.gdb
-
-Original archive:
-NWM_channel_hydrofabric.tar.gz
-
-Source URL:
-https://www.nohrsc.noaa.gov/owp_files/nwm/data_tools/NWM_channel_hydrofabric.tar.gz
-
-Published SHA-256:
-77d8975b543ff864cdac0736cc4f455fe86d77049c4d8b1fb8e458ec755dbc94
-
-Previously verified:
-- 2,776,734 unique CONUS feature IDs.
-- Exact RouteLink/hydrofabric feature-ID set correspondence.
-
-### Validation
-
-Automated:
-- 26 spatial tests passed.
-- 104 total tests passed with the spatial extra.
-- Standard environment previously passed 78 tests with
-  one optional module skipped.
-
-Real hydrofabric:
-- USGS 08165500 nearest reach: 3586192.
-- Nearest channel distance: approximately 98.34 m.
-- Bounding-box selection: 18 reaches.
-- Polygon selection: 12 reaches.
-- No missing or unexpected reaches in the earlier independent
-  geographic subset comparisons.
-
-### Limitations
-
-- Current geographic implementation targets CONUS.
-- Other NWM domains require domain-specific CRS and validation.
-- Point distances are projected distances, not exact geodesic
-  distances.
-- Nearest-channel selection does not establish hydrologic
-  connectivity or guarantee correct gage association.
-- Geographic search-envelope completeness has not been
-  established for all CONUS locations.
-- Bounding boxes crossing the antimeridian are unsupported.
-- Compatibility across all historical NWM versions is unverified.
-- Spatial selection is not yet connected to operational
-  streamflow retrieval.
-
-### Next
-
-- Review the final implementation and tests.
-- Integrate reach selection with operational NWM retrieval.
-- Continue Kerchunk-first access, native fallback, and caching
-  according to docs/ROADMAP.md.
-
-
-
-## Operational NWM retrieval — November 3, 2026
-
-### Objective
-
-Implement the initial operational NWM retrieval workflow described
-in docs/ROADMAP.md, reusing the existing benchmark implementations.
-
-### Scope
-
-Initial supported configuration:
-
-- NWM product: short_range
-- Domain: CONUS
-- Output variable: streamflow
-- Forecast data: channel_rt
-- Reference case: 2026-04-19, t00z, f001
-
-Other products, domains, ensemble members, and analysis t0 remain
-outside the validated implementation.
-
-### Production implementation
-
-Modules:
-
-- src/streamflow_getter/operational_nwm.py
-- src/streamflow_getter/reference_validation.py
-- src/streamflow_getter/reference_cache.py
-
-Implemented functionality:
-
-- Forecast configuration and source identification.
-- Forecast reference-time and valid-time validation.
-- Multi-reach streamflow extraction using feature IDs.
-- Kerchunk-first operational retrieval.
-- Native NetCDF remote retrieval.
-- Controlled native fallback for selected access failures.
-- Optional reference caching.
-- Reference structure and source-identity validation.
-- SHA-256 cache-record integrity validation.
+- Reference structure and external byte-range checks.
+- Source URL identity verification.
+- ETag and source-generation metadata comparison.
+- SHA-256 integrity verification.
 - Atomic cache-record persistence.
-- Reference ETag and source-generation freshness checks.
+- Protection against failed refreshes.
 - Rejection of unresolved source-generation changes.
 
-Caching is opt-in through cache_dir.
-
-When caching is enabled, the coordinator currently propagates
-retrieval errors rather than automatically attempting native fallback.
-
-### Validation
-
-Automated:
-
-- 177 tests passed with spatial and operational extras.
-- Git whitespace validation passed.
-
-Live reference forecast:
-
-- Date: 2026-04-19
-- Cycle: t00z
-- Product: short_range
-- Lead hour: f001
-- Domain: CONUS
-- Feature ID: 3586192
-- Streamflow: 0.40999999083578587 m3/s
-- Valid time: 2026-04-19 01:00 UTC
-- Reference time: 2026-04-19 00:00 UTC
-
-Verified:
-
-- Kerchunk retrieval.
-- Native NetCDF retrieval.
-- Controlled native fallback after simulated Kerchunk failure.
-- Cached Kerchunk retrieval and cache-record reuse.
-- Compatibility with existing benchmark extraction and cache behavior.
-
-### Known limitations
-
-- Initial production support is limited to short_range CONUS.
-- Forecast t0 from analysis_assim is not yet implemented.
-- Medium-range, long-range, ensemble, and other-domain support
-  remains pending.
-- Cache metadata comparison does not independently prove that
-  Kerchunk references were generated against the current NetCDF
-  source generation.
-- Cached requests currently disable automatic native fallback.
-- Broad OSError classification for uncached fallback requires
-  further refinement.
-- Reference JSON size is not equivalent to network bytes transferred.
-- Production CLI integration is not yet implemented.
-- Parquet output is not yet implemented.
-- Operational availability across dates and model versions has
-  not been comprehensively validated.
-
-### Next
+The original reference validation experiment inspected 32 reference entries, including seven external byte ranges.
 
-- Review the final implementation and staged changes.
-- Refine source compatibility and fallback error classification.
-- Integrate the operational reader with the CLI.
-- Implement forecast t0 handling according to docs/ROADMAP.md.
-- Add structured CSV/Parquet output with forecast reference time
-  and lead time.
-
-## NWM analysis t0 integration — November 3, 2026
-
-### Objective
-
-Implement default analysis_assim t0 retrieval for operational
-short_range CONUS forecasts, following docs/ROADMAP.md.
-
-### Implementation
-
-Module: src/streamflow_getter/operational_nwm.py
-
-- Resolve analysis_assim channel_rt tm00 for lead hour zero.
-- Preserve existing short_range forecast retrieval for positive leads.
-- Reuse Kerchunk-first and native NetCDF retrieval.
-- Preserve controlled fallback and optional reference caching.
-- Separate analysis_assim and short_range cache records.
-- Validate source identity, feature IDs, and timestamps.
-- Preserve the original analysis reference_time.
-- Assemble t0 and forecast hours into a pandas DataFrame.
-- Include t0 by default, with include_t0=False available.
-- Reject invalid reach IDs before remote retrieval.
-- Reject inconsistent forecast identity and nonfinite streamflow.
-
-### Live validation
-
-Reference date: 2026-04-19
-Forecast cycle: t00z
-Domain: CONUS
-Feature ID: 3586192
-
-Analysis t0:
-- Product: analysis_assim
-- Valid time: 2026-04-19 00:00 UTC
-- Source reference time: 2026-04-18 21:00 UTC
-- Streamflow: 0.40999999083578587 m3/s
-
-Forecast f001:
-- Product: short_range
-- Valid time: 2026-04-19 01:00 UTC
-- Source reference time: 2026-04-19 00:00 UTC
-- Streamflow: 0.40999999083578587 m3/s
-
-Kerchunk and native NetCDF returned matching t0 values and timestamps.
+The tested native source size was 14,324,480 bytes; the maximum referenced byte boundary matched that size.
 
-Nine analysis cycles were checked for the reference date.
-All had valid times matching their requested cycle hours and
-source reference times three hours earlier.
+**Limitation:** valid byte ranges, ETag comparisons, and cache integrity do not independently prove that a reference was generated from the current source contents.
 
-The analysis and forecast f001 files contained 2,776,734
-feature IDs with identical membership and ordering.
+## 5. Operational NWM implementation
 
-The complete t0 + f001 series was retrieved successfully
-through the production Kerchunk workflow.
+The production implementation uses reusable modules for forecast configuration, source resolution, Kerchunk and native NetCDF retrieval, reach selection, reference validation, caching, and output serialization.
 
-### Automated validation
+Key modules include:
 
-- 218 tests passed with spatial and operational extras.
-- Python compilation passed.
-- Git whitespace validation passed.
+| Module | Responsibility |
+|---|---|
+| `operational_nwm.py` | Forecast products, retrieval, timestamps, and series assembly |
+| `reference_cache.py` | Reference persistence and reuse |
+| `reference_validation.py` | Reference integrity and source checks |
+| `reach_resolution.py` | USGS gage to NWM feature mapping |
+| `spatial_resolution.py` | Geographic channel selection |
+| `output.py` | CSV and Parquet serialization |
+| `cli.py` | Command-line integration |
 
-### Limitations
+### 5.1 Supported forecast products
 
-- Validated production support remains short_range CONUS.
-- The observed three-hour analysis reference-time offset must
-  not be assumed universal.
-- Compatibility across other dates, products, domains, and
-  NWM versions remains unverified.
-- Medium-range and long-range ensemble t0 handling is pending.
-- analysis_assim_no_da handling is pending.
-- Operational CLI integration is pending.
-- CSV/Parquet output integration is pending.
-- Cached retrieval currently propagates errors rather than
-  automatically attempting native fallback.
+| Product | Cycles (UTC) | Modern forecast schedule |
+|---|---|---|
+| `short_range` | 00–23 hourly | f001–f018, hourly |
+| `medium_range_mem1` | 00, 06, 12, 18 | f001–f240, hourly |
+| `medium_range_mem2`–`mem6` | 00, 06, 12, 18 | f001–f204, hourly |
+| `medium_range_blend` | 00, 06, 12, 18 | f001–f240, hourly |
+| `medium_range_no_da` | 00, 06, 12, 18 | f003–f240, every 3 hours |
+| `long_range_mem1`–`mem4` | 00, 06, 12, 18 | f006–f720, every 6 hours |
 
-### Next
+Historical medium-range ensemble schedules differ, as documented in Section 7.
 
-- Review staged changes and commit the t0 milestone.
-- Implement CSV/Parquet output according to docs/ROADMAP.md.
-- Integrate operational retrieval into the existing CLI.
-- Expand product and domain support after source validation.
+### 5.2 Analysis timestep
 
-## CSV and Parquet output writer — November 3, 2026
+The operational CLI includes an analysis timestep (`t0`) by default.
 
-### Objective
+Most supported products use `analysis_assim`. The `medium_range_no_da` product uses `analysis_assim_no_da`.
 
-Implement reusable CSV and Parquet serialization following
-README.md and docs/ROADMAP.md.
+For the April 19, 2026, cycle 00 UTC reference case:
 
-### Implementation
+- Analysis valid time: 2026-04-19 00:00 UTC.
+- Analysis reference time: 2026-04-18 21:00 UTC.
+- Short-range f001 valid time: 2026-04-19 01:00 UTC.
+- Forecast reference time: 2026-04-19 00:00 UTC.
 
-Module: src/streamflow_getter/output.py
+The observed three-hour analysis reference-time offset must not be assumed universal.
 
-- Reusable write_timeseries() library function.
-- CSV and Parquet serialization using pandas.
-- Optional pyarrow dependency through the parquet extra.
-- Output format inferred from .csv or .parquet extensions.
-- Explicit output_format selection supported.
-- Conflicting explicit formats and extensions rejected.
-- Existing output files protected from overwriting.
-- Temporary-file serialization before publication.
-- Cleanup after serialization or publication failures.
-- Original DataFrame columns preserved.
+Long-range products currently use the shared `analysis_assim` t0 specified in the project roadmap. This is technically validated for selected cases, but its equivalence to the ensemble members' internal initialization states is not established.
 
-### Validation
+The CLI supports `--no-t0`.
 
-- 20 output-specific tests passed.
-- 238 complete repository tests passed.
-- Python syntax validation passed.
-- Git whitespace validation passed.
-- CSV and Parquet round-trip tests passed.
-- Existing-file protection verified.
-- Simulated partial-publication failure cleanup verified.
+### 5.3 Selected product validation
 
-### Limitations
+| Product family | Real-data evidence |
+|---|---|
+| Short-range | Kerchunk/native agreement; CLI retrieval |
+| Medium-range members 1–6 | Kerchunk/native agreement at selected f001 leads |
+| Medium-range blend | Kerchunk/native agreement at f001; CLI t0–f002 |
+| Medium-range no-DA | Correct analysis source; native/Kerchunk agreement for t0 and f003 |
+| Long-range members 1–4 | Kerchunk/native agreement at f006; CLI t0, f006, f012 |
 
-- Operational CLI integration is not yet implemented.
-- The --format CLI argument is not yet implemented.
-- The existing retrospective CLI still writes CSV directly.
-- The writer does not independently validate scientific
-  metadata; it expects a validated input DataFrame.
-- CSV timestamps are serialized as text, while Parquet
-  preserves supported column data types.
+The principal modern validation case used April 19, 2026, cycle 00 UTC, feature ID `3586192`.
 
-### Next
+For `medium_range_no_da`, the tested t0, f003, and f006 values were approximately 0.30 m³/s.
 
-- Review and commit the validated output writer.
-- Review the existing CLI architecture and project requirements.
-- Integrate CSV/Parquet selection into the CLI.
-- Preserve existing retrospective command behavior.
+For long-range members 1–4, the tested streamflow values were approximately 0.41 m³/s at t0, 0.33 m³/s at f006, and 0.23 m³/s at f012.
 
-## Operational NWM CLI integration — November 3, 2026
+The availability of f720 source objects was sampled, but complete 720-hour retrieval was not validated.
 
-### Objective
+## 6. USGS and geographic reach resolution
 
-Expose validated operational NWM short-range CONUS retrieval through
-the existing streamflow-getter command-line interface, following
-README.md and docs/ROADMAP.md.
+### 6.1 RouteLink
 
-### Implementation
+The validated NWM v3.1.6 RouteLink dataset contains:
 
-Module: src/streamflow_getter/cli.py
+- 2,776,734 unique NWM feature IDs.
+- 8,735 gage-associated reaches.
+- A verified association between USGS station `08165500` and NWM feature ID `3586192`.
 
-New subcommand: nwm-operational
+Dataset provenance:
 
-Supported options:
-- --date and --cycle
-- Repeated --reach for direct NWM feature IDs
-- --start-hour and --end-hour
-- --no-t0 to exclude analysis_assim t0
-- --cache-dir for optional reference caching
-- --format csv/parquet, with extension inference
-- --out for output destination
+- Source repository: `jameshalgren/troute-lab`
+- Source revision: `bb24900e3229851f6e997b037c337a8643471562`
+- Dataset: `RouteLink_CONUS.nc`
+- File size: 269,369,766 bytes
+- SHA-256: `4957655896f4f27854f893d02fa084f9f79c1cf8e80ce77565a7356dadb6fc0e`
 
-The CLI reuses ForecastConfig, fetch_operational_series,
-and write_timeseries without duplicating retrieval or
-serialization logic.
+USGS identifiers are preserved as strings, including leading zeros. Ambiguous associations, invalid feature IDs, and duplicate selections are rejected.
 
-Invalid forecast-hour ranges, output formats, and existing
-output destinations are rejected before retrieval.
+### 6.2 Geographic hydrofabric
 
-The original nwm retrospective command remains available
-with its existing behavior and help descriptions.
+The validated NWM v3 CONUS channel hydrofabric uses EPSG:4269, while geographic input coordinates use EPSG:4326. Point-to-channel distances are calculated in EPSG:5070.
 
-### Validation
+Dataset source:
 
-- 22 operational CLI tests passed.
-- 260 complete repository tests passed.
-- Operational and retrospective help commands passed.
-- CSV and Parquet output integration passed using mocked retrieval.
-- Retrospective execution regression test passed.
-- Git whitespace validation passed.
+`https://www.nohrsc.noaa.gov/owp_files/nwm/data_tools/NWM_channel_hydrofabric.tar.gz`
 
-### Limitations
+Published SHA-256:
 
-- Operational CLI supports direct feature IDs only.
-- RouteLink gage and geographic selection are not yet exposed.
-- Validated operational retrieval is limited to short_range CONUS.
-- Other NWM products, domains, ensembles, and model-version
-  compatibility require additional validation.
-- Cached retrieval errors currently propagate rather than
-  automatically attempting native fallback.
-- The new operational CLI has not yet undergone a live
-  end-to-end invocation through the installed command.
+`77d8975b543ff864cdac0736cc4f455fe86d77049c4d8b1fb8e458ec755dbc94`
 
-### Next
+### 6.3 Real-data selection results
 
-- Validate the operational CLI with real NWM data.
-- Extend reach selection using existing RouteLink functions.
-- Review operational support across NWM versions.
-- Prepare focused contributions following the established pull-request workflow.
+| Selection method | Result |
+|---|---|
+| Point near USGS 08165500 | Feature ID 3586192 |
+| Point-to-channel distance | Approximately 98.34 m |
+| Geographic bounding box | 19 unique reaches |
+| GeoJSON polygon | 19 unique reaches |
 
-## Operational USGS gage CLI integration — November 3, 2026
+Reference bounding box:
 
-### Objective
-
-Expose RouteLink-based USGS gage resolution through the operational
-NWM CLI, following docs/ROADMAP.md.
-
-### Implementation
-
-Module: src/streamflow_getter/cli.py
-
-- Added repeatable --gage selection.
-- Added --routelink for local RouteLink NetCDF files.
-- Preserved direct --reach selection.
-- Supported combined reach and gage requests.
-- Reused existing RouteLink resolution functions.
-- Preserved leading zeros in USGS gage identifiers.
-- Rejected missing, unknown, and duplicate selections.
-- Performed reach resolution before remote NWM retrieval.
-
-### Real-data validation
-
-RouteLink:
-- File: RouteLink_CONUS.nc
-- Reaches: 2,776,734
-- Mapped USGS gages: 8,735
-
-Reference station:
-- USGS gage: 08165500
-- NWM feature ID: 3586192
-
-Forecast:
-- Date: 2026-04-19
-- Cycle: t00z
-- Product: short_range CONUS
-- Method: Kerchunk
-
-Analysis t0:
-- Valid time: 2026-04-19 00:00 UTC
-- Reference time: 2026-04-18 21:00 UTC
-
-Forecast f001:
-- Valid time: 2026-04-19 01:00 UTC
-- Reference time: 2026-04-19 00:00 UTC
-
-The complete USGS gage to RouteLink to operational NWM
-to CSV workflow passed.
-
-### Automated validation
-
-- 29 operational CLI tests passed.
-- 267 complete repository tests passed.
-- Git whitespace validation passed.
-
-### Limitations
-
-- RouteLink compatibility across all NWM versions is not proven.
-- Geographic point, bounding-box, and polygon CLI selection
-  remain pending.
-- Operational support remains limited to short_range CONUS.
-- Real-data CLI validation covered one USGS gage and one
-  forecast cycle.
-
-### Next
-
-- Review and commit the gage CLI milestone.
-- Extend geographic CLI selection using existing spatial
-  resolution functions.
-- Validate compatibility across NWM versions.
-
-## Operational NWM geographic point CLI integration — November 5, 2026
-
-### Objective
-
-Expose existing NWM hydrofabric point-to-reach resolution through
-the operational CLI, following docs/ROADMAP.md and the geographic
-selection approach established in jameshalgren/troute-lab.
-
-### Implementation
-
-Modules:
-- src/streamflow_getter/cli.py
-- src/streamflow_getter/spatial_resolution.py (reused, unchanged)
-
-CLI arguments:
-- --point LONGITUDE LATITUDE
-- --hydrofabric PATH
-- --max-distance-m DISTANCE (default: 500)
-
-Behavior:
-- Resolve geographic coordinates to the nearest NWM channel.
-- Use actual hydrofabric channel geometries.
-- Calculate distances using the CONUS projected CRS.
-- Select the nearest candidate within the requested radius.
-- Reuse existing spatial-resolution functions.
-- Preserve direct --reach and RouteLink-based --gage selection.
-- Support combined reach-selection methods.
-- Reject duplicate feature IDs.
-- Validate invalid search radii before accessing the hydrofabric.
-- Resolve geographic selections before remote NWM retrieval.
-
-### Real-data validation
-
-Dataset:
-- NOAA NWM v3 channel hydrofabric
-- Layer: nwm_reaches_conus
-- CRS: EPSG:4269
-
-Reference location:
-- USGS station: 08165500
-- Longitude: -99.3217121935161
-- Latitude: 30.0699307434853
-
-Results:
-- Selected NWM feature ID: 3586192
-- Point-to-channel distance: approximately 98.34 m
-- Selection agrees with the previously verified RouteLink association.
-
-The operational CLI geographic-selection path was tested using
-the real hydrofabric with remote forecast retrieval mocked.
-
-No remote NWM retrieval or output-file publication was performed
-during this geographic integration test.
-
-### Automated validation
-
-- 279 complete repository tests passed with the spatial extra.
-- Invalid search radii (zero, negative, NaN, infinity) rejected.
-- Missing hydrofabric arguments rejected.
-- No-candidate selection rejected.
-- Duplicate point/reach selection rejected.
-- Combined point/gage selection tested.
-- Git whitespace validation passed.
-
-### Limitations
-
-- Operational geographic point selection currently supports CONUS.
-- Nearest geographic reach is not necessarily the correct
-  hydrologic reach near confluences or parallel channels.
-- Automatic nearest-reach selection uses distance and feature-ID
-  ordering; it does not independently validate hydrologic topology.
-- Geographic point selection has not yet undergone a live
-  end-to-end NWM forecast retrieval.
-- Bounding-box and polygon selection remain available in the
-  Python library but are not exposed in the operational CLI.
-- Compatibility across historical NWM versions remains unverified.
-
-### Next
-
-- Review CLI argument validation and combined selection behavior.
-- Add operational CLI documentation to README.md.
-- Perform final regression and source-diff checks.
-- Commit the validated geographic point CLI milestone.
-- Continue with geographic bounding-box and polygon CLI selection.
-
-
-
-## Operational NWM bounding-box CLI integration — November 5, 2026
-
-### Objective
-
-Expose existing hydrofabric bounding-box reach selection through
-the operational NWM CLI, following docs/ROADMAP.md.
-
-### Implementation
-
-- Added `--bbox WEST SOUTH EAST NORTH`.
-- Reused `reaches_in_bbox()` from spatial_resolution.py.
-- Preserved `--reach`, `--gage`, and `--point`.
-- Required `--hydrofabric` for geographic selection.
-- Added configurable `--max-reaches` (default: 100).
-- Applied the configurable reach limit to requests involving
-  --bbox, including combined reach-selection methods.
-- Preserved the previous reach-count behavior for requests
-  without --bbox.
-- Rejected empty selections, duplicate IDs, and invalid coordinates.
-- Preserved validation before remote NWM retrieval.
-- Kept spatial dependencies optional.
-
-### Real-data validation
-
-Dataset: NWM v3 CONUS channel hydrofabric.
-
-Bounding box:
 - West: -99.35
 - South: 30.05
 - East: -99.30
 - North: 30.09
 
-Results:
-- 19 NWM reaches selected.
-- 19 unique feature IDs.
-- Known USGS-associated NWM reach 3586192 included.
-- Real hydrofabric-to-CLI integration passed.
+An earlier independent geographic subset comparison returned 18 bounding-box reaches and 12 polygon reaches. These results came from a different validation stage and should not be treated as identical test configurations.
 
-The NWM retrieval function was mocked during this integration
-test. No remote forecast data was downloaded.
+The CLI geographic tests used real hydrofabric data with remote NWM retrieval mocked. They did not establish live end-to-end forecast retrieval for the point, bounding-box, or polygon options.
 
-### Automated validation
+### 6.4 Geographic limitations
 
-- 297 complete repository tests passed in both standard and
-  spatial environments.
-- Verified that the bbox limit does not restrict existing
-  direct-reach requests.
-- Successful multiple-reach selection tested.
-- Empty selections rejected.
-- Per-bbox and combined reach limits tested.
-- Duplicate combined selections rejected.
-- Invalid bounding-box coordinates rejected.
-- Remote retrieval protection tested for invalid selections.
-- Git whitespace validation passed.
+Geographic selection currently targets CONUS.
 
-### Limitations
+The nearest channel may not represent the intended hydrologic reach, especially near confluences or parallel channels.
 
-- Geographic selection currently supports CONUS.
-- The default 100-reach limit is provisional and has not been
-  established through retrieval performance benchmarks.
-- Large geographic selections may require additional performance
-  and memory validation.
-- No live end-to-end NWM retrieval using --bbox has been performed.
-- Polygon selection is available in the Python library but not
-  yet exposed in the operational CLI.
-- Compatibility across NWM versions remains unverified.
+The default limit of 100 reaches for bounding-box and polygon requests is a safeguard, not a measured performance threshold.
 
-### Next
+Compatibility with historical NWM hydrofabric and RouteLink versions remains under investigation.
 
-- Review documentation and final source changes.
-- Verify standard and spatial test environments.
-- Commit the bounding-box CLI milestone.
-- Continue with polygon selection following the project roadmap.
+## 7. Historical NWM compatibility
 
+### 7.1 Historical Kerchunk and native NetCDF agreement
 
+The production operational reader was tested on selected historical NWM files using the same feature ID, `3586192`.
 
-## Operational NWM GeoJSON polygon CLI integration — November 5, 2026
+All comparisons below used CONUS, cycle 00 UTC, and the specified forecast lead.
 
-### Objective
+| Date | Product | Lead | Kerchunk (m³/s) | Native (m³/s) | Absolute difference |
+|---|---|---|---:|---:|---:|
+| 2019-01-01 | short_range | f001 | 2.699999939650297 | 2.699999939650297 | 0 |
+| 2022-01-01 | medium_range_mem1 | f001 | 0.9299999792128801 | 0.9299999792128801 | 0 |
+| 2024-01-01 | short_range | f001 | 0.8799999803304672 | 0.8799999803304672 | 0 |
+| 2019-01-01 | long_range_mem1 | f006 | 3.519999921321869 | 3.519999921321869 | 0 |
+| 2022-01-01 | long_range_mem1 | f006 | 0.5999999865889549 | 0.5999999865889549 | 0 |
+| 2024-01-01 | long_range_mem1 | f006 | 0.6299999859184027 | 0.6299999859184027 | 0 |
 
-Expose polygon-based NWM reach selection through the operational
-CLI, following docs/ROADMAP.md and reusing existing hydrofabric
-geographic-selection functions.
+All six comparisons returned matching forecast valid and reference times.
 
-### Implementation
+This supports numerical agreement for the sampled files, not comprehensive compatibility across all historical NWM configurations.
 
-Modules:
-- src/streamflow_getter/spatial_resolution.py
-- src/streamflow_getter/cli.py
+### 7.2 Historical medium-range forecast schedule
 
-Features:
-- Added reusable load_geojson_polygon().
-- Supported Polygon and MultiPolygon geometries.
-- Supported Feature and single-feature FeatureCollection inputs.
-- Validated polygon geometry and geographic coordinate bounds.
-- Added --polygon GEOJSON_PATH to the operational CLI.
-- Reused reaches_in_polygon() for hydrofabric intersection.
-- Preserved existing --reach, --gage, --point, and --bbox methods.
-- Extended the provisional reach-count safeguard to requests
-  involving --bbox or --polygon.
-- Rejected empty selections and duplicate feature IDs.
-- Preserved validation before remote NWM retrieval.
+CIROH reference inventories indicate a transition in medium-range ensemble forecast frequency between the April 20, 2021, 06 UTC and 12 UTC cycles.
 
-### Real-data validation
-
-Dataset:
-- NOAA NWM v3 CONUS channel hydrofabric.
-
-Reference polygon:
-- West: -99.35
-- South: 30.05
-- East: -99.30
-- North: 30.09
-
-Results:
-- 19 NWM reaches selected.
-- 19 unique feature IDs.
-- NWM feature ID 3586192 included.
-- GeoJSON-to-hydrofabric-to-CLI integration passed.
-
-Remote NWM retrieval was mocked during the integration test.
-No forecast data was downloaded or output file created.
-
-### Automated validation
-
-- 316 complete repository tests passed.
-- GeoJSON geometry, Feature, and FeatureCollection tested.
-- Polygon and MultiPolygon tested.
-- Missing files and unsupported geometries rejected.
-- Self-intersecting polygons rejected.
-- Out-of-range longitude/latitude coordinates rejected.
-- Malformed JSON rejected before remote NWM retrieval.
-- Empty polygon selections and reach-limit violations tested.
-- Duplicate selections rejected.
-- Remote retrieval protection tested for invalid selections.
-- Git whitespace validation passed.
-
-### Limitations
-
-- Operational polygon selection currently supports CONUS.
-- GeoJSON input requires EPSG:4326 longitude/latitude.
-- Numeric coordinate validation does not prove source CRS.
-- FeatureCollections with multiple features are not supported.
-- The 100-reach default is provisional and not benchmarked.
-- No live end-to-end NWM forecast retrieval using --polygon
-  has been performed.
-- Historical NWM version compatibility remains unverified.
-
-### Next
-
-- Verify standard and spatial test environments.
-- Review complete source and documentation changes.
-- Commit the polygon CLI milestone.
-- Reassess remaining roadmap priorities with the project maintainer before
-  expanding functionality.
-
-
-
-## Operational NWM medium-range member 1 configuration — November 5, 2026
-
-### Objective
-
-Extend the existing operational NWM backend to support a
-validated medium-range CONUS ensemble member while preserving
-short-range behavior and reusing the Kerchunk/native readers.
-
-### Implementation
-
-Modules:
-- src/streamflow_getter/operational_nwm.py
-- tests/test_operational_product_config.py
-
-Changes:
-- Added immutable ProductSpec configuration.
-- Added validated medium_range_mem1 source conventions.
-- Preserved short_range as the default product.
-- Validated medium-range cycles at 00, 06, 12, and 18 UTC.
-- Validated medium-range forecast hours f001–f240.
-- Preserved ensemble-member identity in output and cache paths.
-- Reused analysis_assim tm00 for the tested analysis t0.
-- Rejected invalid forecast ranges before remote retrieval.
-- Reused existing Kerchunk-first and native-fallback logic.
-
-### Real-data validation
-
-Reference:
-- Date: 2026-04-19
-- Cycle: t00z
-- Domain: CONUS
-- Product: medium_range_mem1
-- NWM feature ID: 3586192
-
-Source conventions:
-- Directory: medium_range_mem1
-- Filename product: medium_range
-- Channel family: channel_rt_1
-
-Analysis t0:
-- Valid time: 2026-04-19 00:00 UTC
-- Reference time: 2026-04-18 21:00 UTC
-
-Forecast f001:
-- Valid time: 2026-04-19 01:00 UTC
-- Reference time: 2026-04-19 00:00 UTC
-- Kerchunk streamflow: 0.40999999083578587 m3/s
-- Native streamflow: 0.40999999083578587 m3/s
-
-Live retrieval:
-- Analysis t0, f001, and f002 succeeded using Kerchunk.
-- Three time-series rows returned.
-- Forecast and analysis feature-ID arrays matched.
-- No source-identity or timestamp validation errors.
-
-### Automated validation
-
-- 343 complete repository tests passed.
-- 27 product-configuration tests passed.
-- Invalid cycles and forecast hours rejected.
-- Invalid forecast ranges rejected before remote retrieval.
-- Forecast and analysis source identities tested.
-- Cache isolation tested.
-- Recoverable Kerchunk access failure triggered mocked native fallback.
-- Existing short-range regression tests passed.
-- Git whitespace validation passed.
-
-### Limitations
-
-- Live validation covered one date, cycle, reach, and two forecast hours.
-- The full 240-hour forecast was not retrieved.
-- Other ensemble members are not yet enabled.
-- The CLI does not yet expose operational product selection.
-- Historical model-version compatibility remains unverified.
-- Cached retrieval failures still propagate without native fallback.
-- Additional domains and no-DA analysis pairings require validation.
-
-### Next
-
-- Review and commit this product-configuration milestone.
-- Add validated operational product selection to the CLI.
-- Extend support incrementally to other NWM products and ensembles.
-- Continue following the original roadmap coordination gates.
-
-
-## Operational NWM product CLI integration — November 5, 2026
-
-### Objective
-
-Expose the validated medium_range_mem1 configuration through
-the operational CLI without duplicating the retrieval backend.
-
-### Implementation
-
-- Added --product to nwm-operational.
-- Preserved short_range as the default.
-- Added medium_range_mem1 as a supported choice.
-- Passed product selection into ForecastConfig.
-- Validated product-specific cycles and forecast hours.
-- Reused existing reach selection, Kerchunk retrieval,
-  native fallback, and CSV/Parquet output.
-
-### Real-data validation
-
-Configuration:
-- Date: 2026-04-19
-- Cycle: t00z
-- Product: medium_range_mem1
-- Domain: CONUS
-- NWM feature ID: 3586192
-- Forecast leads: analysis t0, f001, f002
-
-Results:
-- Installed CLI execution succeeded.
-- Three CSV records generated.
-- All records retrieved using Kerchunk.
-- Analysis and forecast product identities preserved.
-- Valid times and reference times verified.
-- Streamflow values were finite.
-- Temporary output directory cleaned automatically.
-
-### Automated validation
-
-- 352 complete repository tests passed.
-- Unsupported medium-range cycles rejected.
-- Unsupported forecast hours rejected before retrieval.
-- Existing short-range CLI behavior preserved.
-- Python compilation passed.
-- Git whitespace validation passed.
-
-### Limitations
-
-- Real CLI validation covered one date, cycle, reach,
-  and two forecast hours.
-- Other ensemble members and domains remain unsupported.
-- Full 240-hour retrieval has not been validated.
-- Cached retrieval errors still propagate rather than
-  automatically triggering native fallback.
-
-### Next
-
-- Review and commit the CLI product-selection milestone.
-- Continue validating additional operational NWM products.
-- Preserve the original roadmap's coordination requirements.
-
-
-## Operational NWM medium-range ensemble expansion — November 5, 2026
-
-### Objective
-
-Extend validated operational NWM support from medium_range_mem1
-to medium_range_mem2 through medium_range_mem6 without changing
-the existing retrieval backend.
-
-### Implementation
-
-- Added ProductSpec configurations for members 2–6.
-- Preserved short_range and medium_range_mem1 behavior.
-- Enabled all six members through the --product CLI argument.
-- Used validated forecast cycles 00, 06, 12, and 18 UTC.
-- Preserved the 240-hour horizon for member 1.
-- Applied the 204-hour horizon to members 2–6.
-- Reused Kerchunk-first retrieval, native fallback,
-  source validation, timestamp validation, and caching.
-- Preserved ensemble-member identity in output and cache paths.
-
-### Real-data validation
-
-Date: 2026-04-19
-Cycle: t00z
-Domain: CONUS
-Feature ID: 3586192
-
-Native NOAA objects and CIROH Kerchunk references were
-confirmed available for all six ensemble members.
-
-Members 2–6 were tested individually at f001 using the
-existing read_kerchunk_forecast and read_native_forecast
-functions.
-
-For each member:
-- Kerchunk retrieval succeeded.
-- Native NetCDF retrieval succeeded.
-- Streamflow values matched.
-- Valid times matched.
-- Reference times matched.
-- Product and forecast lead identities were preserved.
-
-All five members returned approximately 0.41 m3/s at the
-tested reach and forecast hour.
-
-### CLI integration
-
-The installed CLI successfully retrieved medium_range_mem2
-with analysis t0, f001, and f002.
-
-- Three CSV records generated.
-- All three records used Kerchunk.
-- Valid and reference timestamps verified.
-- Product and feature identities verified.
-- Streamflow values finite.
-
-### Automated validation
-
-- 412 repository tests passed.
-- 77 product-configuration tests passed.
-- 87 operational CLI tests passed.
-- Product-specific forecast horizons validated.
-- Invalid forecast hours rejected before retrieval.
-- Existing short-range and member 1 tests passed.
-- Git whitespace validation passed.
-
-### Limitations
-
-- Real-data comparisons covered one date, cycle, reach,
-  and forecast hour per additional member.
-- CLI real-data validation covered member 2 only.
-- Complete 204-hour and 240-hour forecasts were not retrieved.
-- Historical model-version compatibility remains unverified.
-- Additional operational products and domains remain pending.
-- Cached retrieval errors do not automatically trigger
-  native fallback.
-
-### Next
-
-- Complete documentation review and commit this milestone.
-- Continue original roadmap operational-product coverage.
-- Validate additional forecast families and domains separately.
-
-
-
-## Operational NWM forecast scheduling — November 5, 2026
-
-### Objective
-
-Support product-specific forecast lead intervals while
-preserving existing hourly operational NWM behavior.
-
-### Implementation
-
-- Added lead_step_hours to ProductSpec.
-- Preserved hourly scheduling as the default.
-- Added schedule-aware forecast lead selection.
-- Validated individual forecast-hour alignment.
-- Updated operational CLI forecast-window validation.
-- Ensured series retrieval selects available leads only.
-- Preserved optional analysis t0 handling.
-
-### Automated validation
-
-- 450 repository tests passed.
-- 38 forecast-scheduling tests passed.
-- Hourly, three-hourly, and six-hourly schedules tested.
-- Invalid lead hours and empty windows rejected.
-- Three-hourly series retrieval verified using a mock.
-- Existing short-range and medium-range ensemble tests passed.
-- Git whitespace validation passed.
-
-### Limitations
-
-- No additional NOAA forecast products were enabled.
-- Three-hour and six-hour schedules were tested using
-  temporary product configurations.
-- Subhourly products are not yet supported.
-- Real-data validation of additional product families
-  remains pending.
-
-### Next
-
-- Commit the scheduling milestone.
-- Validate medium_range_blend source conventions.
-- Validate medium_range_no_da with analysis_assim_no_da.
-- Validate long-range products and ensemble schedules.
-
-
-## Operational NWM medium-range blend — November 5, 2026
-
-### Objective
-
-Enable the validated medium_range_blend operational NWM
-product using the existing Kerchunk-first retrieval backend.
-
-### Implementation
-
-- Added medium_range_blend to ProductSpec configuration.
-- Enabled product selection through the operational CLI.
-- Configured CONUS cycles 00, 06, 12, and 18 UTC.
-- Configured hourly forecast leads f001–f240.
-- Preserved default analysis_assim t0 handling.
-- Reused existing Kerchunk/native retrieval, timestamp
-  validation, caching, and CSV/Parquet output.
-- Added product configuration and CLI regression tests.
-
-### Real-data validation
-
-Date: 2026-04-19
-Cycle: t00z
-Domain: CONUS
-Feature ID: 3586192
-
-- NOAA native NetCDF source available.
-- CIROH Kerchunk reference available.
-- Kerchunk and native streamflow matched at f001.
-- Forecast valid and reference times matched.
-- Installed CLI retrieved analysis t0, f001, and f002.
-- Three CSV records generated using Kerchunk.
-- Product identities and timestamps verified.
-- Streamflow values were finite.
-
-### Automated validation
-
-- 463 repository tests passed.
-- 88 product configuration tests passed.
-- 89 operational CLI tests passed.
-- Python compilation passed.
-- Git whitespace validation passed.
-
-### Limitations
-
-- Real-data validation covered one date, cycle, reach,
-  and two forecast hours.
-- Complete 240-hour retrieval remains unverified.
-- Historical model-version compatibility remains unverified.
-- Additional NWM products and regional domains remain pending.
-
-### Next
-
-- Review and commit medium_range_blend support.
-- Validate medium_range_no_da and its analysis pairing.
-- Continue validating long-range products separately.
-
-
-## Operational NWM medium-range no-DA — November 5, 2026
-
-### Objective
-
-Enable `medium_range_no_da` with the correct
-`analysis_assim_no_da` t0 source and three-hourly
-forecast scheduling.
-
-### Implementation
-
-- Added `analysis_product` to `ProductSpec`, defaulting
-  to `analysis_assim` for backward compatibility.
-- Registered `medium_range_no_da` for CONUS.
-- Configured cycles 00, 06, 12, and 18 UTC.
-- Configured forecast leads f003–f240 at three-hour intervals.
-- Configured `analysis_assim_no_da` as the analysis t0 source.
-- Updated analysis filename, native URL, Kerchunk reference
-  path, source resolution, and series product validation.
-- Enabled `medium_range_no_da` in the operational CLI.
-- Added configuration, source-selection, and CLI tests.
-
-### Real-data validation
-
-Date: 2026-04-19
-Cycle: t00z
-Domain: CONUS
-Feature ID: 3586192
-
-- NOAA native and CIROH Kerchunk sources available
-  for analysis t0, f003, and f006.
-- Kerchunk/native streamflow matched for analysis t0
-  and forecast f003.
-- Analysis t0 valid time: 2026-04-19 00:00 UTC.
-- Analysis t0 reference time: 2026-04-18 21:00 UTC.
-- Forecast f003 valid time: 2026-04-19 03:00 UTC.
-- Forecast f003 reference time: 2026-04-19 00:00 UTC.
-- Installed CLI retrieved analysis t0, f003, and f006.
-- Three CSV records generated using Kerchunk.
-- Product identities and timestamps verified.
-- All three streamflow values approximately 0.30 m³/s.
-
-### Automated validation
-
-- 481 repository tests passed.
-- 104 product configuration tests passed.
-- 91 operational CLI tests passed.
-- Git whitespace check clean.
-
-### Limitations
-
-- Real-data validation covered one date, cycle, and reach.
-- Native comparison was performed for t0 and f003;
-  f006 was retrieved through the CLI using Kerchunk.
-- Complete 240-hour retrieval remains unverified.
-- Historical model-version compatibility remains unverified.
-- Regional domains and other NWM products remain pending.
-
-### Next
-
-- Review and commit medium-range no-DA support.
-- Continue operational NWM product coverage, including
-  validation of long-range ensemble products.
-
-
-## Operational NWM long-range member 1 — November 5, 2026
-
-### Objective
-
-Enable `long_range_mem1` using the existing operational
-NWM Kerchunk-first retrieval backend and six-hourly
-forecast scheduling.
-
-### Implementation
-
-- Registered `long_range_mem1` in `PRODUCT_SPECS`.
-- Configured CONUS cycles 00, 06, 12, and 18 UTC.
-- Configured forecast leads f006–f720 at six-hour intervals.
-- Used `long_range_mem1` as the source directory.
-- Used `long_range` as the filename product.
-- Used `channel_rt_1` as the channel file family.
-- Enabled the product in the operational CLI.
-- Reused existing Kerchunk/native retrieval and validation.
-- Added configuration and CLI regression tests.
-- Retained `analysis_assim` as the provisional t0 source.
-
-### Real-data validation
-
-Date: 2026-04-19
-Cycle: t00z
-Domain: CONUS
-Feature ID: 3586192
-
-- NOAA native and CIROH Kerchunk sources available
-  for f006, f012, and f720.
-- Kerchunk/native streamflow matched at f006.
-- Forecast f006 valid time: 2026-04-19 06:00 UTC.
-- Forecast f006 reference time: 2026-04-19 00:00 UTC.
-- Installed CLI retrieved analysis t0, f006, and f012.
-- Three CSV records generated using Kerchunk.
-- Product identities and timestamps verified.
-- Streamflow: t0 = 0.41, f006 = 0.33,
-  f012 = 0.23 m³/s.
-
-### Automated validation
-
-- 499 repository tests passed.
-- 120 product configuration tests passed.
-- 93 operational CLI tests passed.
-- Python compilation passed.
-- Git whitespace check clean.
-
-### Limitations
-
-- Real-data retrieval covered one date, cycle, and reach.
-- Native comparison was performed for f006 only.
-- The f720 source exists but was not retrieved.
-- `analysis_assim` t0 pairing remains scientifically
-  unverified for the long-range ensemble.
-- Complete 720-hour retrieval remains unverified.
-- Historical model-version compatibility remains unverified.
-
-### Next
-
-- Review and commit long-range member 1 support.
-- Investigate long-range ensemble analysis conventions.
-- Continue validation of additional long-range members.
-
-
-## Operational NWM long-range ensemble members 2–4 — November 5, 2026
-
-### Objective
-
-Enable long-range ensemble members 2, 3, and 4 using
-the existing Kerchunk-first operational NWM backend.
-
-### Implementation
-
-- Registered `long_range_mem2`, `long_range_mem3`,
-  and `long_range_mem4` in `PRODUCT_SPECS`.
-- Configured CONUS cycles 00, 06, 12, and 18 UTC.
-- Configured six-hourly forecast leads f006–f720.
-- Used `long_range` as the filename product.
-- Used `channel_rt_2`, `channel_rt_3`, and `channel_rt_4`.
-- Enabled all three products in the operational CLI.
-- Reused existing source resolution, forecast scheduling,
-  Kerchunk/native retrieval, and output handling.
-- Added parameterized configuration and CLI tests.
-
-### Source availability
-
-Date: 2026-04-19
-Domain: CONUS
-
-- Members 2–4 were present in NOAA native storage
-  and CIROH Kerchunk references.
-- Verified f006, f012, f120, f360, f540, and f720
-  for cycles 00, 06, 12, and 18 UTC.
-- Members 5 and 6 were not found for this date.
-
-### Real-data validation
-
-Date: 2026-04-19
-Cycle: t00z
-Feature ID: 3586192
-
-- Kerchunk/native comparisons passed at f006
-  for members 2, 3, and 4.
-- f006 streamflow: approximately 0.33 m³/s
-  for all three members.
-- Forecast f006 valid time: 06:00 UTC.
-- Forecast f006 reference time: 00:00 UTC.
-- Installed CLI retrieved analysis t0, f006, and f012
-  for all three members.
-- All nine CLI records used Kerchunk.
-- Streamflow values: t0 = 0.41, f006 = 0.33,
-  f012 = 0.23 m³/s for the tested reach.
-- Product identities and timestamps verified.
-
-### Automated validation
-
-- 553 repository tests passed.
-- 168 product configuration tests passed.
-- 99 operational CLI tests passed.
-- Python compilation passed.
-- Git whitespace check clean.
-
-### Limitations
-
-- Real-data retrieval covered one date, cycle, and reach.
-- Native comparisons covered f006 only.
-- Sampled file availability does not establish complete
-  coverage of every lead through f720.
-- `analysis_assim` t0 pairing remains scientifically
-  unverified for long-range ensemble members.
-- Full-horizon retrieval and historical-version
-  compatibility remain unverified.
-
-### Next
-
-- Review and commit long-range ensemble members 2–4.
-- Investigate long-range analysis pairing conventions.
-- Continue the remaining operational NWM roadmap tasks.
-
-
-## Long-range analysis t0 pairing review — November 5, 2026
-
-### Finding
-
-Reviewed the original `docs/ROADMAP.md` and the current
-operational NWM implementation.
-
-The roadmap explicitly requires `analysis_assim` tm00
-as the default t0 source for short-, medium-, and
-long-range forecasts.
-
-It also specifies a shared t0 for ensemble members
-and `analysis_assim_no_da` for no-DA forecast variants.
-
-### Validation
-
-- Long-range members 1–4 use `analysis_assim` at t0.
-- The tested analysis valid time matches the forecast cycle.
-- The analysis reference time is preserved separately.
-- Real NOAA retrievals passed for the tested date and cycle.
-- The CLI supports excluding t0 with `--no-t0`.
-
-### Conclusion
-
-The current source pairing follows the original roadmap.
-No retrieval-code changes are required for this milestone.
-
-The analysis t0 is a shared reference point, not a
-verified representation of each ensemble member's
-internal initialization state.
-
-### Remaining work
-
-- Verify analysis availability and valid times across
-  additional dates and cycles.
-- Verify reuse of a single downloaded t0 across members.
-- Continue the remaining roadmap tasks.
-
-## Historical operational NWM Kerchunk compatibility — November 7, 2026
-
-### Objective
-
-Validate historical operational NWM retrieval across different model versions, following `docs/ROADMAP.md`.
-
-### Historical reference findings
-
-- CIROH Kerchunk references were found for sampled historical dates from 2018 through 2026.
-- Sampled NOAA S3 paths were unavailable for dates before 2025 but available for 2025 and 2026.
-- Historical CIROH references use Google Cloud Storage URLs through the Kerchunk `templates.u` convention.
-- The 2022 reference identifies NWM v2.1.
-- The 2024 reference identifies NWM v3.0.
-- Historical feature-ID arrays differ in size and integer dtype.
-
-### Implementation
-
-- Extended production Kerchunk reference validation to support defined URL templates.
-- Preserved strict source-identity and byte-range validation.
-- Configured selective xarray decoding with `mask_and_scale={"feature_id": False}`.
-- Preserved integer feature identifiers while retaining normal streamflow decoding.
-- Reused the existing operational retrieval implementation.
-
-### Real-data validation
-
-Feature ID: `3586192`
-
-All cases used forecast cycle 00 UTC and lead f001.
-
-| Date | Product | Streamflow (m³/s) | Result |
-|---|---|---:|---|
-| 2019-01-01 | short_range | 2.699999939650297 | Passed |
-| 2022-01-01 | medium_range_mem1 | 0.9299999792128801 | Passed |
-| 2024-01-01 | short_range | 0.8799999803304672 | Passed |
-
-All three retrievals used Kerchunk and returned valid time 01:00 UTC and reference time 00:00 UTC on the respective dates.
-
-### Automated validation
-
-- 66 focused tests passed.
-- 565 repository tests passed.
-- Git whitespace validation passed.
-
-### Limitations
-
-- Historical coverage was sampled, not exhaustively established.
-- The native NetCDF values have not yet been independently compared with the Kerchunk results.
-- Historical reach-set compatibility has not been comprehensively evaluated.
-- Additional forecast products, cycles, domains, and model versions remain unverified.
-- Further NWM retrospective development requires consultation with the designated NWM retrospective specialist.
-
-### Next steps
-
-- Compare historical Kerchunk values against native NetCDF sources.
-- Expand sampled operational source coverage by product, date, and domain.
-- Investigate historical reach-set differences.
-- Continue the remaining requirements in the project roadmap.
-
-## Historical Kerchunk versus native NetCDF validation — November 7, 2026
-
-### Objective
-
-Independently verify historical operational NWM Kerchunk retrieval against the native NetCDF reader, following `docs/ROADMAP.md`.
-
-### Test configuration
-
-- Domain: CONUS
-- Forecast cycle: t00z
-- Forecast lead: f001
-- NWM feature ID: 3586192
-- Methods: production Kerchunk and native NetCDF readers
-
-### Numerical comparison
-
-| Date | Product | Kerchunk (m³/s) | Native (m³/s) | Absolute difference |
-|---|---|---:|---:|---:|
-| 2019-01-01 | short_range | 2.699999939650297 | 2.699999939650297 | 0.0 |
-| 2022-01-01 | medium_range_mem1 | 0.9299999792128801 | 0.9299999792128801 | 0.0 |
-| 2024-01-01 | short_range | 0.8799999803304672 | 0.8799999803304672 | 0.0 |
-
-### Results
-
-- All three historical comparisons passed.
-- Streamflow values agreed exactly at the tested feature.
-- Forecast valid times agreed exactly.
-- Forecast reference times agreed exactly.
-- Historical Kerchunk references and native NetCDF files were accessible for all tested cases.
-
-### Interpretation
-
-The existing operational NWM reader, with historical Kerchunk template support and selective feature-ID decoding, successfully retrieves historical streamflow consistent with the native NetCDF reader.
-
-This provides evidence of compatibility across the sampled historical configurations, including NWM v2.1 and v3.0 references.
-
-### Limitations
-
-- Only three historical dates and one feature ID were compared.
-- All comparisons used forecast cycle t00z and lead f001.
-- Historical coverage remains sampled rather than exhaustive.
-- Additional products, forecast cycles, domains, and reach-set differences require validation.
-- Further NWM retrospective development remains subject to consultation with the designated NWM retrospective specialist.
-
-### Next
-
-Continue roadmap by expanding historical operational source coverage and investigating model-version and reach-set compatibility.
-
-## Historical long-range Kerchunk/native validation — November 7, 2026
-
-### Objective
-
-Validate historical operational NWM long-range forecasts against native NetCDF sources, following `docs/ROADMAP.md`.
-
-### Test configuration
-
-- Product: `long_range_mem1`
-- Domain: CONUS
-- Forecast cycle: t00z
-- Forecast lead: f006
-- Feature ID: 3586192
-
-### Results
-
-| Date | Kerchunk (m³/s) | Native (m³/s) | Absolute difference |
-|---|---:|---:|---:|
-| 2019-01-01 | 3.519999921321869 | 3.519999921321869 | 0.0 |
-| 2022-01-01 | 0.5999999865889549 | 0.5999999865889549 | 0.0 |
-| 2024-01-01 | 0.6299999859184027 | 0.6299999859184027 | 0.0 |
-
-All three comparisons passed.
-
-Forecast valid times were 06:00 UTC and reference times were 00:00 UTC on the respective dates. Both retrieval methods returned matching timestamps.
-
-### Interpretation
-
-The existing production NWM reader successfully retrieves the sampled historical long-range member 1 files through Kerchunk, with numerical results identical to the native NetCDF reader.
-
-Combined with the earlier short- and medium-range comparisons, this establishes six successful historical Kerchunk/native comparisons across the three major forecast families.
-
-### Limitations
-
-- Only member 1, lead f006, cycle t00z, and one feature ID were tested.
-- Other long-range ensemble members and forecast leads remain unverified historically.
-- Continuous historical product coverage has not been established.
-- Historical reach-set differences require further investigation.
-- Further NWM retrospective development requires consultation with the designated NWM retrospective specialist.
-
-### Next
-
-Investigate historical operational product availability transitions, particularly medium-range ensembles and medium-range blend, before expanding model-version and reach-set compatibility testing.
-
-## Historical medium-range forecast scheduling — November 7, 2026
-
-### Objective
-
-Support historical operational NWM medium-range forecast lead schedules within the existing `ForecastConfig` architecture.
-
-### Historical archive evidence
-
-CIROH Kerchunk reference inventories identified a change in forecast lead frequency on April 20, 2021, between the 06 UTC and 12 UTC cycles.
-
-For CONUS medium-range ensemble members 1–6:
-
-| Forecast initialization | Lead interval | Member 1 horizon | Members 2–6 horizon |
+| Initialization | Lead interval | Member 1 | Members 2–6 |
 |---|---|---|---|
 | Through 2021-04-20 06 UTC | 3 hours | f003–f240 | f003–f204 |
 | From 2021-04-20 12 UTC | 1 hour | f001–f240 | f001–f204 |
 
-The transition was observed in CIROH reference filenames across all six members and all four cycles sampled on April 20–21.
+The production forecast configuration now selects the appropriate lead schedule using the initialization date and cycle.
 
-### Implementation
+Real-data testing covered medium-range members 1 and 2 at 06 UTC and 12 UTC on April 20, 2021. Sixteen records were retrieved successfully.
 
-Updated `src/streamflow_getter/operational_nwm.py` to select forecast lead intervals using the forecast initialization date and cycle.
+The transition was inferred from sampled archive references, not independently confirmed from an authoritative NOAA release-history record.
 
-The existing `ProductSpec` definitions, source resolution, Kerchunk reader, native fallback, and CLI architecture were preserved.
+### 7.3 Historical feature-ID sets
 
-Added regression coverage in `tests/test_operational_product_config.py`.
-
-### Real-data validation
-
-Tested operational retrieval for feature ID `3586192` on April 20, 2021.
-
-| Product | Cycle | Retrieved leads | Result |
-|---|---|---|---|
-| medium_range_mem1 | 06 UTC | f003, f006 | PASS |
-| medium_range_mem1 | 12 UTC | f001–f006 | PASS |
-| medium_range_mem2 | 06 UTC | f003, f006 | PASS |
-| medium_range_mem2 | 12 UTC | f001–f006 | PASS |
-
-All 16 records were retrieved using Kerchunk with the expected forecast timestamps.
-
-### Regression validation
-
-- Focused product configuration suite: 223 passed.
-- Complete regression suite: 620 passed.
-- `git diff --check`: clean.
-- Modern medium-range schedules and other operational product schedules preserved.
-
-### Limitations
-
-The transition is established from sampled CIROH archive references rather than an independently verified NOAA release-history record.
-
-Real-data retrieval across the transition was tested for members 1 and 2, leads f001–f006 as applicable, and one feature ID. Other members and longer forecast horizons have unit-test and reference-inventory coverage but were not exhaustively retrieved.
-
-Historical product availability, model-version compatibility, and reach-set changes remain separate investigation tasks.
-
-Further NWM retrospective development remains subject to consultation with the designated NWM retrospective specialist.
-
-
-## Historical NWM reach-set compatibility — November 7, 2026
-
-### Objective
-
-Investigate NWM feature-ID compatibility across historical operational model configurations, following `docs/ROADMAP.md`.
-
-### Method
-
-Compared the complete `feature_id` arrays from CIROH Kerchunk references for CONUS `short_range`, cycle t00z, forecast lead f001, on January 1 of 2019, 2022, and 2024.
-
-References were opened using the existing production Kerchunk filesystem configuration. Integer feature IDs were preserved without CF masking.
-
-### Results
+Complete feature-ID arrays were compared for CONUS short-range, cycle 00 UTC, lead f001.
 
 | Date | Feature count | Data type |
 |---|---:|---|
@@ -1889,169 +379,143 @@ References were opened using the existing production Kerchunk filesystem configu
 | 2022 → 2024 | 4 | 0 | No |
 | 2019 → 2024 | 525 | 48,182 | No |
 
-The four identifiers present in the 2022 sample but absent from the 2024 sample were 4800002, 4800004, 4800006, and 4800007.
+The four identifiers present in the 2022 sample but absent from 2024 were `4800002`, `4800004`, `4800006`, and `4800007`.
 
-Of the 2,729,077 feature IDs in the 2019 sample, 2,728,552 (approximately 99.98%) were also present in the 2024 sample.
+Of the 2,729,077 feature IDs in the 2019 sample, 2,728,552 (approximately 99.98%) were also present in 2024.
 
-### Interpretation
+The production extractor resolves channels by feature ID rather than assuming fixed array positions. These findings do not independently justify a change to that implementation.
 
-Historical operational NWM files do not necessarily contain identical feature-ID sets.
+### 7.4 RouteLink v3.1.6 historical compatibility
 
-The existing `extract_streamflow()` implementation resolves reaches by feature ID rather than relying on fixed array positions. No production change is justified solely by these observations.
+The modern RouteLink identifier set was compared with the historical operational feature-ID arrays.
 
-The change from int32 to int64 also requires no immediate modification because the current extraction implementation supports the tested integer types.
-
-### Limitations
-
-- Three historical dates were compared.
-- Only CONUS short-range t00z f001 was inspected.
-- Identifier persistence does not prove identical river geometry or connectivity.
-- Compatibility of historical feature IDs with version-specific RouteLink metadata remains unverified.
-- No historical crosswalk or reach remapping was implemented.
-
-### Next steps
-
-Inspect existing RouteLink resolution logic and identify authoritative historical RouteLink sources before assessing cross-version gage-to-reach compatibility.
-
-Further NWM retrospective development remains subject to consultation with the designated NWM retrospective specialist.
-
-### RouteLink v3.1.6 compatibility validation
-
-Compared the complete `link` identifier array from the previously validated NWM v3.1.6 `RouteLink_CONUS.nc` against historical CONUS operational `short_range`, t00z, f001 feature-ID arrays.
-
-RouteLink v3.1.6 contains 2,776,734 unique feature IDs and 8,735 gage-associated reaches.
-
-| Historical sample | RouteLink IDs absent from NWM | NWM IDs absent from RouteLink | Gage-associated reach IDs absent | Exact set match |
+| Historical sample | RouteLink IDs absent from NWM | NWM IDs absent from RouteLink | Modern gage reaches absent | Exact set match |
 |---|---:|---:|---:|---|
 | 2019-01-01 | 48,182 | 525 | 347 | No |
 | 2022-01-01 | 0 | 4 | 0 | No |
 | 2024-01-01 | 0 | 0 | 0 | Yes |
 
-The four extra operational identifiers in the 2022 sample were 4800002, 4800004, 4800006, and 4800007.
+For the 2019 sample, 8,388 of 8,735 modern gage-associated reaches were present, approximately 96.03%.
 
-The 2024 operational sample exactly matches the RouteLink v3.1.6 feature-ID set.
+The 2024 operational feature-ID set matched RouteLink v3.1.6 exactly.
 
-For the 2019 sample, 8,388 of 8,735 modern gage-associated reaches were present (approximately 96.03%). The remaining 347 modern gage-associated reach IDs were absent.
+**Important:** identifier-set equality does not prove unchanged channel geometry, network connectivity, or USGS gage associations.
 
-These findings establish identifier-set compatibility only. They do not prove that USGS-to-reach associations, channel geometries, or hydrologic connectivity remained unchanged.
+The existing RouteLink resolver should be retained. Historical version-specific gage-to-reach mapping requires authoritative metadata before automatic remapping is considered.
 
-No production code changes or automatic historical reach remapping were introduced.
+Existing network comparison work in `troute-lab/repro/network_stats/analyze.py` addresses network outlets and network-size differences. It does not directly establish historical USGS gage-to-feature associations.
 
-**Next:** Identify authoritative historical RouteLink metadata and compare gage-to-reach mappings across NWM versions before implementing version-specific resolution.
+### 7.5 Historical source coverage
 
-### Relationship to existing troute-lab research
+| Source | Observed coverage evidence | Limitation |
+|---|---|---|
+| NOAA Google Cloud Storage | Successful native retrieval on sampled dates in 2019, 2022, 2024, and 2026 | Continuous availability not established |
+| CIROH S3 Kerchunk | References discovered on sampled dates from 2018 through 2026 | Complete product coverage not established |
+| NOAA S3 `noaa-nwm-pds` | Selected paths found in 2025 and 2026 | Earliest available date unverified |
+| NOAA S3 before 2025 | Selected paths checked without success | Does not prove complete historical absence |
 
-Reviewed `jameshalgren/troute-lab/repro/network_stats/analyze.py`, including `compare_versions()`.
+Historical source discovery, successful file retrieval, and continuous archive coverage are separate levels of evidence.
 
-The existing comparison evaluates network outlets and changes in network sizes between NWM v2.1 and v3.1.6. It does not directly compare individual USGS gage-to-feature-ID associations.
+No authoritative continuous start and end dates have been established for every product, cycle, lead, ensemble member, or domain.
 
-The historical operational comparisons in `streamflow_getter` therefore complement the existing network analysis without duplicating its implementation.
+## 8. End-to-end USGS-to-Parquet validation
 
-The 2019 operational sample contains 2,729,077 feature IDs, matching the segment count cited for the AGU 2020 network analysis. This suggests an earlier network configuration, but its exact RouteLink version remains unverified.
+### 8.1 Configuration
 
-**Conclusion:** Preserve the existing RouteLink resolver and require users to supply an appropriate RouteLink file for the intended NWM configuration. Identifier existence alone does not guarantee historical gage-mapping or geometric equivalence.
-
-No production code changes are proposed from this investigation. Historical RouteLink association validation remains open pending appropriate version-specific metadata.
-
-## Historical operational NWM source coverage inventory — November 7, 2026
-
-### Objective
-
-Consolidate verified historical operational NWM source observations in support of the data-date-range requirement in `docs/ROADMAP.md`.
-
-This inventory distinguishes observed file availability, successful retrieval, and continuous historical coverage.
-
-### Source observations
-
-| Source | Observed dates or periods | Evidence | Limitation |
-|---|---|---|---|
-| NOAA Google Cloud Storage, native NetCDF | Sampled dates in 2019, 2022, 2024, and 2026 | Successful operational native retrieval | Continuous availability not established |
-| CIROH S3 Kerchunk references | Sampled dates between 2018 and 2026 | Historical reference discovery and successful retrieval on selected dates | Continuous product coverage not established |
-| NOAA S3 `noaa-nwm-pds` | Sampled dates in 2025 and 2026 | Paths available in sampled checks | Exact earliest available date not established |
-| NOAA S3 `noaa-nwm-pds`, pre-2025 | Selected paths checked without success | Negative sample observations | Does not establish complete historical absence |
-
-### Validated historical product samples
-
-All observations below concern CONUS.
-
-| Product | Historical validation |
+| Parameter | Value |
 |---|---|
-| `short_range` | Kerchunk/native agreement on 2019-01-01 and 2024-01-01 |
-| `medium_range_mem1` | Kerchunk/native agreement on 2022-01-01; historical lead-schedule transition tested in April 2021 |
-| `medium_range_mem2` | Historical lead-schedule transition tested in April 2021 using Kerchunk |
-| `medium_range_mem3`–`mem6` | Historical reference-inventory checks around the April 2021 transition |
-| `medium_range_blend` | Operational samples validated; continuous historical coverage not established |
-| `medium_range_no_da` | Configured in production; historical coverage not established by this inventory |
-| `long_range_mem1` | Kerchunk/native agreement on 2019-01-01, 2022-01-01, and 2024-01-01 |
-| `long_range_mem2`–`mem4` | Operational samples validated on 2026-04-19 |
+| Forecast date | 2026-04-19 |
+| Product | short_range |
+| Cycle | 00 UTC |
+| Domain | CONUS |
+| USGS station | 08165500 |
+| NWM feature ID | 3586192 |
+| RouteLink | v3.1.6 |
+| Forecast leads | f001–f002 |
+| Analysis t0 | Enabled |
+| Output | Parquet |
 
-### Historical configuration differences
+### 8.2 Retrieved records
 
-The sampled CIROH archive indicates a medium-range ensemble lead-schedule transition between the 2021-04-20 06 UTC and 12 UTC forecast cycles.
-
-The historical operational `feature_id` sets also differ between the sampled 2019, 2022, and 2024 configurations. See the preceding reach-set compatibility investigation.
-
-### Scope and limitations
-
-- The production operational reader currently supports CONUS only.
-- A configured product does not imply that its files exist on every historical date.
-- A successful retrieval does not establish continuous availability.
-- Availability of all cycles, forecast leads, and ensemble members has not been exhaustively verified.
-- Source observations should not be interpreted as authoritative archive start or end dates.
-- Retrospective NWM and GEOGLOWS coverage remain outside this operational inventory.
-- Further retrospective NWM development requires consultation with the designated NWM retrospective specialist; GEOGLOWS development requires consultation with the designated GEOGLOWS specialist.
-
-### Remaining roadmap work
-
-1. Establish authoritative or systematically verified availability boundaries by source, product, and domain.
-2. Distinguish missing products from missing individual cycles or forecast leads.
-3. Extend the inventory to other domains only when domain support is explicitly in scope.
-4. Reconcile retrospective and GEOGLOWS coverage after the required consultations.
-
-**Status:** Historical operational source coverage partially documented. Continuous date ranges remain unverified.
-## Operational USGS-to-Parquet integration validation — November 7, 2026
-
-### Configuration
-
-- Forecast date: 2026-04-19
-- Product: short_range
-- Cycle: t00z
-- Domain: CONUS
-- USGS station: 08165500
-- RouteLink v3.1.6 feature ID: 3586192
-- Forecast leads: f001–f002
-- Analysis t0: enabled
-- Output: Parquet
-
-### Real-data results
-
-| Product | Lead | Valid time (UTC) | Streamflow (m3/s) | Method |
+| Product | Lead | Valid time (UTC) | Streamflow (m³/s) | Method |
 |---|---:|---|---:|---|
-| analysis_assim | 0 | 2026-04-19 00:00 | 0.41 | kerchunk |
-| short_range | 1 | 2026-04-19 01:00 | 0.41 | kerchunk |
-| short_range | 2 | 2026-04-19 02:00 | 0.40 | kerchunk |
+| analysis_assim | 0 | 2026-04-19 00:00 | 0.41 | Kerchunk |
+| short_range | 1 | 2026-04-19 01:00 | 0.41 | Kerchunk |
+| short_range | 2 | 2026-04-19 02:00 | 0.40 | Kerchunk |
 
-All three records used feature ID 3586192.
+All three records used feature ID `3586192`.
 
-The analysis t0 reference time was 2026-04-18 21:00 UTC,
-while its valid time matched the forecast initialization
-at 2026-04-19 00:00 UTC.
+The analysis t0 source reference time was April 18, 2026, 21:00 UTC, while its valid time matched the forecast initialization at April 19, 2026, 00:00 UTC.
 
-### Validation
+Validation confirmed:
 
-- Operational CLI completed successfully.
-- USGS station resolved using the local RouteLink file.
-- All three records were retrieved using Kerchunk.
-- Parquet output contained the expected ten columns.
-- No missing values or duplicate records were found.
+- Successful installed CLI execution.
+- Correct USGS-to-RouteLink resolution.
+- Three successful Kerchunk retrievals.
+- Parquet output with ten expected columns.
+- No missing values or duplicate records.
 - 123 focused integration tests passed.
-- The generated Parquet file is excluded by .gitignore.
-- Git working tree was clean before documenting this test.
 
-### Limitations
+Native fallback was not exercised in this end-to-end run.
 
-This validates one station, one forecast date, one cycle,
-and two forecast leads. It does not establish continuous
-historical availability or validate every product and domain.
+The result validates one station, one forecast date, one cycle, and two forecast leads.
 
-Native fallback was not exercised in this integration run.
+## 9. Scientific and technical limitations
+
+### 9.1 Retrieval performance
+
+Network and cache conditions were not fully controlled. Accounted HTTP bytes exclude some protocol overhead. Benchmark timings do not include reach resolution.
+
+Additional repeated trials across dates, cycles, reaches, and network conditions are required before making general performance claims.
+
+### 9.2 Source compatibility
+
+A structurally valid Kerchunk reference does not independently establish source-generation equivalence.
+
+Historical product availability varies. A successful sample retrieval does not prove continuous archive coverage.
+
+### 9.3 Network compatibility
+
+Historical feature-ID sets are not identical. Feature-ID persistence does not prove geometric or topological equivalence.
+
+Version-specific RouteLink metadata is needed to validate historical USGS-to-reach associations.
+
+### 9.4 Forecast initialization
+
+The long-range shared `analysis_assim` t0 follows the project roadmap, but its interpretation as the internal initialization of each ensemble member is not scientifically established.
+
+### 9.5 Spatial selection
+
+The nearest channel is not necessarily the hydrologically correct channel. Geographic reach selection requires additional live end-to-end testing and broader CONUS validation.
+
+### 9.6 Scope
+
+The implemented operational geographic workflow targets CONUS. Full forecast horizons, historical dates, additional domains, and all ensemble combinations have not been exhaustively validated.
+
+## 10. Remaining research priorities
+
+1. Establish systematically verified historical source availability boundaries by product, cycle, lead, and domain.
+2. Validate historical RouteLink associations using appropriate version-specific datasets.
+3. Expand Kerchunk/native comparisons across additional historical configurations.
+4. Repeat performance experiments under controlled network and cache conditions.
+5. Validate complete medium- and long-range forecast horizons.
+6. Investigate long-range ensemble initialization and shared t0 interpretation.
+7. Perform live end-to-end retrieval for geographic selections.
+8. Extend domain coverage only when explicitly authorized and technically validated.
+
+Further NWM retrospective and GEOGLOWS development must follow the consultation and coordination requirements in [the project roadmap](../docs/ROADMAP.md).
+
+## 11. Reproducibility and development practices
+
+The benchmark implementations, tests, and recorded outputs are maintained in the repository.
+
+- [Benchmark instructions](README.md)
+- [Operational NWM guide](../docs/OPERATIONAL_NWM.md)
+- [Project roadmap](../docs/ROADMAP.md)
+- [Main project README](../README.md)
+
+Historical experiment notes and milestone-by-milestone development records remain recoverable through Git history, including commit `1f0d795`.
+
+This report is a consolidated account of documented validation evidence. It does not replace the original experimental outputs or imply that untested combinations have been verified.
+
+Development should continue through focused changes, reusable production modules, automated regression tests, and reviewable Git commits.
