@@ -2009,3 +2009,49 @@ The historical operational `feature_id` sets also differ between the sampled 201
 4. Reconcile retrospective and GEOGLOWS coverage after the required consultations.
 
 **Status:** Historical operational source coverage partially documented. Continuous date ranges remain unverified.
+## Operational USGS-to-Parquet integration validation — November 7, 2026
+
+### Configuration
+
+- Forecast date: 2026-04-19
+- Product: short_range
+- Cycle: t00z
+- Domain: CONUS
+- USGS station: 08165500
+- RouteLink v3.1.6 feature ID: 3586192
+- Forecast leads: f001–f002
+- Analysis t0: enabled
+- Output: Parquet
+
+### Real-data results
+
+| Product | Lead | Valid time (UTC) | Streamflow (m3/s) | Method |
+|---|---:|---|---:|---|
+| analysis_assim | 0 | 2026-04-19 00:00 | 0.41 | kerchunk |
+| short_range | 1 | 2026-04-19 01:00 | 0.41 | kerchunk |
+| short_range | 2 | 2026-04-19 02:00 | 0.40 | kerchunk |
+
+All three records used feature ID 3586192.
+
+The analysis t0 reference time was 2026-04-18 21:00 UTC,
+while its valid time matched the forecast initialization
+at 2026-04-19 00:00 UTC.
+
+### Validation
+
+- Operational CLI completed successfully.
+- USGS station resolved using the local RouteLink file.
+- All three records were retrieved using Kerchunk.
+- Parquet output contained the expected ten columns.
+- No missing values or duplicate records were found.
+- 123 focused integration tests passed.
+- The generated Parquet file is excluded by .gitignore.
+- Git working tree was clean before documenting this test.
+
+### Limitations
+
+This validates one station, one forecast date, one cycle,
+and two forecast leads. It does not establish continuous
+historical availability or validate every product and domain.
+
+Native fallback was not exercised in this integration run.
