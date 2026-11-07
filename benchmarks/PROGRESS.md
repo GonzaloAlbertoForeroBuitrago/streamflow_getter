@@ -1952,3 +1952,60 @@ The 2019 operational sample contains 2,729,077 feature IDs, matching the segment
 **Conclusion:** Preserve the existing RouteLink resolver and require users to supply an appropriate RouteLink file for the intended NWM configuration. Identifier existence alone does not guarantee historical gage-mapping or geometric equivalence.
 
 No production code changes are proposed from this investigation. Historical RouteLink association validation remains open pending appropriate version-specific metadata.
+
+## Historical operational NWM source coverage inventory — November 7, 2026
+
+### Objective
+
+Consolidate verified historical operational NWM source observations in support of the data-date-range requirement in `docs/ROADMAP.md`.
+
+This inventory distinguishes observed file availability, successful retrieval, and continuous historical coverage.
+
+### Source observations
+
+| Source | Observed dates or periods | Evidence | Limitation |
+|---|---|---|---|
+| NOAA Google Cloud Storage, native NetCDF | Sampled dates in 2019, 2022, 2024, and 2026 | Successful operational native retrieval | Continuous availability not established |
+| CIROH S3 Kerchunk references | Sampled dates between 2018 and 2026 | Historical reference discovery and successful retrieval on selected dates | Continuous product coverage not established |
+| NOAA S3 `noaa-nwm-pds` | Sampled dates in 2025 and 2026 | Paths available in sampled checks | Exact earliest available date not established |
+| NOAA S3 `noaa-nwm-pds`, pre-2025 | Selected paths checked without success | Negative sample observations | Does not establish complete historical absence |
+
+### Validated historical product samples
+
+All observations below concern CONUS.
+
+| Product | Historical validation |
+|---|---|
+| `short_range` | Kerchunk/native agreement on 2019-01-01 and 2024-01-01 |
+| `medium_range_mem1` | Kerchunk/native agreement on 2022-01-01; historical lead-schedule transition tested in April 2021 |
+| `medium_range_mem2` | Historical lead-schedule transition tested in April 2021 using Kerchunk |
+| `medium_range_mem3`–`mem6` | Historical reference-inventory checks around the April 2021 transition |
+| `medium_range_blend` | Operational samples validated; continuous historical coverage not established |
+| `medium_range_no_da` | Configured in production; historical coverage not established by this inventory |
+| `long_range_mem1` | Kerchunk/native agreement on 2019-01-01, 2022-01-01, and 2024-01-01 |
+| `long_range_mem2`–`mem4` | Operational samples validated on 2026-04-19 |
+
+### Historical configuration differences
+
+The sampled CIROH archive indicates a medium-range ensemble lead-schedule transition between the 2021-04-20 06 UTC and 12 UTC forecast cycles.
+
+The historical operational `feature_id` sets also differ between the sampled 2019, 2022, and 2024 configurations. See the preceding reach-set compatibility investigation.
+
+### Scope and limitations
+
+- The production operational reader currently supports CONUS only.
+- A configured product does not imply that its files exist on every historical date.
+- A successful retrieval does not establish continuous availability.
+- Availability of all cycles, forecast leads, and ensemble members has not been exhaustively verified.
+- Source observations should not be interpreted as authoritative archive start or end dates.
+- Retrospective NWM and GEOGLOWS coverage remain outside this operational inventory.
+- Further retrospective NWM development requires consultation with Josh Cunningham; GEOGLOWS development requires consultation with Riley Hales.
+
+### Remaining roadmap work
+
+1. Establish authoritative or systematically verified availability boundaries by source, product, and domain.
+2. Distinguish missing products from missing individual cycles or forecast leads.
+3. Extend the inventory to other domains only when domain support is explicitly in scope.
+4. Reconcile retrospective and GEOGLOWS coverage after the required consultations.
+
+**Status:** Historical operational source coverage partially documented. Continuous date ranges remain unverified.
