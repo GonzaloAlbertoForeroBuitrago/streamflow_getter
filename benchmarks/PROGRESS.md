@@ -1712,3 +1712,51 @@ All three retrievals used Kerchunk and returned valid time 01:00 UTC and referen
 - Expand sampled operational source coverage by product, date, and domain.
 - Investigate historical reach-set differences.
 - Continue the remaining requirements in James's roadmap.
+
+## Historical Kerchunk versus native NetCDF validation — November 7, 2026
+
+### Objective
+
+Independently verify historical operational NWM Kerchunk retrieval against the native NetCDF reader, following `docs/ROADMAP.md`.
+
+### Test configuration
+
+- Domain: CONUS
+- Forecast cycle: t00z
+- Forecast lead: f001
+- NWM feature ID: 3586192
+- Methods: production Kerchunk and native NetCDF readers
+
+### Numerical comparison
+
+| Date | Product | Kerchunk (m³/s) | Native (m³/s) | Absolute difference |
+|---|---|---:|---:|---:|
+| 2019-01-01 | short_range | 2.699999939650297 | 2.699999939650297 | 0.0 |
+| 2022-01-01 | medium_range_mem1 | 0.9299999792128801 | 0.9299999792128801 | 0.0 |
+| 2024-01-01 | short_range | 0.8799999803304672 | 0.8799999803304672 | 0.0 |
+
+### Results
+
+- All three historical comparisons passed.
+- Streamflow values agreed exactly at the tested feature.
+- Forecast valid times agreed exactly.
+- Forecast reference times agreed exactly.
+- Historical Kerchunk references and native NetCDF files were accessible for all tested cases.
+
+### Interpretation
+
+The existing operational NWM reader, with historical Kerchunk template support and selective feature-ID decoding, successfully retrieves historical streamflow consistent with the native NetCDF reader.
+
+This provides evidence of compatibility across the sampled historical configurations, including NWM v2.1 and v3.0 references.
+
+### Limitations
+
+- Only three historical dates and one feature ID were compared.
+- All comparisons used forecast cycle t00z and lead f001.
+- Historical coverage remains sampled rather than exhaustive.
+- Additional products, forecast cycles, domains, and reach-set differences require validation.
+- Further NWM retrospective development remains subject to consultation with Josh Cunningham.
+
+### Next
+
+Continue roadmap by expanding historical operational source coverage and investigating model-version and reach-set compatibility.
