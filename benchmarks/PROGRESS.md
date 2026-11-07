@@ -1861,3 +1861,94 @@ Real-data retrieval across the transition was tested for members 1 and 2, leads 
 Historical product availability, model-version compatibility, and reach-set changes remain separate investigation tasks.
 
 Further NWM retrospective development remains subject to consultation with Josh Cunningham.
+
+
+## Historical NWM reach-set compatibility — November 7, 2026
+
+### Objective
+
+Investigate NWM feature-ID compatibility across historical operational model configurations, following `docs/ROADMAP.md`.
+
+### Method
+
+Compared the complete `feature_id` arrays from CIROH Kerchunk references for CONUS `short_range`, cycle t00z, forecast lead f001, on January 1 of 2019, 2022, and 2024.
+
+References were opened using the existing production Kerchunk filesystem configuration. Integer feature IDs were preserved without CF masking.
+
+### Results
+
+| Date | Feature count | Data type |
+|---|---:|---|
+| 2019-01-01 | 2,729,077 | int32 |
+| 2022-01-01 | 2,776,738 | int32 |
+| 2024-01-01 | 2,776,734 | int64 |
+
+| Comparison | Removed IDs | Added IDs | Identical ordering |
+|---|---:|---:|---|
+| 2019 → 2022 | 525 | 48,186 | No |
+| 2022 → 2024 | 4 | 0 | No |
+| 2019 → 2024 | 525 | 48,182 | No |
+
+The four identifiers present in the 2022 sample but absent from the 2024 sample were 4800002, 4800004, 4800006, and 4800007.
+
+Of the 2,729,077 feature IDs in the 2019 sample, 2,728,552 (approximately 99.98%) were also present in the 2024 sample.
+
+### Interpretation
+
+Historical operational NWM files do not necessarily contain identical feature-ID sets.
+
+The existing `extract_streamflow()` implementation resolves reaches by feature ID rather than relying on fixed array positions. No production change is justified solely by these observations.
+
+The change from int32 to int64 also requires no immediate modification because the current extraction implementation supports the tested integer types.
+
+### Limitations
+
+- Three historical dates were compared.
+- Only CONUS short-range t00z f001 was inspected.
+- Identifier persistence does not prove identical river geometry or connectivity.
+- Compatibility of historical feature IDs with version-specific RouteLink metadata remains unverified.
+- No historical crosswalk or reach remapping was implemented.
+
+### Next steps
+
+Inspect existing RouteLink resolution logic and identify authoritative historical RouteLink sources before assessing cross-version gage-to-reach compatibility.
+
+Further NWM retrospective development remains subject to consultation with Josh Cunningham.
+
+### RouteLink v3.1.6 compatibility validation
+
+Compared the complete `link` identifier array from the previously validated NWM v3.1.6 `RouteLink_CONUS.nc` against historical CONUS operational `short_range`, t00z, f001 feature-ID arrays.
+
+RouteLink v3.1.6 contains 2,776,734 unique feature IDs and 8,735 gage-associated reaches.
+
+| Historical sample | RouteLink IDs absent from NWM | NWM IDs absent from RouteLink | Gage-associated reach IDs absent | Exact set match |
+|---|---:|---:|---:|---|
+| 2019-01-01 | 48,182 | 525 | 347 | No |
+| 2022-01-01 | 0 | 4 | 0 | No |
+| 2024-01-01 | 0 | 0 | 0 | Yes |
+
+The four extra operational identifiers in the 2022 sample were 4800002, 4800004, 4800006, and 4800007.
+
+The 2024 operational sample exactly matches the RouteLink v3.1.6 feature-ID set.
+
+For the 2019 sample, 8,388 of 8,735 modern gage-associated reaches were present (approximately 96.03%). The remaining 347 modern gage-associated reach IDs were absent.
+
+These findings establish identifier-set compatibility only. They do not prove that USGS-to-reach associations, channel geometries, or hydrologic connectivity remained unchanged.
+
+No production code changes or automatic historical reach remapping were introduced.
+
+**Next:** Identify authoritative historical RouteLink metadata and compare gage-to-reach mappings across NWM versions before implementing version-specific resolution.
+
+### Relationship to existing troute-lab research
+
+Reviewed `jameshalgren/troute-lab/repro/network_stats/analyze.py`, including `compare_versions()`.
+
+The existing comparison evaluates network outlets and changes in network sizes between NWM v2.1 and v3.1.6. It does not directly compare individual USGS gage-to-feature-ID associations.
+
+The historical operational comparisons in `streamflow_getter` therefore complement the existing network analysis without duplicating its implementation.
+
+The 2019 operational sample contains 2,729,077 feature IDs, matching the segment count cited for the AGU 2020 network analysis. This suggests an earlier network configuration, but its exact RouteLink version remains unverified.
+
+**Conclusion:** Preserve the existing RouteLink resolver and require users to supply an appropriate RouteLink file for the intended NWM configuration. Identifier existence alone does not guarantee historical gage-mapping or geometric equivalence.
+
+No production code changes are proposed from this investigation. Historical RouteLink association validation remains open pending appropriate version-specific metadata.
