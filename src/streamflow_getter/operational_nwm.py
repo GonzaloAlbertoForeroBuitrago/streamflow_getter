@@ -376,7 +376,9 @@ def extract_streamflow(ds, reach_ids: list[int]) -> dict[int, float]:
     mapping = {}
     wanted = set(requested)
     for position, raw_id in enumerate(ids):
-        if isinstance(raw_id, (bool, np.bool_)) or not isinstance(raw_id, numbers.Integral):
+        if isinstance(raw_id, (bool, np.bool_)) or not isinstance(
+            raw_id, numbers.Integral
+        ):
             raise ValueError("NWM feature IDs must be integers")
         feature_id = int(raw_id)
         if feature_id in wanted:
@@ -483,6 +485,7 @@ def read_kerchunk_forecast(
         fs.get_mapper(""),
         consolidated=False,
         zarr_format=2,
+        mask_and_scale={"feature_id": False},
     ) as ds:
         flows = extract_streamflow(ds, reach_ids)
         valid_time = ds.time.values[0]

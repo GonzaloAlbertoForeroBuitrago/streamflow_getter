@@ -67,3 +67,71 @@ def test_reference_validation_matches_benchmark(reference, mutation):
     assert valid_source_identity(reference, expected_url) == (
         benchmark_source_identity(reference, expected_url)
     )
+
+
+def test_valid_historical_template(reference):
+    """A defined template pointing to the expected file is valid."""
+    expected_url = "https://storage.googleapis.com/national-water-model/nwm.nc"
+
+    reference["templates"] = {"u": expected_url}
+    reference["refs"]["feature_id/0"][0] = "{{u}}"
+    reference["refs"]["streamflow/0"][0] = "{{u}}"
+
+    assert validate_reference(reference)
+    assert valid_source_identity(reference, expected_url)
+
+
+@pytest.mark.parametrize(
+    "template_value",
+    [
+        None,
+        "",
+        "ftp://example.com/nwm.nc",
+        "{{other}}",
+    ],
+)
+def test_invalid_historical_template(reference, template_value):
+    reference["templates"] = {"u": template_value}
+    reference["refs"]["feature_id/0"][0] = "{{u}}"
+
+    assert not validate_reference(reference)
+
+
+def test_undefined_historical_template(reference):
+    reference["refs"]["feature_id/0"][0] = "{{missing}}"
+
+    assert not validate_reference(reference)
+
+
+def test_historical_template_wrong_source(reference):
+    expected_url = "https://example.com/nwm.nc"
+
+    reference["templates"] = {
+        "u": "https://example.com/another-file.nc"
+    }
+
+    reference["refs"]["feature_id/0"][0] = "{{u}}"
+    reference["refs"]["streamflow/0"][0] = "{{u}}"
+
+    assert validate_reference(reference)
+    assert not valid_source_identity(reference, expected_url)
+
+
+def test_historical_template_invalid_byte_range(reference):
+    reference["templates"] = {
+        "u": "https://example.com/nwm.nc"
+    }
+
+    reference["refs"]["feature_id/0"] = ["{{u}}", -1, 100]
+
+    assert not validate_reference(reference)
+
+
+def test_historical_template_zero_length(reference):
+    reference["templates"] = {
+        "u": "https://example.com/nwm.nc"
+    }
+
+    reference["refs"]["feature_id/0"] = ["{{u}}", 0, 0]
+
+    assert not validate_reference(reference)

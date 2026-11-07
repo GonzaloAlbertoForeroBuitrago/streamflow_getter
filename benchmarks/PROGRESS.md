@@ -1654,3 +1654,61 @@ internal initialization state.
   additional dates and cycles.
 - Verify reuse of a single downloaded t0 across members.
 - Continue the remaining roadmap tasks.
+
+## Historical operational NWM Kerchunk compatibility — November 7, 2026
+
+### Objective
+
+Validate historical operational NWM retrieval across different model versions, following `docs/ROADMAP.md`.
+
+### Historical reference findings
+
+- CIROH Kerchunk references were found for sampled historical dates from 2018 through 2026.
+- Sampled NOAA S3 paths were unavailable for dates before 2025 but available for 2025 and 2026.
+- Historical CIROH references use Google Cloud Storage URLs through the Kerchunk `templates.u` convention.
+- The 2022 reference identifies NWM v2.1.
+- The 2024 reference identifies NWM v3.0.
+- Historical feature-ID arrays differ in size and integer dtype.
+
+### Implementation
+
+- Extended production Kerchunk reference validation to support defined URL templates.
+- Preserved strict source-identity and byte-range validation.
+- Configured selective xarray decoding with `mask_and_scale={"feature_id": False}`.
+- Preserved integer feature identifiers while retaining normal streamflow decoding.
+- Reused the existing operational retrieval implementation.
+
+### Real-data validation
+
+Feature ID: `3586192`
+
+All cases used forecast cycle 00 UTC and lead f001.
+
+| Date | Product | Streamflow (m³/s) | Result |
+|---|---|---:|---|
+| 2019-01-01 | short_range | 2.699999939650297 | Passed |
+| 2022-01-01 | medium_range_mem1 | 0.9299999792128801 | Passed |
+| 2024-01-01 | short_range | 0.8799999803304672 | Passed |
+
+All three retrievals used Kerchunk and returned valid time 01:00 UTC and reference time 00:00 UTC on the respective dates.
+
+### Automated validation
+
+- 66 focused tests passed.
+- 565 repository tests passed.
+- Git whitespace validation passed.
+
+### Limitations
+
+- Historical coverage was sampled, not exhaustively established.
+- The native NetCDF values have not yet been independently compared with the Kerchunk results.
+- Historical reach-set compatibility has not been comprehensively evaluated.
+- Additional forecast products, cycles, domains, and model versions remain unverified.
+- Further NWM retrospective development requires consultation with Josh Cunningham.
+
+### Next steps
+
+- Compare historical Kerchunk values against native NetCDF sources.
+- Expand sampled operational source coverage by product, date, and domain.
+- Investigate historical reach-set differences.
+- Continue the remaining requirements in James's roadmap.

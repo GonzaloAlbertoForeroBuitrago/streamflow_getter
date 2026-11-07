@@ -291,3 +291,35 @@ def test_kerchunk_analysis_t0_rejects_wrong_valid_time(
             0,
             [3586192],
         )
+
+def test_kerchunk_preserves_integer_feature_ids(
+    mock_kerchunk,
+    monkeypatch,
+):
+    """Disable masking only for feature_id, not streamflow."""
+    import xarray as xr
+
+    captured = {}
+    original_open_zarr = xr.open_zarr
+
+    def inspect_open_zarr(*args, **kwargs):
+        captured.update(kwargs)
+        return original_open_zarr(*args, **kwargs)
+
+    # The existing fixture has already mocked xr.open_zarr.
+    monkeypatch.setattr(
+        xr,
+        "open_zarr",
+        inspect_open_zarr,
+    )
+
+    result = read_kerchunk_forecast(
+        ForecastConfig(),
+        1,
+        [3586192],
+    )
+
+    assert result["method"] == "kerchunk"
+    assert captured["mask_and_scale"] == {
+        "feature_id": False
+    }

@@ -278,3 +278,25 @@ def test_analysis_t0_rejects_missing_reference_time():
             "2026-04-19T00:00:00",
             np.datetime64("NaT", "s"),
         )
+
+@pytest.mark.parametrize("dtype", [np.int32, np.int64])
+def test_extract_streamflow_numpy_integer_feature_ids(dtype):
+    """Historical NWM integer feature IDs must remain valid."""
+    ds = xr.Dataset(
+        {
+            "streamflow": (
+                "feature_id",
+                [0.41, 1.25],
+            ),
+        },
+        coords={
+            "feature_id": np.array(
+                [3586192, 1122645],
+                dtype=dtype,
+            ),
+        },
+    )
+
+    result = extract_streamflow(ds, [3586192])
+
+    assert result == {3586192: 0.41}
