@@ -1804,3 +1804,60 @@ Combined with the earlier short- and medium-range comparisons, this establishes 
 ### Next
 
 Investigate historical operational product availability transitions, particularly medium-range ensembles and medium-range blend, before expanding model-version and reach-set compatibility testing.
+
+## Historical medium-range forecast scheduling — November 7, 2026
+
+### Objective
+
+Support historical operational NWM medium-range forecast lead schedules within the existing `ForecastConfig` architecture.
+
+### Historical archive evidence
+
+CIROH Kerchunk reference inventories identified a change in forecast lead frequency on April 20, 2021, between the 06 UTC and 12 UTC cycles.
+
+For CONUS medium-range ensemble members 1–6:
+
+| Forecast initialization | Lead interval | Member 1 horizon | Members 2–6 horizon |
+|---|---|---|---|
+| Through 2021-04-20 06 UTC | 3 hours | f003–f240 | f003–f204 |
+| From 2021-04-20 12 UTC | 1 hour | f001–f240 | f001–f204 |
+
+The transition was observed in CIROH reference filenames across all six members and all four cycles sampled on April 20–21.
+
+### Implementation
+
+Updated `src/streamflow_getter/operational_nwm.py` to select forecast lead intervals using the forecast initialization date and cycle.
+
+The existing `ProductSpec` definitions, source resolution, Kerchunk reader, native fallback, and CLI architecture were preserved.
+
+Added regression coverage in `tests/test_operational_product_config.py`.
+
+### Real-data validation
+
+Tested operational retrieval for feature ID `3586192` on April 20, 2021.
+
+| Product | Cycle | Retrieved leads | Result |
+|---|---|---|---|
+| medium_range_mem1 | 06 UTC | f003, f006 | PASS |
+| medium_range_mem1 | 12 UTC | f001–f006 | PASS |
+| medium_range_mem2 | 06 UTC | f003, f006 | PASS |
+| medium_range_mem2 | 12 UTC | f001–f006 | PASS |
+
+All 16 records were retrieved using Kerchunk with the expected forecast timestamps.
+
+### Regression validation
+
+- Focused product configuration suite: 223 passed.
+- Complete regression suite: 620 passed.
+- `git diff --check`: clean.
+- Modern medium-range schedules and other operational product schedules preserved.
+
+### Limitations
+
+The transition is established from sampled CIROH archive references rather than an independently verified NOAA release-history record.
+
+Real-data retrieval across the transition was tested for members 1 and 2, leads f001–f006 as applicable, and one feature ID. Other members and longer forecast horizons have unit-test and reference-inventory coverage but were not exhaustively retrieved.
+
+Historical product availability, model-version compatibility, and reach-set changes remain separate investigation tasks.
+
+Further NWM retrospective development remains subject to consultation with Josh Cunningham.

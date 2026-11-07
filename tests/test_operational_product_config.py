@@ -913,3 +913,79 @@ def test_long_range_ensemble_analysis_source(member):
     assert source["filename"] == (
         "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
     )
+
+@pytest.mark.parametrize("member", range(1, 7))
+@pytest.mark.parametrize(
+    "date,cycle,expected_step",
+    [
+        ("2021-04-20", 0, 3),
+        ("2021-04-20", 6, 3),
+        ("2021-04-20", 12, 1),
+        ("2021-04-20", 18, 1),
+        ("2021-04-21", 0, 1),
+        ("2026-04-19", 0, 1),
+    ],
+)
+def test_historical_medium_range_lead_step(
+    member, date, cycle, expected_step
+):
+    config = ForecastConfig(
+        date=date,
+        cycle=cycle,
+        product=f"medium_range_mem{member}",
+    )
+
+    assert config.lead_step_hours == expected_step
+
+    expected_hours = list(range(expected_step, 13, expected_step))
+    assert config.forecast_hours(1, 12) == expected_hours
+
+
+@pytest.mark.parametrize("member", range(1, 7))
+@pytest.mark.parametrize("cycle", [0, 6])
+def test_historical_medium_range_rejects_unavailable_lead(
+    member, cycle
+):
+    config = ForecastConfig(
+        date="2021-04-20",
+        cycle=cycle,
+        product=f"medium_range_mem{member}",
+    )
+
+    with pytest.raises(ValueError, match="multiple of 3"):
+        config.filename(1)
+
+    assert ".f003." in config.filename(3)
+
+
+@pytest.mark.parametrize("member", range(1, 7))
+def test_historical_medium_range_full_horizon(member):
+    config = ForecastConfig(
+        date="2021-04-20",
+        cycle=6,
+        product=f"medium_range_mem{member}",
+    )
+
+    max_hour = 240 if member == 1 else 204
+    hours = config.forecast_hours(1, max_hour)
+
+    assert hours[0] == 3
+    assert hours[-1] == max_hour
+    assert len(hours) == max_hour // 3
+
+
+def test_other_products_keep_existing_lead_steps():
+    cases = [
+        ("short_range", 1),
+        ("medium_range_no_da", 3),
+        ("long_range_mem1", 6),
+    ]
+
+    for product, expected_step in cases:
+        config = ForecastConfig(
+            date="2021-04-20",
+            cycle=0,
+            product=product,
+        )
+
+        assert config.lead_step_hours == expected_step

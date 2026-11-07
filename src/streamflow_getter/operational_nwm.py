@@ -131,6 +131,9 @@ PRODUCT_SPECS = {
 
 }
 
+# Observed CIROH operational medium-range scheduling transition.
+MEDIUM_RANGE_HOURLY_START = datetime(2021, 4, 20, 12)
+
 @dataclass(frozen=True)
 class ForecastConfig:
     """Identify a supported operational NWM forecast cycle."""
@@ -169,6 +172,22 @@ class ForecastConfig:
         return PRODUCT_SPECS[self.product]
 
     @property
+    def lead_step_hours(self) -> int:
+        """Return the forecast lead interval for this product and cycle."""
+        if self.product in {
+            f"medium_range_mem{i}" for i in range(1, 7)
+        }:
+            initialization = datetime.combine(
+                date.fromisoformat(self.date),
+                datetime.min.time(),
+            ).replace(hour=self.cycle)
+
+            if initialization < MEDIUM_RANGE_HOURLY_START:
+                return 3
+
+        return self.spec.lead_step_hours
+
+    @property
     def date_folder(self) -> str:
         return "nwm." + self.date.replace("-", "")
 
@@ -196,7 +215,7 @@ class ForecastConfig:
                 f"for {self.product}"
             )
 
-        step = self.spec.lead_step_hours
+        step = self.lead_step_hours
         if isinstance(step, bool) or not isinstance(step, int) or step < 1:
             raise ValueError("Forecast lead step must be a positive integer")
         first = ((start_hour + step - 1) // step) * step
@@ -220,7 +239,7 @@ class ForecastConfig:
                 f"{self.spec.max_hour} for {self.product}"
             )
 
-        step = self.spec.lead_step_hours
+        step = self.lead_step_hours
 
         if isinstance(step, bool) or not isinstance(step, int) or step < 1:
             raise ValueError("Forecast lead step must be a positive integer")
