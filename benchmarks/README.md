@@ -140,17 +140,18 @@ Contains one record per reach and retrieval method, including:
 
 Separating these outputs prevents network-transfer measurements from being counted repeatedly for each reach.
 
-Existing output files are overwritten when the benchmark is rerun. Preserve important results through versioned experiment documentation before running a different configuration.
+The runner refuses to overwrite existing output CSVs. Use a new `--output-prefix` for a deliberate new experiment and preserve accepted results. Record their configuration and SHA-256 fingerprints in `PROGRESS.md`.
 
 ## 8. Automated Testing
 
 Run the complete test suite:
 
 ```bash
-uv run --locked pytest -q
+uv sync --locked --extra operational --extra spatial --extra parquet
+uv run --locked --extra operational --extra spatial --extra parquet pytest -q -ra
 ```
 
-**Latest verified result: 638 tests passed (November 7, 2026).**.
+The full repository suite exercises optional operational, spatial, and Parquet capabilities. For the latest verified environment, test result, and CI status, see [Development Status](../docs/DEVELOPMENT_STATUS.md).
 
 The benchmark tests verify batch extraction, feature identity, reach ordering, single-reach compatibility, non-finite value rejection, CSV output structure, streamflow disagreement detection, and timestamp disagreement detection.
 
@@ -210,7 +211,7 @@ Further NWM retrospective and GEOGLOWS development must follow the consultation 
 - Avoid unnecessary backups and temporary copies.
 - Use Git for version history.
 - Keep changes on the development branch.
-- Defer pull requests and publication until validation is complete.
+- Keep pull requests focused, validate changes before publishing, and record their limitations.
 
 ## 12. Experiment History
 

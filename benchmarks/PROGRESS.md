@@ -1,6 +1,6 @@
 # NWM Operational Retrieval — Research and Validation Progress
 
-**Last updated:** November 7, 2026
+**Last updated:** November 9, 2026
 **Project:** `streamflow_getter`
 **Development branch:** `research/nwm-historical-coverage`
 **Requirements:** [Project roadmap](../docs/ROADMAP.md)
@@ -20,7 +20,7 @@ The results distinguish three levels of evidence:
 
 Successful retrieval on selected dates does not establish continuous historical coverage, full forecast-horizon compatibility, or hydrologic correctness for every location.
 
-The latest reported complete test suite passed **638 tests** on November 7, 2026.
+Current automated-test and CI status are recorded in [Development Status](../docs/DEVELOPMENT_STATUS.md).
 
 ## 2. Reference dataset and retrieval methods
 
@@ -153,6 +153,34 @@ Benchmark output includes:
 - `benchmarks/results/repeated_benchmark_flows.csv`
 
 See [Benchmark documentation](README.md) for execution procedures.
+
+### 3.7 Verification of archived benchmark results
+
+On November 9, 2026, the existing local CSV pairs for Sections 3.3 and 3.4 were revalidated using implementation commit `5d1db8951f8917e5b77cd2bcff8cf27334a3cda3`. This was validation of stored results, not a new retrieval or performance experiment.
+
+The files below are local generated artifacts under `benchmarks/results/`, covered by the existing Git ignore policy. Their SHA-256 fingerprints were unchanged between inventory and validation.
+
+| File | Rows | SHA-256 |
+|---|---:|---|
+| `short_range_18h_5reaches_3trials.csv` | 216 | `3aba9e7ce044968245a6276169fa613737e67374aaf91f1608a10584b602dc9e` |
+| `short_range_18h_5reaches_3trials_flows.csv` | 1,080 | `09da06e9164d6de8c0561596f1d1c63f1cbff164d4deb069a0c6680ee88850ba` |
+| `short_range_20260419_20260421_t00z.csv` | 12 | `44eac1146b2dbf28368bf35f057f686420f18bd67f1b0f6d428f4a8a932a8981` |
+| `short_range_20260419_20260421_t00z_flows.csv` | 60 | `d5014dd0c0ebaf3c207d1bee6346e45d8a06cbf02dfd7b304599c6e44126e205` |
+
+Both pairs passed the following checks:
+
+- Complete expected operation and flow keys, with no duplicate, missing, or unexpected combinations.
+- Five expected reaches per operation: `1122645`, `3586192`, `7144704`, `14191043`, and `23610484`.
+- Finite discharge values, with genuine zeros retained.
+- Reference times equal to the selected forecast initialization and valid times equal to initialization plus forecast hour.
+- Agreement across all methods and trials within each forecast/lead/reach group, using `rtol=1e-6` and `atol=1e-6`. The observed maximum absolute difference was `0 m3/s` in both experiments.
+- Recomputed median retrieval times matched the rounded values in the existing tables, and accounted response-body byte totals matched exactly.
+
+The 18-hour files contain 216 stored zero-valued flow rows; the three-day files contain 12. These counts include repeated method/trial rows. Both datasets have a discharge range of `0` to `16062.709641 m3/s`.
+
+The 18-hour CSVs predate the forecast metadata columns. Their documented context (`2026-04-19`, cycle `00`, `short_range`, `conus`) was supplied only in memory for validation. The three-day CSVs already contain these fields. Both experiments contain forecast leads without analysis t0; the reference-time check above does not define the rule for analysis-derived t0 rows.
+
+This validates the stored coverage, timing, and agreement between retrieval methods for these specific experiments. It does not establish continuous archive coverage, controlled cache performance, or a universal retrieval-speed advantage.
 
 ## 4. Reference caching and validation
 
