@@ -161,7 +161,11 @@ def save_cache_record(path, record, expected_url):
 
 
 def load_cache_record(path, expected_url):
-    """Return a validated cache record or None."""
+    """Return a validated record, or None if it is missing or invalid.
+
+    Other local filesystem errors propagate so callers can distinguish
+    storage failures from recoverable cache misses.
+    """
     path = Path(path)
 
     try:
@@ -171,7 +175,7 @@ def load_cache_record(path, expected_url):
         if validate_cache_record(record, expected_url):
             return record
 
-    except (OSError, UnicodeError, ValueError, TypeError):
+    except (FileNotFoundError, UnicodeError, ValueError, TypeError):
         pass
 
     return None

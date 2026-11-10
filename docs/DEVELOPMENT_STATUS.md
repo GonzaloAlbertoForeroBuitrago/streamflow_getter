@@ -1,9 +1,9 @@
 # Development Status — NWM Implementation Checkpoint
 
 **Checkpoint date:** November 7, 2026
-**Updated:** November 9, 2026
+**Updated:** November 10, 2026
 **Branch:** `research/nwm-historical-coverage`
-**Status:** Implemented operational NWM backend submitted in PR #6; CI dependency correction validated locally; remaining backend and Alabama research work pending.
+**Status:** Implemented operational NWM backend submitted in PR #6; local cache-read I/O correction validated; remaining backend and Alabama research work pending.
 
 ## 1. Completed Work
 
@@ -51,7 +51,23 @@ At implementation commit `55c2ab571393429cadb9cf801f89bd5da9493af0`:
 - Live production CLI retrieval passed for a point CSV, bounding-box CSV, and equivalent rectangular-polygon Parquet: 1, 19, and 19 rows, all through Kerchunk. See [PROGRESS Section 6.5](../benchmarks/PROGRESS.md#65-live-geographic-retrieval-and-export).
 - Controlled missing-reference injection led the production coordinator to retrieve real native NetCDF data for reach `3586192`. Method, fallback reason, metadata, timestamps, and numerical agreement with the accepted point records passed. See [PROGRESS Section 5.4](../benchmarks/PROGRESS.md#54-controlled-native-fallback-integration).
 
-These local acceptance cases cover April 19, 2026, cycle 00, short-range CONUS f001 with reference caching disabled. Exact UTC execution times, configurations, limitations, and artifact fingerprints are recorded in the linked sections. Full-suite and hosted-CI status remain as recorded above.
+These local acceptance cases cover April 19, 2026, cycle 00, short-range CONUS f001 with reference caching disabled. Exact UTC execution times, configurations, limitations, and artifact fingerprints are recorded in the linked sections. Full-suite results and hosted-CI verification are tracked separately in this section.
+
+### Local cache I/O correction — recorded November 10, 2026
+
+Validated the correction in a working tree based on `2aca2e78a455c63139f9924b22931c66e0ab2cf3`.
+
+- `load_cache_record` preserves recovery for missing or invalid cached records and propagates other local filesystem errors.
+- Three regression cases cover `PermissionError`, `IsADirectoryError`, and `OSError` with `errno.EIO`. They verify that the same exception propagates, the reference-body downloader is not called, and existing cache bytes remain unchanged.
+- Local environment: macOS ARM64, Python 3.14.6, pytest 9.1.1.
+- Locked full-suite result: **641 passed in 1.90 seconds**.
+- `git diff --check` passed; `pyproject.toml`, `uv.lock`, and `docs/ROADMAP.md` were unchanged.
+
+Validated command:
+
+    uv run --locked --extra operational --extra spatial --extra parquet pytest -q -ra
+
+Remote freshness metadata is still checked before the local cache read. This is local automated validation; verify GitHub Actions for the published PR head.
 
 ## 3. Known Limitations and Remaining Work
 
@@ -63,7 +79,7 @@ These local acceptance cases cover April 19, 2026, cycle 00, short-range CONUS f
 - Some analysis-to-forecast `t0` relationships require additional scientific review.
 - NRDS and GEOGLOWS adapters remain future development work.
 
-**Next backend task:** Complete the reference-preparation design and classify remote availability, local cache I/O, and integrity failures before changing cached-path fallback or default-cache behavior. Reuse the existing source resolver and cache implementation, alongside the product/time/provenance coordination described below.
+**Next backend task:** Extract a shared reference-preparation function from the operational Kerchunk reader, reusing the existing source resolver and validated cache implementation. Keep remote availability, local cache I/O, and integrity failures distinguishable before changing cached-path fallback or default-cache behavior. Continue the product/time/provenance coordination described below.
 
 ## 4. Next Research Phase — Alabama
 

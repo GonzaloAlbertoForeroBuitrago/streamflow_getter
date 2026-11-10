@@ -1,7 +1,10 @@
 
 """Tests for production NWM reference caching."""
 
+import errno
 import json
+from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
@@ -187,6 +190,45 @@ def test_failed_refresh_preserves_record(
         )
 
     assert path.read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "error_type,error_number",
+    [
+        (PermissionError, errno.EACCES),
+        (IsADirectoryError, errno.EISDIR),
+        (OSError, errno.EIO),
+    ],
+    ids=["permission", "directory", "io"],
+)
+def test_cache_read_io_error_stops_refresh_and_preserves_record(
+    tmp_path, monkeypatch, valid_reference, metadata,
+    error_type, error_number,
+):
+    path = tmp_path / "record.json"
+    save_cache_record(
+        path,
+        create_cache_record(valid_reference, URL, metadata),
+        URL,
+    )
+    original_bytes = path.read_bytes()
+    failure = error_type(error_number, "Cache read failed", str(path))
+    original_open = Path.open
+    downloader = Mock(side_effect=AssertionError("Unexpected reference download"))
+
+    def fail_cache_read(candidate, *args, **kwargs):
+        if candidate == path:
+            raise failure
+        return original_open(candidate, *args, **kwargs)
+
+    with monkeypatch.context() as context:
+        context.setattr(Path, "open", fail_cache_read)
+        with pytest.raises(error_type) as caught:
+            load_fresh_reference(path, URL, lambda: metadata, downloader)
+        assert caught.value is failure
+        downloader.assert_not_called()
+
+    assert path.read_bytes() == original_bytes
 
 
 def test_invalid_download_rejected(tmp_path, metadata):

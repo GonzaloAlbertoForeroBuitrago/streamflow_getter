@@ -305,7 +305,9 @@ The operational reader can store validated Kerchunk reference records locally.
 
 The cache implementation checks reference structure, source identity, SHA-256 integrity, remote ETag, source generation, and consistency of remote metadata during downloads.
 
-Cached references are reused when their metadata remains valid. Corrupted records can be replaced with validated downloads; source-generation changes are rejected when compatibility cannot be established.
+Cached references are reused when their metadata remains valid. Missing or invalid local records can be replaced with validated downloads; source-generation changes are rejected when compatibility cannot be established.
+
+Permission errors, directory misuse, and other local cache-read I/O errors propagate and stop reference-body download or cache replacement. A remote freshness-metadata check precedes the local cache read.
 
 Use `--cache-dir` to choose the cache location.
 
