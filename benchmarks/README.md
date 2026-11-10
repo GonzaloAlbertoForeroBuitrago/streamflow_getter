@@ -188,6 +188,8 @@ The following capabilities have been implemented:
 - Analysis t0 integration and CSV/Parquet output.
 - Selected historical Kerchunk/native NetCDF comparisons.
 
+Selected live acceptance evidence is recorded in [PROGRESS Section 6.5](PROGRESS.md#65-live-geographic-retrieval-and-export) for geographic CLI retrieval/export and [Section 5.4](PROGRESS.md#54-controlled-native-fallback-integration) for controlled missing-reference injection with real native retrieval. Both cases use April 19, 2026, cycle 00, short-range CONUS f001. Their scope and artifact fingerprints are recorded there.
+
 Remaining research priorities include:
 
 - Controlled performance measurements across additional dates and cycles.
@@ -195,7 +197,7 @@ Remaining research priorities include:
 - Version-specific RouteLink and NWM network compatibility.
 - Complete medium- and long-range forecast-horizon validation.
 - Scientific assessment of long-range ensemble initialization.
-- Live end-to-end geographic-selection validation.
+- Geographic validation beyond the accepted point and rectangular-region case.
 - Additional NWM domains where explicitly authorized.
 
 See [PROGRESS.md](PROGRESS.md) for experimental evidence, numerical results, and scientific limitations.

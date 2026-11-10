@@ -44,15 +44,26 @@ Validated commands:
 
 This is local validation. Verify the GitHub Actions result for the updated PR head after pushing the commit.
 
+### Live geographic retrieval and controlled fallback — November 9, 2026
+
+At implementation commit `55c2ab571393429cadb9cf801f89bd5da9493af0`:
+
+- Live production CLI retrieval passed for a point CSV, bounding-box CSV, and equivalent rectangular-polygon Parquet: 1, 19, and 19 rows, all through Kerchunk. See [PROGRESS Section 6.5](../benchmarks/PROGRESS.md#65-live-geographic-retrieval-and-export).
+- Controlled missing-reference injection led the production coordinator to retrieve real native NetCDF data for reach `3586192`. Method, fallback reason, metadata, timestamps, and numerical agreement with the accepted point records passed. See [PROGRESS Section 5.4](../benchmarks/PROGRESS.md#54-controlled-native-fallback-integration).
+
+These local acceptance cases cover April 19, 2026, cycle 00, short-range CONUS f001 with reference caching disabled. Exact UTC execution times, configurations, limitations, and artifact fingerprints are recorded in the linked sections. Full-suite and hosted-CI status remain as recorded above.
+
 ## 3. Known Limitations and Remaining Work
 
 - Reference caching is optional rather than enabled by default.
 - Advance preprocessing of Kerchunk references remains incomplete.
-- Cached retrieval failures do not always trigger native fallback.
+- Cached retrieval errors currently propagate rather than invoking native fallback.
 - Historical NWM network compatibility requires version-specific verification.
 - Complete forecast-horizon and historical product coverage have not been verified.
 - Some analysis-to-forecast `t0` relationships require additional scientific review.
 - NRDS and GEOGLOWS adapters remain future development work.
+
+**Next backend task:** Complete the reference-preparation design and classify remote availability, local cache I/O, and integrity failures before changing cached-path fallback or default-cache behavior. Reuse the existing source resolver and cache implementation, alongside the product/time/provenance coordination described below.
 
 ## 4. Next Research Phase — Alabama
 

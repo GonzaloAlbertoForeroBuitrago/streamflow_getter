@@ -293,6 +293,36 @@ For long-range members 1–4, the tested streamflow values were approximately 0.
 
 The availability of f720 source objects was sampled, but complete 720-hour retrieval was not validated.
 
+### 5.4 Controlled native-fallback integration
+
+- Execution UTC: `2026-11-10T03:36:14.972298+00:00`.
+- Implementation commit: `55c2ab571393429cadb9cf801f89bd5da9493af0`.
+- Configuration: `2026-04-19`, cycle `00`, `short_range`, `conus`, lead `f001`, feature ID `3586192`, `cache_dir=None`.
+
+A process-local patch injected `FileNotFoundError` only at `read_kerchunk_forecast`. The unchanged `fetch_operational_forecast` coordinator then performed a real native HTTP-range retrieval through `read_native_forecast`. Exactly one injected call was confirmed, and the original Kerchunk reader was restored afterward.
+
+Native source:
+
+`https://storage.googleapis.com/national-water-model/nwm.20260419/short_range/nwm.t00z.short_range.channel_rt.f001.conus.nc`
+
+The returned method was `native_remote`, with fallback reason `FileNotFoundError: B5 controlled missing-reference injection`.
+
+Validation confirmed the requested forecast metadata and reach, finite discharge, reference time `2026-04-19T00:00:00Z`, and valid time `2026-04-19T01:00:00Z`. Native discharge was `0.40999999083578587 m3/s`. Its absolute difference from each stored comparison value was `5.5511151231257827e-17 m3/s`, within `rtol=1e-6` and `atol=1e-6`.
+
+The comparison records were the live point CSV in Section 6.5 and the archived `native_download` row for trial 1, f001, reach `3586192` in `short_range_18h_5reaches_3trials_flows.csv` (Section 3.7). Both comparison-file fingerprints were verified before retrieval.
+
+The single coordinator call took `1.993 s`. This is acceptance-run context, not a controlled performance benchmark.
+
+The local diagnostic artifact under `benchmarks/results/` is covered by the existing Git ignore policy:
+
+| File | Rows | Bytes | SHA-256 |
+|---|---:|---:|---|
+| `live_native_fallback_20260419_t00_f001.csv` | 1 | 755 | `a1422fd08205799dd60e254773608bf9ccae0113177c75275eb827b78fade452` |
+
+The diagnostic CSV retains the returned fallback reason, the `controlled_missing_reference` experiment label, and provenance fields. These are acceptance-artifact fields; the production CLI export contract was unchanged.
+
+This validates controlled uncached fallback for the selected case. The missing reference was injected; the experiment does not establish a naturally occurring archive outage, cached-path fallback, or analysis-t0 behavior.
+
 ## 6. USGS and geographic reach resolution
 
 ### 6.1 RouteLink
@@ -343,7 +373,7 @@ Reference bounding box:
 
 An earlier independent geographic subset comparison returned 18 bounding-box reaches and 12 polygon reaches. These results came from a different validation stage and should not be treated as identical test configurations.
 
-The CLI geographic tests used real hydrofabric data with remote NWM retrieval mocked. They did not establish live end-to-end forecast retrieval for the point, bounding-box, or polygon options.
+The earlier CLI geographic tests used real hydrofabric data with remote NWM retrieval mocked. They established selection behavior. The subsequent live point, bounding-box, and polygon retrieval and export checks are recorded in Section 6.5.
 
 ### 6.4 Geographic limitations
 
@@ -354,6 +384,57 @@ The nearest channel may not represent the intended hydrologic reach, especially 
 The default limit of 100 reaches for bounding-box and polygon requests is a safeguard, not a measured performance threshold.
 
 Compatibility with historical NWM hydrofabric and RouteLink versions remains under investigation.
+
+### 6.5 Live geographic retrieval and export
+
+- Execution UTC: `2026-11-10T00:48:22.736861+00:00`.
+- Implementation commit: `55c2ab571393429cadb9cf801f89bd5da9493af0`.
+- Environment: Python `3.14.6`, pandas `3.0.6`, pyarrow `26.0.1`.
+- Configuration: `2026-04-19`, cycle `00`, `short_range`, `conus`, lead `f001`, `--no-t0`, reference cache disabled.
+
+The production `streamflow_getter.cli.main` entry point performed real selection, retrieval, and export separately for a point, bounding box, and newly constructed rectangular GeoJSON polygon. The polygon used the same bounds as the box. No geographic or retrieval functions were mocked in this experiment.
+
+Inputs:
+
+- Hydrofabric: `/Users/gonzalo/Documents/troute-lab/data/NWM_v3_hydrofabric.gdb`; layer `nwm_reaches_conus`; CRS verified as `EPSG:4269`.
+- Point in longitude/latitude order: `(-99.3217121935161, 30.0699307434853)`; search radius `500 m`.
+- Bounding box in west/south/east/north order: `(-99.35, 30.05, -99.30, 30.09)`.
+- Polygon ring: `[[-99.35, 30.05], [-99.30, 30.05], [-99.30, 30.09], [-99.35, 30.09], [-99.35, 30.05]]`.
+
+The point selected feature ID `3586192` at a reported distance of `98.34 m`. Both area selections returned exactly these 19 unique IDs, matching the previously recorded bounding-box selection:
+
+```text
+3585578, 3585604, 3585606, 3585614, 3585616,
+3585620, 3585622, 3585750, 3585754, 3585756,
+3586192, 3586194, 3586210, 3586216, 3586218,
+3586224, 3586226, 3586228, 3586230
+```
+
+| Selection | Format | Rows | Method | Zero-flow rows | Elapsed time |
+|---|---|---:|---|---:|---:|
+| Point | CSV | 1 | `kerchunk` | 0 | 2.336 s |
+| Bounding box | CSV | 19 | `kerchunk` | 4 | 1.068 s |
+| Rectangular polygon | Parquet | 19 | `kerchunk` | 4 | 1.104 s |
+
+Elapsed times cover each full CLI call, including geographic selection, retrieval, and export. These single-pass measurements are acceptance-run context, not controlled reader benchmarks.
+
+The matching CIROH reference object was:
+
+`s3://ciroh-nwm-zarr-copy/national-water-model/nwm.20260419/short_range/nwm.t00z.short_range.channel_rt.f001.conus.nc.json`
+
+The exported files were read back and checked for the expected columns, exact reach coverage, forecast metadata, finite discharge, reference time `2026-04-19T00:00:00Z`, and valid time `2026-04-19T01:00:00Z`.
+
+The point CSV value was `0.4099999908357858 m3/s` and agreed with the archived native-download comparison from Section 3.7. Both area outputs ranged from `0` to `0.4399999901652336 m3/s`, preserving four genuine zeros each. The maximum bbox-CSV/polygon-Parquet difference was `8.326672684688674e-17 m3/s`. All three selections agreed at reach `3586192` within `rtol=1e-6` and `atol=1e-6`.
+
+These local generated artifacts under `benchmarks/results/` are covered by the existing Git ignore policy:
+
+| File | Rows | Bytes | SHA-256 |
+|---|---:|---:|---|
+| `live_geo_20260419_t00_f001_point.csv` | 1 | 243 | `ebce7115eb906db7f2eb8b7f57ba4f071b3adb284941ab4e39a2397383da4dcc` |
+| `live_geo_20260419_t00_f001_bbox.csv` | 19 | 2,519 | `fa96b0d8639ec21d5e23f413c5ee4b4518a3c6ca294ce02fc93820d5814660b3` |
+| `live_geo_20260419_t00_f001_polygon.parquet` | 19 | 6,625 | `888643c34f1a6a64a5fb4861d7bb7ceb83e275a3540ceb4337b94c841e46d1d7` |
+
+This establishes live CLI geographic selection, Kerchunk retrieval, and CSV/Parquet export for one point and one rectangular region at one forecast cycle and lead. Broader geography, historical network compatibility, analysis t0, and native fallback are outside this experiment. The separate controlled fallback result is recorded in Section 5.4.
 
 ## 7. Historical NWM compatibility
 
@@ -514,7 +595,7 @@ The long-range shared `analysis_assim` t0 follows the project roadmap, but its i
 
 ### 9.5 Spatial selection
 
-The nearest channel is not necessarily the hydrologically correct channel. Geographic reach selection requires additional live end-to-end testing and broader CONUS validation.
+The nearest channel is not necessarily the hydrologically correct channel. Section 6.5 establishes one live point and rectangular-region case; broader geographic coverage and hydrologic matching remain outside that acceptance result.
 
 ### 9.6 Scope
 
@@ -528,14 +609,14 @@ The implemented operational geographic workflow targets CONUS. Full forecast hor
 4. Repeat performance experiments under controlled network and cache conditions.
 5. Validate complete medium- and long-range forecast horizons.
 6. Investigate long-range ensemble initialization and shared t0 interpretation.
-7. Perform live end-to-end retrieval for geographic selections.
+7. Extend geographic validation beyond the accepted point and rectangular-region case where required by the agreed release scope.
 8. Extend domain coverage only when explicitly authorized and technically validated.
 
 Further NWM retrospective and GEOGLOWS development must follow the consultation and coordination requirements in [the project roadmap](../docs/ROADMAP.md).
 
 ## 11. Reproducibility and development practices
 
-The benchmark implementations, tests, and recorded outputs are maintained in the repository.
+The benchmark implementations, tests, and experimental summaries are maintained in the repository. Generated result files remain local under the existing Git ignore policy; accepted artifacts are identified by their recorded SHA-256 fingerprints.
 
 - [Benchmark instructions](README.md)
 - [Operational NWM guide](../docs/OPERATIONAL_NWM.md)
