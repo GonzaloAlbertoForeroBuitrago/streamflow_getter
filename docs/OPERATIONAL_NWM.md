@@ -311,6 +311,65 @@ Permission errors, directory misuse, and other local cache-read I/O errors propa
 
 Use `--cache-dir` to choose the cache location.
 
+### Preparing a reference before retrieval
+
+The Python API can prepare one forecast or analysis reference without opening model arrays. Preparation and the Kerchunk reader share the same source resolution, reference validation, and cache implementation:
+
+```python
+from streamflow_getter.operational_nwm import (
+    ForecastConfig,
+    prepare_operational_reference,
+    read_kerchunk_forecast,
+)
+
+config = ForecastConfig(date="2026-04-19", cycle=0, product="short_range")
+cache_dir = "~/.cache/streamflow_getter"
+
+prepared = prepare_operational_reference(config, 1, cache_dir=cache_dir)
+print(prepared["source"])
+
+result = read_kerchunk_forecast(
+    config, 1, [3586192], cache_dir=cache_dir
+)
+```
+
+The returned dictionary contains `source` (the resolved source descriptor), `reference` (the validated Kerchunk JSON), and `reference_json_bytes`. That size field preserves the reader's existing accounting: raw JSON length without caching, serialized reference length with caching. It is not a measurement of network transfer on cache hits.
+
+Pass `hour=0` to prepare the matching analysis reference, including `analysis_assim_no_da` for a no-DA forecast. Analysis and forecast references use separate cache records. With `cache_dir=None`, preparation returns the validated reference without writing a cache record; persistent reuse requires an explicit cache directory.
+
+Cached preparation may download the reference JSON and performs remote freshness checks, including native-source metadata requests. It does not open the NetCDF data arrays, extract flows, or validate decoded timestamps and reach availability; the reader performs those checks during retrieval. Subsequent retrieval checks freshness again, so preparation does not establish offline access. Existing acquisition, local filesystem, and integrity exceptions propagate unchanged.
+
+This function prepares one explicitly selected reference. Use the batch API below to prepare a collection of forecast configurations.
+
+### Preparing a batch of references
+
+`prepare_operational_references` accepts a finite iterable of `ForecastConfig` objects and a shared inclusive forecast-hour window. This supports explicit selections across dates, cycles, products, and ensemble members:
+
+```python
+from streamflow_getter.operational_nwm import (
+    ForecastConfig,
+    prepare_operational_references,
+)
+
+configs = [
+    ForecastConfig(date=day, cycle=0, product=product)
+    for day in ("2026-04-19", "2026-04-20")
+    for product in ("medium_range_mem1", "medium_range_mem2")
+]
+summaries = prepare_operational_references(
+    configs, 1, 3, cache_dir="~/.cache/streamflow_getter"
+)
+print(len(summaries), "unique references prepared")
+```
+
+The complete configuration collection and each product's available leads are validated before metadata requests, reference downloads, or cache writes. A window invalid for any configuration stops the batch before acquisition; it is not silently shortened to fit that product. An explicit, nonempty cache directory is required.
+
+Analysis t0 is included by default; pass `include_t0=False` to omit it. Sources are deduplicated by their full reference path and native URL, preserving first occurrence order. Ensemble members sharing an analysis reference prepare it once, while no-DA analysis, different dates/cycles, and distinct forecast files remain separate. This shares reference preparation; reuse of decoded t0 flow rows across ensemble series remains a separate task.
+
+The returned list contains one compact summary per unique source: `forecast_date`, `forecast_cycle`, `domain`, `source`, and `reference_json_bytes`. The date and cycle describe the selection, not decoded dataset timestamps. Full reference JSON stays in the cache rather than accumulating in the result list; the existing single-reference size accounting applies.
+
+Request validation does not establish remote availability. If acquisition fails partway through a batch, the original exception propagates and later sources are not attempted. Earlier validated cache records remain available for a retry, with freshness checks still required. Date-range CLI selection, named events, default caching, and changes to cached-path fallback remain separate backend tasks under the roadmap.
+
 ## Validation and limitations
 
 ### Validated behavior

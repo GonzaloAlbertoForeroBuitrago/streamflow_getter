@@ -159,7 +159,7 @@ Tests using simulated retrieval methods do not require network access.
 
 ## 9. Reference Cache
 
-The experimental cache supports:
+The production reference cache supports:
 
 - Kerchunk reference structure and source validation
 - External byte-range validation
@@ -173,7 +173,7 @@ The cache stores reference metadata, not the complete NWM model data. Remote mod
 
 Remote reference/source compatibility and concurrent cache refresh remain unresolved operational concerns.
 
-See `PROGRESS.md` for experimental measurements and limitations.
+See the [single-reference and batch preparation guide](../docs/OPERATIONAL_NWM.md#preparing-a-reference-before-retrieval) for API usage. Live preparation/retrieval and batch-reuse evidence, including artifact fingerprints and limitations, is recorded in [PROGRESS Section 4.4](PROGRESS.md#44-live-preparation-followed-by-cached-retrieval) and [Section 4.5](PROGRESS.md#45-live-batch-preparation-and-reuse).
 
 ## 10. Remaining Validation and Research
 
@@ -182,6 +182,7 @@ The following capabilities have been implemented:
 - Multi-reach retrieval and full 18-hour short-range benchmarking.
 - Kerchunk-first operational retrieval with native NetCDF fallback.
 - Reference caching and integrity validation.
+- Single-reference and batch preparation with complete request validation and source deduplication.
 - USGS gage resolution using RouteLink.
 - Geographic point, bounding-box, and polygon selection.
 - Short-, medium-, and long-range operational product configurations.

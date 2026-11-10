@@ -3,7 +3,7 @@
 **Checkpoint date:** November 7, 2026
 **Updated:** November 10, 2026
 **Branch:** `research/nwm-historical-coverage`
-**Status:** Implemented operational NWM backend submitted in PR #6; local cache-read I/O correction validated; remaining backend and Alabama research work pending.
+**Status:** Operational NWM backend submitted in PR #6; shared single-reference and batch preparation validated locally; remaining backend and Alabama research work pending.
 
 ## 1. Completed Work
 
@@ -11,6 +11,7 @@
 - Preserved retrospective NWM retrieval for versions 2.1 and 3.0.
 - Implemented Kerchunk-first retrieval with native NetCDF fallback under supported conditions.
 - Added optional reference caching with integrity and source validation.
+- Added shared single-reference preparation and batch preparation with request validation and source deduplication.
 - Implemented reach selection using NWM feature IDs, USGS gages, geographic points, bounding boxes, and polygons.
 - Added analysis timestep (`t0`) handling, forecast metadata, and CSV/Parquet output.
 - Consolidated production modules, tests, benchmarks, and documentation.
@@ -69,17 +70,32 @@ Validated command:
 
 Remote freshness metadata is still checked before the local cache read. This is local automated validation; verify GitHub Actions for the published PR head.
 
+### Reference preparation and reuse — recorded November 10, 2026
+
+Validated in working trees based on `e857f6987a07fafe7d3781307c528102bf99199d`. The operational-module fingerprints distinguish the intermediate and completed implementations in [PROGRESS Section 4.3](../benchmarks/PROGRESS.md#43-shared-reference-preparation).
+
+- The Kerchunk reader and preparation APIs share source resolution, reference validation, and the existing cache implementation.
+- Batch requests are validated before acquisition, follow product-specific lead schedules, include analysis t0 by default, and deduplicate by reference path plus native URL. Results contain compact source summaries; acquisition errors propagate unchanged.
+- Local environment: macOS ARM64, Python 3.14.6, pytest 9.1.1.
+- Intermediate single-reference implementation (C3): **643 passed in 1.32 seconds**.
+- Completed batch implementation (C5): **655 passed in 0.92 seconds**, using the locked full-suite command recorded above.
+- Live single-reference preparation followed by production retrieval passed (C4); see [PROGRESS Section 4.4](../benchmarks/PROGRESS.md#44-live-preparation-followed-by-cached-retrieval).
+- Live preparation of five unique analysis/forecast references and unchanged warm-cache reuse passed (C6); see [PROGRESS Section 4.5](../benchmarks/PROGRESS.md#45-live-batch-preparation-and-reuse).
+
+The final documentation consolidation preserves the source and test fingerprints validated in C5 and C6. These are local results; verify GitHub Actions for the published PR head separately.
+
 ## 3. Known Limitations and Remaining Work
 
 - Reference caching is optional rather than enabled by default.
-- Advance preprocessing of Kerchunk references remains incomplete.
+- Explicit batch reference preparation is implemented; date-range, recent-period, and event request planning and CLI integration remain pending.
+- Shared analysis reference preparation does not yet share decoded t0 flow rows across ensemble series.
 - Cached retrieval errors currently propagate rather than invoking native fallback.
 - Historical NWM network compatibility requires version-specific verification.
 - Complete forecast-horizon and historical product coverage have not been verified.
 - Some analysis-to-forecast `t0` relationships require additional scientific review.
 - NRDS and GEOGLOWS adapters remain future development work.
 
-**Next backend task:** Extract a shared reference-preparation function from the operational Kerchunk reader, reusing the existing source resolver and validated cache implementation. Keep remote availability, local cache I/O, and integrity failures distinguishable before changing cached-path fallback or default-cache behavior. Continue the product/time/provenance coordination described below.
+**Next backend task:** Classify remote availability, local cache I/O, and integrity failures before changing cached-path fallback or default-cache behavior. Build date-range, recent-period, and event request planning on the validated preparation APIs, with the product/time/provenance coordination described below.
 
 ## 4. Next Research Phase — Alabama
 
@@ -95,12 +111,12 @@ Planned activities:
 4. Implement reproducible comparison statistics and tests.
 5. Document the methodology, results, assumptions, and limitations.
 
-Continue Alabama work on `research/alabama-nwm-nrds-comparison`. At this update, that branch remains at `dbc5a27` while the CI and documentation corrections are made on `research/nwm-historical-coverage`. Website development follows backend acceptance.
+Continue Alabama work on `research/alabama-nwm-nrds-comparison`; its last recorded checkpoint is `dbc5a27`. Backend corrections and reference-preparation development continue on `research/nwm-historical-coverage`. Website development follows backend acceptance.
 
 ## 5. Contribution Status
 
 The NWM implementation has been submitted in [PR #6](https://github.com/jameshalgren/streamflow_getter/pull/6), from `research/nwm-historical-coverage`.
 
-Maintain this existing contribution through focused corrections and validation. The CI dependency correction has passed local validation; GitHub Actions verification for the updated PR head remains pending.
+Maintain this existing contribution through focused corrections and validation. The reference-preparation contribution consolidates implementation, regression coverage, and bounded live acceptance evidence. Local validation has passed; GitHub Actions must be checked for the published PR head.
 
 Preserve the original roadmap, keep Git history traceable, and avoid unnecessary dependencies or duplicated implementations.

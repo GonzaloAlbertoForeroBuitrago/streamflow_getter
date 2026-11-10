@@ -98,9 +98,9 @@ Streamflow is reported in cubic meters per second (m³/s). The operational outpu
 ## Development
 
 ```bash
-uv sync --extra operational
-uv run --locked pytest -q
-uv run --locked streamflow-getter nwm-operational --help
+uv sync --locked --extra operational --extra spatial --extra parquet
+uv run --locked --extra operational --extra spatial --extra parquet pytest -q -ra
+uv run --no-sync streamflow-getter nwm-operational --help
 ```
 
 The implementation lives in `src/streamflow_getter/`, automated tests in `tests/` and `benchmarks/test_*.py`, and performance experiments in `benchmarks/`. Use focused branches and pull requests according to the repository's contribution policy; do not assume changes to the roadmap or other data adapters are authorized by these examples.

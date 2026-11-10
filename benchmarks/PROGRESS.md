@@ -1,6 +1,6 @@
 # NWM Operational Retrieval — Research and Validation Progress
 
-**Last updated:** November 9, 2026
+**Last updated:** November 10, 2026
 **Project:** `streamflow_getter`
 **Development branch:** `research/nwm-historical-coverage`
 **Requirements:** [Project roadmap](../docs/ROADMAP.md)
@@ -227,6 +227,58 @@ The tested native source size was 14,324,480 bytes; the maximum referenced byte 
 
 **Limitation:** valid byte ranges, ETag comparisons, and cache integrity do not independently prove that a reference was generated from the current source contents.
 
+### 4.3 Shared reference preparation
+
+`prepare_operational_reference` prepares one validated reference without opening model arrays. The Kerchunk reader reuses this function. `prepare_operational_references` validates a complete collection of forecast configurations before acquisition, applies product-specific schedules and optional analysis t0, and prepares each unique reference path/native URL pair once. See the [preparation API guide](../docs/OPERATIONAL_NWM.md#preparing-a-reference-before-retrieval) for usage, failure behavior, and size-accounting semantics.
+
+The following live cases used different uncommitted working-tree revisions, both based on `e857f6987a07fafe7d3781307c528102bf99199d`:
+
+| Acceptance case | Operational module SHA-256 |
+|---|---|
+| C4, after single-reference implementation C3 | `bc91a6e66909fb18eff54de87d2bafbdb0da597094e832d9423e05b210b9392e` |
+| C6, after batch implementation C5 | `134401dae3d2ae9a8e8c3a2d0304ee77f020fcecdbcac83b8e175106c11dd0f6` |
+
+The acceptance CSVs record the base commit and full four-file working-tree fingerprint maps, source identities, and cache metadata. They remain local generated artifacts under `benchmarks/results/`, covered by the existing CSV ignore rule. Automated-test results are recorded in [Development Status](../docs/DEVELOPMENT_STATUS.md).
+
+### 4.4 Live preparation followed by cached retrieval
+
+Execution UTC: `2026-11-10T16:52:16.884685+00:00`. Selection: CONUS, April 19, 2026, cycle 00, `short_range` f001, reach `3586192`.
+
+Preparation used a new temporary cache with model-data entry points blocked. Subsequent production retrieval used the prepared reference and returned `method="kerchunk"`. Remote freshness metadata was checked during both phases; cached record bytes remained unchanged.
+
+| Phase | Reference-body open calls | Elapsed seconds |
+|---|---:|---:|
+| Preparation | 1 | 0.870 |
+| Retrieval | 0 | 1.695 |
+
+The returned flow was `0.40999999083578587 m3/s`, with reference time `2026-04-19T00:00:00Z` and valid time `2026-04-19T01:00:00Z`. Its absolute difference from both the accepted [live Kerchunk point](#65-live-geographic-retrieval-and-export) and [archived native-download value](#37-verification-of-archived-benchmark-results) was `5.5511151231257827e-17 m3/s`, within `rtol=1e-6` and `atol=1e-6`.
+
+Artifact: `live_reference_preparation_20260419_t00_f001.csv` — 1 row, 1,797 bytes. SHA-256: `2be179764d7d86156c3c72aa47f105084880ead300a3bb4e3e476a854fe013b3`.
+
+This verifies one reference and one reach for one forecast lead. The temporary cache was removed and the implementation files and Git state were preserved. Counts describe reference-body opens, not HTTP requests or transferred bytes; elapsed times provide acceptance context, not a controlled performance comparison. Warm retrieval still requires remote freshness checks and model-data access.
+
+### 4.5 Live batch preparation and reuse
+
+Execution UTC: `2026-11-10T17:47:00.539630+00:00`. Selection: CONUS, April 19, 2026, cycle 00, forecast window f003 plus default analysis t0. Four requested configurations were `medium_range_mem1`, `medium_range_mem2`, `medium_range_no_da`, and a deliberate duplicate of member 1.
+
+Each phase prepared exactly five unique sources, in the following order:
+
+| Source product | Lead hour | Cold preparation calls | Warm preparation calls | Cold reference-body opens | Warm reference-body opens |
+|---|---:|---:|---:|---:|---:|
+| `analysis_assim` | 0 | 1 | 1 | 1 | 0 |
+| `medium_range_mem1` | 3 | 1 | 1 | 1 | 0 |
+| `medium_range_mem2` | 3 | 1 | 1 | 1 | 0 |
+| `analysis_assim_no_da` | 0 | 1 | 1 | 1 | 0 |
+| `medium_range_no_da` | 3 | 1 | 1 | 1 | 0 |
+
+All five cache records validated; their byte snapshots and compact source summaries were unchanged on the warm pass. Remote freshness metadata was checked and source-specific consistency verified in both phases. Model-data entry points were blocked throughout: this case prepared references without decoding flow arrays or timestamps. The temporary cache was removed and the C5 implementation files and Git state were preserved.
+
+Cold/warm batch elapsed times were `3.179` and `1.010` seconds. The totals of five cold and zero warm reference-body opens do not measure HTTP-request counts or network bytes. The timings are acceptance context, not a controlled cache-speed benchmark.
+
+Artifact: `live_batch_reference_preparation_20260419_t00_f003.csv` — 5 rows, 6,231 bytes. SHA-256: `0df34c00443069ed6ea85c72c5d0dcd99a2beb08939572a6e87bf0ed390bfcf5`.
+
+This verifies deduplication of a shared analysis reference and repeated configuration while keeping ensemble forecasts and no-DA sources distinct for this cycle. It does not establish decoded t0 sharing, offline retrieval, complete product/date coverage, or scientific equivalence of forecast initialization states.
+
 ## 5. Operational NWM implementation
 
 The production implementation uses reusable modules for forecast configuration, source resolution, Kerchunk and native NetCDF retrieval, reach selection, reference validation, caching, and output serialization.
@@ -235,7 +287,7 @@ Key modules include:
 
 | Module | Responsibility |
 |---|---|
-| `operational_nwm.py` | Forecast products, retrieval, timestamps, and series assembly |
+| `operational_nwm.py` | Forecast products, reference preparation, retrieval, timestamps, and series assembly |
 | `reference_cache.py` | Reference persistence and reuse |
 | `reference_validation.py` | Reference integrity and source checks |
 | `reach_resolution.py` | USGS gage to NWM feature mapping |

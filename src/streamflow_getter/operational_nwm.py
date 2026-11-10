@@ -1,5 +1,6 @@
 """Configuration and validated extraction for operational NWM forecasts."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 import numbers
@@ -420,23 +421,23 @@ def extract_streamflow(ds, reach_ids: list[int]) -> dict[int, float]:
         raise ValueError("Non-finite streamflow values found")
     return {reach: float(flow) for reach, flow in zip(requested, flows)}
 
-def read_kerchunk_forecast(
+def prepare_operational_reference(
     config: ForecastConfig,
     hour: int,
-    reach_ids: list[int],
     *,
     cache_dir=None,
 ) -> dict:
-    """Read an operational forecast or analysis t0 using Kerchunk.
+    """Prepare one validated Kerchunk reference without opening model arrays.
 
-    Cache use is opt-in; cached references undergo the same validation.
+    With a cache directory, store or reuse the existing validated record,
+    including remote freshness checks. Otherwise, return it without caching.
+    Return source identity, reference contents, and reference-size accounting.
+    Acquisition, local I/O, and integrity errors propagate unchanged.
     """
     import json
     from pathlib import Path
 
-    import fsspec
     import s3fs
-    import xarray as xr
 
     from streamflow_getter.reference_cache import (
         fetch_remote_metadata,
@@ -490,6 +491,88 @@ def read_kerchunk_forecast(
         raise ValueError("Invalid Kerchunk reference structure")
     if not valid_source_identity(reference, expected_url):
         raise ValueError("Incorrect Kerchunk source identity")
+
+    return {
+        "source": source,
+        "reference": reference,
+        "reference_json_bytes": reference_json_bytes,
+    }
+
+
+def prepare_operational_references(
+    configs: Iterable[ForecastConfig],
+    start_hour: int,
+    end_hour: int,
+    *,
+    cache_dir,
+    include_t0: bool = True,
+) -> list[dict]:
+    """Prepare unique references for a finite collection of forecast cycles.
+
+    Validate the complete request before acquisition. Reuse each product's
+    lead schedule and include analysis t0 by default. References sharing the
+    same reference path and native URL are prepared once, in first-seen order.
+    Return compact summaries; full references remain in the explicit cache.
+    Acquisition errors propagate, leaving earlier validated records reusable.
+    """
+    from pathlib import Path
+
+    if cache_dir is None or (
+        isinstance(cache_dir, str) and not cache_dir.strip()
+    ):
+        raise ValueError("cache_dir is required for batch reference preparation")
+    cache_root = Path(cache_dir).expanduser()
+
+    if not isinstance(include_t0, bool):
+        raise ValueError("include_t0 must be a boolean")
+
+    requested = list(configs)
+    if not requested:
+        raise ValueError("At least one forecast configuration is required")
+
+    planned = {}
+    for config in requested:
+        if not isinstance(config, ForecastConfig):
+            raise TypeError("configs must contain ForecastConfig instances")
+        hours = config.forecast_hours(start_hour, end_hour)
+        if include_t0:
+            hours.insert(0, 0)
+        for hour in hours:
+            source = resolve_operational_source(config, hour)
+            identity = (source["reference_path"], source["native_url"])
+            planned.setdefault(identity, (config, hour))
+
+    summaries = []
+    for config, hour in planned.values():
+        prepared = prepare_operational_reference(config, hour, cache_dir=cache_root)
+        summaries.append({
+            "forecast_date": config.date,
+            "forecast_cycle": config.cycle,
+            "domain": config.domain,
+            "source": prepared["source"],
+            "reference_json_bytes": prepared["reference_json_bytes"],
+        })
+    return summaries
+
+
+def read_kerchunk_forecast(
+    config: ForecastConfig,
+    hour: int,
+    reach_ids: list[int],
+    *,
+    cache_dir=None,
+) -> dict:
+    """Read an operational forecast or analysis t0 using Kerchunk.
+
+    Cache use is opt-in; cached references undergo the same validation.
+    """
+    import fsspec
+    import xarray as xr
+
+    prepared = prepare_operational_reference(config, hour, cache_dir=cache_dir)
+    source = prepared["source"]
+    reference = prepared["reference"]
+    reference_json_bytes = prepared["reference_json_bytes"]
 
     fs = fsspec.filesystem(
         "reference",

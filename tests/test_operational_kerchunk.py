@@ -10,6 +10,7 @@ import xarray as xr
 
 from streamflow_getter.operational_nwm import (
     ForecastConfig,
+    prepare_operational_reference,
     read_kerchunk_forecast,
 )
 
@@ -96,6 +97,39 @@ def mock_kerchunk(monkeypatch, sample_dataset, valid_reference):
         "filesystem": filesystem,
         "dataset_context": dataset_context,
     }
+
+
+def test_prepare_reference_without_opening_model_data(
+    mock_kerchunk, valid_reference, monkeypatch
+):
+    import fsspec
+
+    from streamflow_getter import operational_nwm
+
+    config = ForecastConfig()
+    raw = json.dumps(valid_reference, indent=2).encode("utf-8")
+    remote_file = mock_kerchunk["s3"].open.return_value.__enter__.return_value
+    remote_file.read.return_value = raw
+
+    data_access = MagicMock(
+        side_effect=AssertionError("Unexpected model data access")
+    )
+    monkeypatch.setattr(fsspec, "filesystem", data_access)
+    monkeypatch.setattr(xr, "open_zarr", data_access)
+    monkeypatch.setattr(operational_nwm, "read_native_forecast", data_access)
+
+    prepared = prepare_operational_reference(config, 1)
+
+    assert prepared["reference"] == valid_reference
+    assert prepared["reference_json_bytes"] == len(raw)
+    assert prepared["source"]["source_product"] == "short_range"
+    assert prepared["source"]["native_url"] == config.native_url(1)
+    assert prepared["source"]["reference_path"] == config.reference_path(1)
+    assert prepared["source"]["lead_hour"] == 1
+    mock_kerchunk["s3"].open.assert_called_once_with(
+        config.reference_path(1), "rb"
+    )
+    data_access.assert_not_called()
 
 
 def test_kerchunk_success(mock_kerchunk):
