@@ -4,13 +4,16 @@
 import errno
 import json
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
+from urllib.error import HTTPError, URLError
 
 import pytest
 
 from streamflow_getter.reference_cache import (
+    RemoteReferenceNotFoundError,
     compare_metadata,
     create_cache_record,
+    fetch_remote_metadata,
     load_cache_record,
     load_fresh_reference,
     save_cache_record,
@@ -279,7 +282,147 @@ def test_fetch_remote_metadata(monkeypatch):
         "source_generation": "generation-456",
     }
 
-    s3.info.assert_called_once_with("bucket/reference.json")
+    s3.info.assert_called_once_with("bucket/reference.json", refresh=True)
+
+
+@pytest.mark.parametrize("listing_state", ["stale-etag", "stale-absence"])
+def test_stale_s3_listing_cannot_hide_reference_refresh(
+    tmp_path, monkeypatch, valid_reference, metadata, listing_state
+):
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+    import urllib.request
+
+    import s3fs
+
+    reference_path = "bucket/references/reference.json"
+    cache_file = tmp_path / "record.json"
+    save_cache_record(
+        cache_file, create_cache_record(valid_reference, URL, metadata), URL
+    )
+    original_bytes = cache_file.read_bytes()
+    updated_reference = {
+        **valid_reference,
+        "refs": {**valid_reference["refs"], ".zattrs": '{"revision":"updated"}'},
+    }
+    raw = json.dumps(updated_reference).encode("utf-8")
+    current_etag = "etag-2"
+
+    s3 = s3fs.S3FileSystem(anon=True, skip_instance_cache=True)
+    s3.dircache["bucket/references"] = (
+        [{"name": reference_path, "type": "file", "size": 1,
+          "ETag": metadata["reference_etag"]}]
+        if listing_state == "stale-etag" else []
+    )
+
+    async def current_reference_metadata(operation, *args, **kwargs):
+        assert operation == "head_object"
+        assert kwargs["Bucket"] == "bucket"
+        assert kwargs["Key"] == "references/reference.json"
+        return {"ETag": current_etag, "ContentLength": len(raw)}
+
+    call_s3 = AsyncMock(side_effect=current_reference_metadata)
+    monkeypatch.setattr(s3, "_call_s3", call_s3)
+    response = SimpleNamespace(
+        headers={"x-goog-generation": metadata["source_generation"]}
+    )
+    source_head = Mock(return_value=nullcontext(response))
+    monkeypatch.setattr(urllib.request, "urlopen", source_head)
+
+    def download_reference():
+        with s3.open(reference_path, "rb") as remote_file:
+            assert remote_file.details["ETag"] == current_etag
+            assert remote_file.size == len(raw)
+        return raw
+
+    downloader = Mock(side_effect=download_reference)
+
+    result = load_fresh_reference(
+        cache_file, URL,
+        lambda: fetch_remote_metadata(reference_path, URL, s3=s3),
+        downloader,
+    )
+
+    assert result == updated_reference
+    cached = load_cache_record(cache_file, URL)
+    assert cached is not None
+    assert cached["reference"] == updated_reference
+    assert cached["manifest"]["reference_etag"] == current_etag
+    assert cached["manifest"]["source_generation"] == metadata["source_generation"]
+    assert cache_file.read_bytes() != original_bytes
+    downloader.assert_called_once_with()
+    assert call_s3.await_count == 3
+    assert source_head.call_count == 2
+
+
+def test_missing_reference_metadata_is_classified(monkeypatch):
+    import urllib.request
+
+    reference_path = "bucket/reference.json"
+    failure = FileNotFoundError(reference_path)
+    s3 = Mock()
+    s3.info.side_effect = failure
+    source_head = Mock(side_effect=AssertionError("Unexpected source HEAD"))
+    monkeypatch.setattr(urllib.request, "urlopen", source_head)
+
+    with pytest.raises(RemoteReferenceNotFoundError, match="metadata") as caught:
+        fetch_remote_metadata(reference_path, URL, s3=s3)
+
+    assert caught.value.__cause__ is failure
+    assert reference_path in str(caught.value)
+    source_head.assert_not_called()
+    s3.open.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        PermissionError(errno.EACCES, "Reference access denied"),
+        OSError(errno.EINVAL, "Invalid reference request"),
+        TimeoutError("Reference metadata request timed out"),
+    ],
+    ids=["permission", "invalid-request", "timeout"],
+)
+def test_other_reference_metadata_errors_propagate(monkeypatch, failure):
+    import urllib.request
+
+    s3 = Mock()
+    s3.info.side_effect = failure
+    source_head = Mock(side_effect=AssertionError("Unexpected source HEAD"))
+    monkeypatch.setattr(urllib.request, "urlopen", source_head)
+
+    with pytest.raises(type(failure)) as caught:
+        fetch_remote_metadata("bucket/reference.json", URL, s3=s3)
+
+    assert caught.value is failure
+    source_head.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        HTTPError(URL, 403, "Forbidden", {}, None),
+        HTTPError(URL, 404, "Not Found", {}, None),
+        URLError(TimeoutError("Source metadata request timed out")),
+        FileNotFoundError("Native source metadata unavailable"),
+    ],
+    ids=["http-403", "http-404", "url-error", "file-not-found"],
+)
+def test_source_head_errors_are_not_reference_missing(monkeypatch, failure):
+    import urllib.request
+
+    s3 = Mock()
+    s3.info.return_value = {"ETag": "etag-1"}
+    source_head = Mock(side_effect=failure)
+    monkeypatch.setattr(urllib.request, "urlopen", source_head)
+
+    with pytest.raises(type(failure)) as caught:
+        fetch_remote_metadata("bucket/reference.json", URL, s3=s3)
+
+    assert caught.value is failure
+    assert not isinstance(caught.value, RemoteReferenceNotFoundError)
+    source_head.assert_called_once()
+    s3.open.assert_not_called()
 
 
 def test_fetch_remote_metadata_missing_generation(monkeypatch):

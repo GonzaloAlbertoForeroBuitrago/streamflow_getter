@@ -1,9 +1,9 @@
 # Development Status — NWM Implementation Checkpoint
 
 **Checkpoint date:** November 7, 2026
-**Updated:** November 10, 2026
+**Updated:** November 10, 2026 (America/Chicago)
 **Branch:** `research/nwm-historical-coverage`
-**Status:** Operational NWM backend submitted in PR #6; shared single-reference and batch preparation validated locally; remaining backend and Alabama research work pending.
+**Status:** Operational NWM backend submitted in PR #6; subsequent remote-reference reliability changes validated locally and still uncommitted at this checkpoint; remaining backend and Alabama research work pending.
 
 ## 1. Completed Work
 
@@ -84,18 +84,31 @@ Validated in working trees based on `e857f6987a07fafe7d3781307c528102bf99199d`. 
 
 The final documentation consolidation preserves the source and test fingerprints validated in C5 and C6. These are local results; verify GitHub Actions for the published PR head separately.
 
+### Remote reference reliability — recorded November 10, 2026
+
+Validated in a local working tree based on `f8dde69cd7fa6bb33a3180a5637b4f3bf0d32e1d`, including the D1-D3 implementation changes. Production and regression-test fingerprints are recorded in [PROGRESS Section 4.6](../benchmarks/PROGRESS.md#46-remote-reference-reliability).
+
+- Missing remote reference metadata or bodies are classified as `RemoteReferenceNotFoundError`, preserving the original cause. Local cache, native-source metadata, authorization, and integrity failures remain distinguishable.
+- Fresh reference metadata bypasses stale S3 listings; listing invalidation also prevents a later body open from reusing an outdated size or ETag.
+- Cached retrieval permits native fallback only for the classified missing-reference error. Preparation APIs retain their strict failure behavior. When both readers fail, diagnostics retain the native cause and the Kerchunk reason.
+- Local environment: macOS ARM64, Python 3.14.6, pytest 9.1.1; s3fs and fsspec 2026.9.0.
+- Completed implementation (D3), using the locked full-suite command above: **689 passed in 1.88 seconds**.
+- Controlled cached fallback with live native retrieval passed (D4): one CONUS short-range forecast lead and reach, correct timestamps and flow agreement, and the prepared cache record preserved. See [PROGRESS Section 5.5](../benchmarks/PROGRESS.md#55-controlled-cached-native-fallback) for the artifact and bounded scope.
+
+These follow-up changes remain local at this checkpoint. The results do not establish hosted-CI success; verify GitHub Actions for the relevant PR head after publication. This documentation update preserves the validated production and test files.
+
 ## 3. Known Limitations and Remaining Work
 
 - Reference caching is optional rather than enabled by default.
 - Explicit batch reference preparation is implemented; date-range, recent-period, and event request planning and CLI integration remain pending.
 - Shared analysis reference preparation does not yet share decoded t0 flow rows across ensemble series.
-- Cached retrieval errors currently propagate rather than invoking native fallback.
+- Cached retrieval falls back to native NetCDF only for a classified missing remote reference (`RemoteReferenceNotFoundError`); other cached errors propagate. Controlled live acceptance passed for one reference-metadata absence case. Broader live coverage remains unverified.
 - Historical NWM network compatibility requires version-specific verification.
 - Complete forecast-horizon and historical product coverage have not been verified.
 - Some analysis-to-forecast `t0` relationships require additional scientific review.
 - NRDS and GEOGLOWS adapters remain future development work.
 
-**Next backend task:** Classify remote availability, local cache I/O, and integrity failures before changing cached-path fallback or default-cache behavior. Build date-range, recent-period, and event request planning on the validated preparation APIs, with the product/time/provenance coordination described below.
+**Next backend task:** Define and implement the operational CLI cache policy: the default cache location, an explicit directory override, and an explicit opt-out, with documented cached-error behavior. Preserve the validated distinction between missing remote references, local cache I/O failures, and integrity failures. Then build date-range, recent-period, and event request planning on the existing configuration and reference-preparation APIs, with an execution policy that preserves native fallback when references are unavailable and the product/time/provenance coordination described below.
 
 ## 4. Next Research Phase — Alabama
 

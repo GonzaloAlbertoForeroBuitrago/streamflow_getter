@@ -305,6 +305,8 @@ The operational reader can store validated Kerchunk reference records locally.
 
 The cache implementation checks reference structure, source identity, SHA-256 integrity, remote ETag, source generation, and consistency of remote metadata during downloads.
 
+Before checking the reference ETag, the metadata reader clears the reference path's and ancestor paths' in-memory S3 listing entries and requests fresh object metadata with `refresh=True`. This prevents stale listings from supplying an old ETag, an incorrect missing-file result, or an outdated size/ETag to a subsequent reference-body open. This listing-cache invalidation does not delete validated reference records on disk; the existing integrity and before/after metadata checks still govern their reuse and replacement.
+
 Cached references are reused when their metadata remains valid. Missing or invalid local records can be replaced with validated downloads; source-generation changes are rejected when compatibility cannot be established.
 
 Permission errors, directory misuse, and other local cache-read I/O errors propagate and stop reference-body download or cache replacement. A remote freshness-metadata check precedes the local cache read.
@@ -337,7 +339,15 @@ The returned dictionary contains `source` (the resolved source descriptor), `ref
 
 Pass `hour=0` to prepare the matching analysis reference, including `analysis_assim_no_da` for a no-DA forecast. Analysis and forecast references use separate cache records. With `cache_dir=None`, preparation returns the validated reference without writing a cache record; persistent reuse requires an explicit cache directory.
 
-Cached preparation may download the reference JSON and performs remote freshness checks, including native-source metadata requests. It does not open the NetCDF data arrays, extract flows, or validate decoded timestamps and reach availability; the reader performs those checks during retrieval. Subsequent retrieval checks freshness again, so preparation does not establish offline access. Existing acquisition, local filesystem, and integrity exceptions propagate unchanged.
+Cached preparation may download the reference JSON and performs remote freshness checks, including native-source metadata requests. It does not open the NetCDF data arrays, extract flows, or validate decoded timestamps and reach availability; the reader performs those checks during retrieval. Subsequent retrieval checks freshness again, so preparation does not establish offline access.
+
+If the S3 reference metadata lookup or reference-body open/read raises `FileNotFoundError`, preparation raises `RemoteReferenceNotFoundError` from `streamflow_getter.reference_cache`. This subclass of `FileNotFoundError` identifies the missing remote reference and retains the original exception as `__cause__`. Its message identifies the reference path and acquisition stage.
+
+Native NetCDF source metadata failures, local cache read/write failures, authorization errors, other transport errors, and parsing/integrity errors retain their existing exception behavior. In particular, a local cache-write `FileNotFoundError` is not classified as a missing remote reference.
+
+The retrieval coordinator, `fetch_operational_forecast`, uses native NetCDF fallback for `RemoteReferenceNotFoundError`, including when caching is enabled. All other cached retrieval errors propagate. This also covers a reference that disappears during the second metadata lookup after its body was downloaded: the existing cache record remains unchanged because replacement requires successful before/after checks. The preparation APIs themselves continue to raise the exception and never invoke native retrieval.
+
+Fallback retrieves the current native object and applies the native reader's reach, flow, and timestamp checks. It does not establish equivalence to an older cached source generation or enable offline cache reuse. Successful fallback records the exception type and message in `fallback_reason`; if native retrieval also fails, the resulting `RuntimeError` retains the native exception as its cause and the Kerchunk reason as an exception note. The existing uncached fallback policy is unchanged.
 
 This function prepares one explicitly selected reference. Use the batch API below to prepare a collection of forecast configurations.
 
@@ -368,7 +378,7 @@ Analysis t0 is included by default; pass `include_t0=False` to omit it. Sources 
 
 The returned list contains one compact summary per unique source: `forecast_date`, `forecast_cycle`, `domain`, `source`, and `reference_json_bytes`. The date and cycle describe the selection, not decoded dataset timestamps. Full reference JSON stays in the cache rather than accumulating in the result list; the existing single-reference size accounting applies.
 
-Request validation does not establish remote availability. If acquisition fails partway through a batch, the original exception propagates and later sources are not attempted. Earlier validated cache records remain available for a retry, with freshness checks still required. Date-range CLI selection, named events, default caching, and changes to cached-path fallback remain separate backend tasks under the roadmap.
+Request validation does not establish remote availability. If acquisition fails partway through a batch, its exception propagates and later sources are not attempted. Missing remote references use the classification and preserved cause described above; batch preparation does not invoke the retrieval coordinator's native fallback. Earlier validated cache records remain available for a retry, with freshness checks still required. Date-range CLI selection, named events, default caching, and any broader cached-path fallback policy remain separate backend tasks under the roadmap.
 
 ## Validation and limitations
 
@@ -382,6 +392,7 @@ Automated and selected real-data tests have verified:
 - Geographic point, bounding-box, and polygon selection.
 - CSV and Parquet output.
 - Reference-cache integrity, reuse, and recovery.
+- Controlled missing-reference fallback with a populated cache for the selected live case in [PROGRESS Section 5.5](../benchmarks/PROGRESS.md#55-controlled-cached-native-fallback).
 
 The tests demonstrate these behaviors for the cases examined, not every possible NWM file.
 

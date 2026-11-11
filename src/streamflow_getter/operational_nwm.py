@@ -432,7 +432,8 @@ def prepare_operational_reference(
     With a cache directory, store or reuse the existing validated record,
     including remote freshness checks. Otherwise, return it without caching.
     Return source identity, reference contents, and reference-size accounting.
-    Acquisition, local I/O, and integrity errors propagate unchanged.
+    Missing remote references are classified with their original cause;
+    other acquisition, local I/O, and integrity errors propagate unchanged.
     """
     import json
     from pathlib import Path
@@ -440,6 +441,7 @@ def prepare_operational_reference(
     import s3fs
 
     from streamflow_getter.reference_cache import (
+        RemoteReferenceNotFoundError,
         fetch_remote_metadata,
         load_fresh_reference,
     )
@@ -453,9 +455,17 @@ def prepare_operational_reference(
     expected_url = source["native_url"]
     s3 = s3fs.S3FileSystem(anon=True)
 
+    def downloader():
+        try:
+            with s3.open(reference_path, "rb") as file:
+                return file.read()
+        except FileNotFoundError as exc:
+            raise RemoteReferenceNotFoundError(
+                f"Kerchunk reference body not found: {reference_path}"
+            ) from exc
+
     if cache_dir is None:
-        with s3.open(reference_path, "rb") as file:
-            reference_bytes = file.read()
+        reference_bytes = downloader()
         reference = json.loads(reference_bytes)
         reference_json_bytes = len(reference_bytes)
     else:
@@ -473,10 +483,6 @@ def prepare_operational_reference(
                 expected_url,
                 s3=s3,
             )
-
-        def downloader():
-            with s3.open(reference_path, "rb") as file:
-                return file.read()
 
         reference = load_fresh_reference(
             cache_file,
@@ -661,11 +667,14 @@ def fetch_operational_forecast(
     *,
     cache_dir=None,
 ) -> dict:
-    """Use Kerchunk first, with controlled native fallback when uncached.
+    """Use Kerchunk first, with controlled native fallback.
 
-    Cached retrieval errors are propagated to avoid masking cache failures.
+    With caching, only a classified missing remote reference permits fallback.
+    Other cached errors propagate; uncached access handling is unchanged.
     """
     import json
+
+    from streamflow_getter.reference_cache import RemoteReferenceNotFoundError
 
     try:
         if cache_dir is None:
@@ -678,6 +687,8 @@ def fetch_operational_forecast(
         )
     except PermissionError:
         raise
+    except RemoteReferenceNotFoundError as exc:
+        kerchunk_error = exc
     except (OSError, json.JSONDecodeError) as exc:
         if cache_dir is not None:
             raise
@@ -686,9 +697,14 @@ def fetch_operational_forecast(
     try:
         result = read_native_forecast(config, hour, reach_ids)
     except Exception as native_error:
-        raise RuntimeError(
+        failure = RuntimeError(
             "Both Kerchunk and native NWM retrieval failed"
-        ) from native_error
+        )
+        failure.add_note(
+            f"Kerchunk fallback reason: "
+            f"{type(kerchunk_error).__name__}: {kerchunk_error}"
+        )
+        raise failure from native_error
 
     result["fallback_reason"] = (
         f"{type(kerchunk_error).__name__}: {kerchunk_error}"

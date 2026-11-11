@@ -11,6 +11,16 @@ from .reference_validation import (
     valid_source_identity,
 )
 
+
+class RemoteReferenceNotFoundError(FileNotFoundError):
+    """A remote Kerchunk reference object was not found.
+
+    Raised only at reference metadata/body acquisition boundaries. The
+    original FileNotFoundError is retained as the exception's __cause__.
+    Native-source, local-cache, and validation errors are not classified here.
+    """
+
+
 def compare_metadata(cached, current):
     """Return a freshness status for two metadata snapshots.
 
@@ -275,7 +285,8 @@ def fetch_remote_metadata(
     """Retrieve remote metadata required for NWM cache freshness.
 
     Uses the reference object's S3 ETag and the source NetCDF
-    object's GCS generation header.
+    object's GCS generation header. Clear S3 listing metadata for this path
+    before requesting fresh object metadata, including for later body opens.
     """
     import urllib.request
 
@@ -287,7 +298,14 @@ def fetch_remote_metadata(
             skip_instance_cache=True,
         )
 
-    reference_info = s3.info(reference_path)
+    # Later body opens must not reuse an old listing's size or ETag either.
+    s3.invalidate_cache(reference_path)
+    try:
+        reference_info = s3.info(reference_path, refresh=True)
+    except FileNotFoundError as exc:
+        raise RemoteReferenceNotFoundError(
+            f"Kerchunk reference metadata not found: {reference_path}"
+        ) from exc
 
     request = urllib.request.Request(
         source_url,

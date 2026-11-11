@@ -1,6 +1,6 @@
 # NWM Operational Retrieval — Research and Validation Progress
 
-**Last updated:** November 10, 2026
+**Last updated:** November 10, 2026 (America/Chicago)
 **Project:** `streamflow_getter`
 **Development branch:** `research/nwm-historical-coverage`
 **Requirements:** [Project roadmap](../docs/ROADMAP.md)
@@ -279,6 +279,24 @@ Artifact: `live_batch_reference_preparation_20260419_t00_f003.csv` — 5 rows, 6
 
 This verifies deduplication of a shared analysis reference and repeated configuration while keeping ensemble forecasts and no-DA sources distinct for this cycle. It does not establish decoded t0 sharing, offline retrieval, complete product/date coverage, or scientific equivalence of forecast initialization states.
 
+### 4.6 Remote reference reliability
+
+The cache implementation distinguishes missing remote references from local storage and integrity failures. `RemoteReferenceNotFoundError` identifies absence at the reference metadata or body acquisition boundary and preserves the original cause. Freshness checks invalidate the relevant in-memory S3 listing entries and request fresh object metadata, preventing stale ETags, false missing-file results, and outdated body-open metadata from those listings. Existing source-generation and before/after consistency checks still govern cache reuse and replacement.
+
+The retrieval coordinator permits cached native fallback only for this missing-reference classification. Other cached errors propagate. Single and batch preparation remain strict and do not invoke native retrieval. See the [operational guide](../docs/OPERATIONAL_NWM.md#reference-caching) for the failure contract.
+
+The D3 automated validation and D4 live case used a working tree based on `f8dde69cd7fa6bb33a3180a5637b4f3bf0d32e1d`, with these production and test fingerprints:
+
+| File | SHA-256 |
+|---|---|
+| `src/streamflow_getter/reference_cache.py` | `cdc41d30168302a7d99585c94fac2a6cb94d0e606983a84a3bab9021fb7cd646` |
+| `src/streamflow_getter/operational_nwm.py` | `26146465a7e9b7cab4438874cf6318f2b8f2cdd9fe1a6c3e86db7fd9df43b773` |
+| `tests/test_operational_reference_cache.py` | `11345a5e980b7fa72f4864a9cd483036ee5f747da66e889a66fc0ddda4efdf42` |
+| `tests/test_operational_kerchunk.py` | `54e676baecdeb2da966211d7aad2103230d6e2b4254a72e7ccaf7e954da81aa0` |
+| `tests/test_operational_fallback.py` | `67cf291e1178dda52759a917887344a51d8b9ea597b1c281b298832fc1cb8620` |
+
+The D4 CSV retains the complete seven-file working-tree map, including the documentation revisions used during that experiment. Subsequent evidence consolidation preserves the production and test fingerprints above. Automated results and publication status are recorded in [Development Status](../docs/DEVELOPMENT_STATUS.md).
+
 ## 5. Operational NWM implementation
 
 The production implementation uses reusable modules for forecast configuration, source resolution, Kerchunk and native NetCDF retrieval, reach selection, reference validation, caching, and output serialization.
@@ -374,6 +392,31 @@ The local diagnostic artifact under `benchmarks/results/` is covered by the exis
 The diagnostic CSV retains the returned fallback reason, the `controlled_missing_reference` experiment label, and provenance fields. These are acceptance-artifact fields; the production CLI export contract was unchanged.
 
 This validates controlled uncached fallback for the selected case. The missing reference was injected; the experiment does not establish a naturally occurring archive outage, cached-path fallback, or analysis-t0 behavior.
+
+### 5.5 Controlled cached native fallback
+
+Execution UTC: `2026-11-11T02:25:18.957354+00:00` (November 10, 2026, America/Chicago). Selection: CONUS, April 19, 2026, cycle 00, `short_range` f001, reach `3586192`. Implementation provenance is recorded in [Section 4.6](#46-remote-reference-reliability).
+
+A live reference was prepared in a new temporary cache with model-array entry points blocked. During subsequent production retrieval, a process-local `FileNotFoundError` was injected only at the actual S3 filesystem instance's metadata lookup for the exact reference path. The original metadata implementation classified it as `RemoteReferenceNotFoundError`, retaining its cause. The coordinator then called the actual native reader once.
+
+| Phase | Metadata-provider calls | Reference-body opens | Native-reader calls | Elapsed seconds |
+|---|---:|---:|---:|---:|
+| Preparation | 2 | 1 | 0 | 0.945 |
+| Retrieval with injected metadata absence | 1 | 0 | 1 | 8.813 |
+
+The failed retrieval metadata call included one injected lookup. Counts describe Python calls, not HTTP requests or transferred bytes. Elapsed times provide acceptance context, not a controlled performance comparison.
+
+The result was `method="native_remote"`, flow `0.40999999083578587 m3/s`, reference time `2026-04-19T00:00:00Z`, and valid time `2026-04-19T01:00:00Z`. The fallback reason identified `RemoteReferenceNotFoundError` and the exact missing reference path. The absolute difference from both the accepted [live Kerchunk point](#65-live-geographic-retrieval-and-export) and [archived native-download value](#37-verification-of-archived-benchmark-results) was `5.5511151231257827e-17 m3/s`, within `rtol=1e-6` and `atol=1e-6`.
+
+The existing cache bytes and validated manifest remained unchanged. Temporary instrumentation was restored, the temporary cache was removed, and the seven implementation/documentation/test files and Git state were preserved.
+
+| Local artifact under `benchmarks/results/` | Rows | Bytes | SHA-256 |
+|---|---:|---:|---|
+| `live_cached_native_fallback_20260419_t00_f001.csv` | 1 | 3,025 | `df0a9c916f2b35b5c721d9d244cf1f69898620e5c3317d61b27220d2aab53305` |
+
+The CSV records the controlled injection, source identity, working-tree and comparison fingerprints, prepared cache manifest and record digest, call counts, fallback reason, and flow differences. It remains a local generated artifact under the existing ignore policy. Returned `reference_json_bytes=0` describes the native result; preparation still opened one reference body.
+
+This validates one controlled cached metadata-absence case with live native data. The error condition was injected rather than observed as a natural archive outage. The prepared cache's source generation does not establish the generation of the fallback native object. Other cached failure modes, products, domains, and analysis t0 were not exercised by this live case.
 
 ## 6. USGS and geographic reach resolution
 
