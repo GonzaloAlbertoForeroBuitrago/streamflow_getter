@@ -1,9 +1,9 @@
 # Development Status — NWM Implementation Checkpoint
 
 **Checkpoint date:** November 7, 2026
-**Updated:** November 10, 2026 (America/Chicago)
+**Updated:** November 11, 2026 (America/Chicago)
 **Branch:** `research/nwm-historical-coverage`
-**Status:** Operational NWM backend submitted in PR #6; subsequent remote-reference reliability changes validated locally and still uncommitted at this checkpoint; remaining backend and Alabama research work pending.
+**Status:** Operational NWM backend submitted in PR #6; reference preparation, cache/fallback reliability, default cache policy, and operational request planning are validated on the active PR branch; remaining provenance/output-contract and Alabama research work is pending.
 
 ## 1. Completed Work
 
@@ -112,18 +112,34 @@ Validated in a working tree based on `b3995ee6b0a1173ec4e3bebb1123ac1c30cfd588`.
 
 These changes are separate from the previously published reference-reliability contribution and preserve its fallback/error contract.
 
+### Operational request planning — recorded November 11, 2026
+
+Validated in a working tree based on `c7108c2f835ba23b843cbf22d2e6df30591b0805`.
+
+- Added a pure inclusive UTC date-range planner that reuses `ForecastConfig` validation rather than duplicating product/cycle/domain rules.
+- Added deterministic recent-day resolution to absolute UTC dates.
+- Added an immutable named-event window abstraction that delegates to the same planner; no event database or duplicate NWM reader was introduced.
+- Added strict multi-configuration execution through the existing single-configuration retrieval primitive.
+- Shared normal analysis t0 is decoded once per unique resolved analysis source and attached to each requested forecast context; no-DA analysis remains distinct.
+- The operational CLI preserves `--date` and adds `--start-date` / `--end-date` and `--recent-days`. The CLI still intentionally exposes one cycle and one product per request.
+- Local full-suite result after the completed event abstraction: **746 passed in 0.88 seconds**.
+- Live multi-product execution passed with four requested products and only two actual analysis-t0 decodes; see [PROGRESS Section 4.8](../benchmarks/PROGRESS.md#48-operational-request-planning-and-multi-configuration-execution).
+- Live April 19-21, 2026 CLI period retrieval returned three distinct initializations and matched the accepted native-download values exactly for the selected f001 reach.
+
+The planner and executor do not create a second retrieval implementation: existing source resolution, Kerchunk/native fallback, reference cache, timestamp validation, reach extraction, and output writing remain authoritative.
+
 ## 3. Known Limitations and Remaining Work
 
 - Operational CLI reference caching is enabled by default at `~/.cache/streamflow_getter`; users can override the directory or disable persistent caching explicitly. Lower-level Python retrieval APIs retain explicit `cache_dir=None` semantics.
-- Explicit batch reference preparation is implemented; date-range, recent-period, and event request planning and CLI integration remain pending.
-- Shared analysis reference preparation does not yet share decoded t0 flow rows across ensemble series.
+- Explicit date-range and recent-day CLI selection are implemented. Named events are currently a Python planning abstraction and are not exposed by the CLI until request/run provenance can preserve the event name.
+- Multi-configuration execution shares decoded analysis t0 rows when requested configurations resolve to the same analysis source. Multi-product/member selection is not yet exposed by the CLI.
 - Cached retrieval falls back to native NetCDF only for a classified missing remote reference (`RemoteReferenceNotFoundError`); other cached errors propagate. Controlled live acceptance passed for one reference-metadata absence case. Broader live coverage remains unverified.
 - Historical NWM network compatibility requires version-specific verification.
 - Complete forecast-horizon and historical product coverage have not been verified.
 - Some analysis-to-forecast `t0` relationships require additional scientific review.
 - NRDS and GEOGLOWS adapters remain future development work.
 
-**Next backend task:** Build date-range, recent-period, and event request planning on the existing configuration and reference-preparation APIs. Preserve the validated default-cache, override, opt-out, native-fallback, and error-classification behavior while introducing request orchestration and product/time/provenance reporting.
+**Next backend task:** Define the stable combined-request output and run-provenance contract before adding another data source or exposing named events in the CLI. Preserve requested product/member separately from actual source product, carry cache/fallback diagnostics into run evidence, retain forecast initialization/reference/valid-time identity, and add an explicit completeness/manifest contract for strict and future partial-result workflows.
 
 ## 4. Next Research Phase — Alabama
 

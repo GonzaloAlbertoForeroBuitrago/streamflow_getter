@@ -56,7 +56,30 @@ def build_parser() -> argparse.ArgumentParser:
         "nwm-operational",
         help="Operational NWM CONUS forecasts",
     )
-    operational.add_argument("--date", required=True)
+    date_selection = operational.add_mutually_exclusive_group(
+        required=True
+    )
+    date_selection.add_argument(
+        "--date",
+        help="Single forecast initialization date (YYYY-MM-DD)",
+    )
+    date_selection.add_argument(
+        "--start-date",
+        help="Inclusive UTC start date (YYYY-MM-DD)",
+    )
+    date_selection.add_argument(
+        "--recent-days",
+        type=int,
+        metavar="N",
+        help=(
+            "Most recent N UTC calendar dates, including "
+            "the current UTC date"
+        ),
+    )
+    operational.add_argument(
+        "--end-date",
+        help="Inclusive UTC end date; requires --start-date",
+    )
     operational.add_argument("--cycle", type=int, default=0)
 
     operational.add_argument(
@@ -206,17 +229,70 @@ def main(argv: list[str] | None = None) -> int:
             ForecastConfig,
             fetch_operational_series,
         )
+        from streamflow_getter.operational_requests import (
+            fetch_operational_configs,
+        )
+        from streamflow_getter.request_planning import (
+            plan_operational_configs,
+            resolve_recent_date_range,
+        )
         from streamflow_getter.output import (
             resolve_output_format,
             write_timeseries,
         )
 
 
-        config = ForecastConfig(
-            date=args.date,
-            cycle=args.cycle,
-            product=args.product,
-        )
+        if args.date is not None:
+            if args.end_date is not None:
+                raise ValueError(
+                    "--end-date cannot be used with --date"
+                )
+
+            configs = [
+                ForecastConfig(
+                    date=args.date,
+                    cycle=args.cycle,
+                    product=args.product,
+                )
+            ]
+
+        elif args.start_date is not None:
+            if args.end_date is None:
+                raise ValueError(
+                    "--end-date is required with --start-date"
+                )
+
+            configs = plan_operational_configs(
+                args.start_date,
+                args.end_date,
+                cycles=(args.cycle,),
+                products=(args.product,),
+            )
+
+        else:
+            if args.end_date is not None:
+                raise ValueError(
+                    "--end-date requires --start-date"
+                )
+
+            recent_start, recent_end = (
+                resolve_recent_date_range(
+                    args.recent_days
+                )
+            )
+
+            print(
+                f"Resolved --recent-days {args.recent_days} "
+                f"to UTC dates {recent_start} through "
+                f"{recent_end}"
+            )
+
+            configs = plan_operational_configs(
+                recent_start,
+                recent_end,
+                cycles=(args.cycle,),
+                products=(args.product,),
+            )
 
 
         # Reject invalid forecast-hour ranges before remote access.
@@ -228,7 +304,11 @@ def main(argv: list[str] | None = None) -> int:
 
 
         # Validate product-specific forecast hours before remote access.
-        config.forecast_hours(args.start_hour, args.end_hour)
+        for config in configs:
+            config.forecast_hours(
+                args.start_hour,
+                args.end_hour,
+            )
 
 
         # Validate output before starting remote retrieval.
@@ -418,14 +498,40 @@ def main(argv: list[str] | None = None) -> int:
             )
 
         # Retrieve operational NWM streamflow after local validation.
-        frame = fetch_operational_series(
-            config,
-            reaches,
-            args.start_hour,
-            args.end_hour,
-            include_t0=not args.no_t0,
-            cache_dir=args.cache_dir,
-        )
+        if args.date is not None:
+            frame = fetch_operational_series(
+                configs[0],
+                reaches,
+                args.start_hour,
+                args.end_hour,
+                include_t0=not args.no_t0,
+                cache_dir=args.cache_dir,
+            )
+        else:
+            frame = fetch_operational_configs(
+                configs,
+                reaches,
+                args.start_hour,
+                args.end_hour,
+                include_t0=not args.no_t0,
+                cache_dir=args.cache_dir,
+            )
+
+            if (
+                "requested_product" not in frame.columns
+                or not frame["requested_product"].eq(
+                    args.product
+                ).all()
+            ):
+                raise ValueError(
+                    "Unexpected requested product in "
+                    "planned operational result"
+                )
+
+            # Preserve the existing one-product CLI export schema.
+            frame = frame.drop(
+                columns=["requested_product"]
+            )
 
         destination = write_timeseries(
             frame,

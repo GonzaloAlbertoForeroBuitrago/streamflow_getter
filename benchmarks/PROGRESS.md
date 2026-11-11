@@ -1,6 +1,6 @@
 # NWM Operational Retrieval — Research and Validation Progress
 
-**Last updated:** November 10, 2026 (America/Chicago)
+**Last updated:** November 11, 2026 (America/Chicago)
 **Project:** `streamflow_getter`
 **Development branch:** `research/nwm-historical-coverage`
 **Requirements:** [Project roadmap](../docs/ROADMAP.md)
@@ -333,6 +333,57 @@ Its cold-run cache-file SHA-256 was `1a5d8e4c10d0874a35b269e07c19f6ab86038a24786
 | `live_cli_cache_policy_20260419_t00_f001.csv` | 4 | 1,925 | `eaa0d734ac21b4cb115b69f98d27f591ecce0ff1bb3621e111d855595d5f4e8e` |
 
 Elapsed times in the artifact are acceptance context only and do not establish a cache-speed advantage. This case covers one CONUS short-range cycle, forecast lead, and reach. It does not establish full product/date/domain coverage or offline retrieval.
+
+### 4.8 Operational request planning and multi-configuration execution
+
+The operational request layer now separates request expansion from model-data retrieval.
+
+`plan_operational_configs` expands an inclusive UTC date range into validated `ForecastConfig` objects in deterministic date/cycle/product order without remote access. `resolve_recent_date_range` converts a relative recent-day selection to absolute UTC dates before planning. `OperationalEvent` is an immutable name plus absolute start/end dates, and `plan_operational_event` delegates to the same planner rather than creating a second event-specific NWM path.
+
+`fetch_operational_configs` executes a finite configuration collection through the existing `fetch_operational_series` primitive. It validates all product-specific lead windows before retrieval, uses strict failure behavior, adds `requested_product` to preserve request identity, and decodes analysis t0 once per unique resolved analysis source before attaching the row to each requested product sharing that source. `analysis_assim_no_da` remains separate.
+
+The operational CLI preserves the established single-`--date` path and adds an inclusive `--start-date` / `--end-date` path plus `--recent-days N`. The current CLI intentionally remains one cycle and one product per invocation. The internal `requested_product` field is removed before one-product CLI export so the established output schema is unchanged. Named events remain a Python planning abstraction until the project has a request/run provenance contract capable of retaining the event name.
+
+Local automated validation after the event abstraction: **746 passed in 0.88 seconds**.
+
+#### Live multi-product shared-t0 case
+
+Execution scope: April 19, 2026, cycle 00, f003, reach `3586192`; requested products `short_range`, `medium_range_mem1`, `medium_range_mem2`, and `medium_range_no_da`.
+
+Production retrieval performed exactly six forecast/analysis fetches:
+
+1. `short_range` t0 -> `analysis_assim`
+2. `short_range` f003
+3. `medium_range_mem1` f003
+4. `medium_range_mem2` f003
+5. `medium_range_no_da` t0 -> `analysis_assim_no_da`
+6. `medium_range_no_da` f003
+
+Thus four requested products required only two actual analysis-t0 decodes. The combined output contained eight rows: t0 plus f003 for each requested product. The three normal products carried identical copied `analysis_assim` t0 science while retaining distinct `requested_product`; no-DA retained `analysis_assim_no_da`.
+
+The live short-range f003 flow was `0.3899999912828207 m3/s`, exactly matching the accepted archived native-download comparison (`0.0 m3/s` absolute difference). Six unique reference-cache records were created in the temporary cache.
+
+| Local artifact under `benchmarks/results/` | Rows | Bytes | SHA-256 |
+|---|---:|---:|---|
+| `live_multi_config_shared_t0_20260419_t00_f003.csv` | 8 | 29,558 | `78d003e2ffe0413f141f24d282260a56aee2d73f78399e7925e84ee825630fc8` |
+
+#### Live inclusive three-day CLI case
+
+The production CLI requested April 19-21, 2026, cycle 00, `short_range` f001, reach `3586192`, with t0 disabled and a temporary explicit cache.
+
+The CLI returned three rows representing three distinct forecast initializations:
+
+- April 19: `0.4099999908357858 m3/s`
+- April 20: `0.3699999917298555 m3/s`
+- April 21: `1.1299999747425318 m3/s`
+
+Each initialization retained its own 00Z `reference_time`, 01Z `valid_time`, and separate cache record. All three live Kerchunk flows matched their accepted archived native-download values with `0.0 m3/s` absolute difference.
+
+| Local artifact under `benchmarks/results/` | Rows | Bytes | SHA-256 |
+|---|---:|---:|---|
+| `live_cli_period_20260419_20260421_t00_f001.csv` | 3 | 3,767 | `330460dfb27e04a96fcd198de7f6aa7f9abba8260c3df9985c1b3d7adaf67d91` |
+
+These live cases validate one date/cycle/lead/reach product group and one three-day short-range period. They do not establish current-date `--recent-days` archive availability, every product/cycle/date combination, a named-event catalogue, or partial-result behavior. Elapsed times in the local evidence are acceptance context rather than performance benchmarks.
 
 ## 5. Operational NWM implementation
 

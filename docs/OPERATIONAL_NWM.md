@@ -315,6 +315,160 @@ Operational CLI retrieval uses `~/.cache/streamflow_getter` by default. Use `--c
 
 This default is a CLI policy. The lower-level Python retrieval functions retain their explicit `cache_dir=None` behavior so library callers do not begin writing persistent cache records implicitly.
 
+### Planning an explicit operational date range
+
+`plan_operational_configs` expands an inclusive UTC calendar-date range into
+validated `ForecastConfig` objects without performing remote access. The
+existing `ForecastConfig` rules remain authoritative for supported products,
+cycles, domains, and date syntax.
+
+Example:
+
+    from streamflow_getter.request_planning import plan_operational_configs
+
+    configs = plan_operational_configs(
+        "2026-04-19",
+        "2026-04-21",
+        cycles=(0, 6),
+        products=("short_range", "medium_range_mem1"),
+    )
+
+The output order is date, cycle, then product. Every requested combination
+must be valid; unsupported cycle/product combinations fail the complete plan
+rather than being silently omitted. Archive availability is not checked
+during planning.
+
+This API is the deterministic primitive for future explicit-period,
+recent-day, and event requests. Recent windows should be resolved to
+absolute UTC dates before planning, and a named event can later provide
+those same absolute dates plus the request's reach or region selection.
+
+### Planning a named event
+
+`OperationalEvent` is a small immutable representation of a named
+absolute UTC date window. It deliberately does not implement an event
+catalogue or another retrieval path:
+
+    from streamflow_getter.request_planning import (
+        OperationalEvent,
+        plan_operational_event,
+    )
+
+    event = OperationalEvent(
+        name="Alabama April 2026",
+        start_date="2026-04-19",
+        end_date="2026-04-21",
+    )
+
+    configs = plan_operational_event(
+        event,
+        cycles=(0,),
+        products=("short_range",),
+    )
+
+Event planning delegates to the same `plan_operational_configs` function
+used by explicit periods and recent-day requests. Product, cycle, domain,
+and date validation therefore remain centralized.
+
+Reach and region selection remain independent of the event window. The
+same event can be combined with the existing reach, gage, point, bounding
+box, or polygon selection paths. A future SEED/CSES or other event
+catalogue can construct this object after resolving a name to absolute
+dates and spatial selection; it does not require a second NWM reader.
+
+The CLI does not yet expose a named-event option because the current
+exported row schema has no request/event provenance field. Event names
+should be exposed together with the planned run/provenance manifest
+rather than silently discarded from output.
+
+### Selecting an explicit date range from the CLI
+
+The operational CLI preserves the existing single-date interface:
+
+    streamflow-getter nwm-operational           --date 2026-04-19           --cycle 0           --product short_range           --reach 3586192           --out flow.csv
+
+An inclusive UTC calendar-date range can instead be requested with
+`--start-date` and `--end-date`:
+
+    streamflow-getter nwm-operational           --start-date 2026-04-19           --end-date 2026-04-21           --cycle 0           --product short_range           --reach 3586192           --out flow.csv
+
+`--date` and `--start-date` are mutually exclusive, and `--end-date`
+is required when `--start-date` is used. The current CLI intentionally
+keeps one product and one cycle per request; the Python request planner
+already supports finite collections of both.
+
+Explicit-period requests use `plan_operational_configs` followed by
+`fetch_operational_configs`. Because the current CLI still exposes one
+requested product, the internal `requested_product` orchestration field
+is removed before export so the established operational output schema is
+preserved. A broader normalized/provenance schema should be introduced
+deliberately rather than as an incidental consequence of period support.
+
+### Selecting a recent UTC window
+
+`--recent-days N` selects the most recent `N` UTC calendar dates,
+including the current UTC date. For example, a three-day window resolved
+as of `2026-04-21` covers `2026-04-19` through `2026-04-21`, inclusive.
+
+    streamflow-getter nwm-operational \
+      --recent-days 3 \
+      --cycle 0 \
+      --product short_range \
+      --reach 3586192 \
+      --out recent.csv
+
+The CLI resolves the relative window to absolute UTC start/end dates
+before request planning and prints those dates. The Python helper
+`resolve_recent_date_range(days, as_of=...)` accepts an explicit `as_of`
+date for deterministic replay and testing; when omitted it uses the
+current UTC calendar date.
+
+Recent selection does not weaken strict retrieval behavior. If an object
+within the resolved period is unavailable or another retrieval/validation
+failure occurs, that error remains visible rather than silently shortening
+the requested window.
+
+### Executing planned forecast configurations
+
+`fetch_operational_configs` executes a finite collection of validated
+`ForecastConfig` objects through the existing single-configuration
+`fetch_operational_series` primitive. It validates every product-specific
+forecast-hour window before retrieval and uses strict failure behavior:
+a retrieval or validation failure propagates rather than returning an
+apparently complete partial result.
+
+```python
+from streamflow_getter.operational_requests import fetch_operational_configs
+from streamflow_getter.request_planning import plan_operational_configs
+
+configs = plan_operational_configs(
+    "2026-04-19",
+    "2026-04-21",
+    cycles=(0,),
+    products=("medium_range_mem1", "medium_range_mem2"),
+)
+
+frame = fetch_operational_configs(
+    configs,
+    [3586192],
+    3,
+    12,
+    cache_dir="~/.cache/streamflow_getter",
+)
+```
+
+The combined frame adds `requested_product` while retaining `product` as
+the actual source product. For forecast rows these normally match. For t0,
+`requested_product` identifies the forecast/member that requested the row
+while `product` remains `analysis_assim` or `analysis_assim_no_da`.
+
+Analysis t0 data are decoded once per unique resolved analysis source and
+reused across requested configurations sharing that source. The attached
+rows remain separate in the combined result through `requested_product`.
+No-DA analysis remains a distinct source. This reuse concerns decoded
+analysis rows; existing reference preparation/cache deduplication remains
+responsible for reference JSON reuse.
+
 ### Preparing a reference before retrieval
 
 The Python API can prepare one forecast or analysis reference without opening model arrays. Preparation and the Kerchunk reader share the same source resolution, reference validation, and cache implementation:
