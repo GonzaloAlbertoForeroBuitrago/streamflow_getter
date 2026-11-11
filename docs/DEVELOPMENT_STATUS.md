@@ -179,3 +179,34 @@ The NWM implementation has been submitted in [PR #6](https://github.com/jameshal
 Maintain this existing contribution through focused corrections and validation. The reference-preparation contribution consolidates implementation, regression coverage, and bounded live acceptance evidence. Local validation has passed; GitHub Actions must be checked for the published PR head.
 
 Preserve the original roadmap, keep Git history traceable, and avoid unnecessary dependencies or duplicated implementations.
+
+
+## November 11, 2026 — Operational version and RouteLink compatibility
+
+Operational NWM retrieval now derives model-version provenance from
+forecast initialization time and records it in successful run manifests.
+
+RouteLink-based USGS gage resolution now has content-based network-version
+protection. Complete CONUS gage-to-feature crosswalk fingerprints identify
+the verified NWM 3.0 and 3.1 mappings:
+
+- NWM 3.0: `3e4232517ce3958bebfa7d9d66826f8ee59c34f0b5b90fb540c3d4ab159d2c68`
+- NWM 3.1: `c0ee33504fd74319e68ba07b370110d022efe09a76a022ccb7361921fc909ec6`
+
+Known RouteLink/request mismatches are rejected before remote retrieval.
+Unknown RouteLink fingerprints remain usable but are explicitly recorded
+as unverified.
+
+Final live validation used gage `07166500` with the local NWM 3.1
+RouteLink. It resolved to feature `20955128`, retrieved the 2026-11-10
+00Z short-range f001 forecast by Kerchunk, and agreed with direct native
+NetCDF to `1.1102230246251565e-16 m3/s`.
+
+A 2026-04-19 00Z NWM 3.0 request using the same NWM 3.1 RouteLink was
+rejected before retrieval; the recorded retrieval-call count was zero.
+
+Current validation baseline for this contribution: **815 passing tests**.
+
+Remaining version work is intentionally separate: version compatibility
+for hydrofabric geometry used by point, bounding-box, and polygon
+selection has not been inferred from the RouteLink result.

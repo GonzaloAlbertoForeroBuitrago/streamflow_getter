@@ -877,3 +877,137 @@ Historical experiment notes and milestone-by-milestone development records remai
 This report is a consolidated account of documented validation evidence. It does not replace the original experimental outputs or imply that untested combinations have been verified.
 
 Development should continue through focused changes, reusable production modules, automated regression tests, and reviewable Git commits.
+
+
+## Operational NWM version provenance and RouteLink compatibility — November 11, 2026
+
+### Objective
+
+Close the roadmap requirement to handle operational NWM model-version
+changes without changing the existing Kerchunk/native source-path logic,
+and prevent USGS-gage resolution from silently using a known incompatible
+RouteLink crosswalk.
+
+### Operational model-version provenance
+
+Model version is derived from forecast initialization time rather than
+selected manually for operational retrieval. The verified transition
+registry used by the implementation is:
+
+- NWM 1.1 at the project baseline of 2018-01-01 00Z.
+- NWM 1.2 from 2018-03-06 12Z.
+- NWM 2.0 from 2019-06-19 12Z.
+- NWM 2.1 from 2021-04-20 12Z.
+- NWM 3.0 from 2023-09-20 12Z.
+- NWM 3.1 from 2026-08-18 12Z.
+
+Initializations before the 2018 project baseline remain unresolved rather
+than being assigned a guessed version.
+
+Operational run manifests now retain the derived version for every planned
+configuration and summarize all resolved versions used by the request.
+
+### Live transition validation
+
+One strict request was validated across the NWM 3.0 to 3.1 transition on
+2026-08-18 using the unchanged operational source-path logic:
+
+- 11Z initialization -> NWM 3.0.
+- 12Z initialization -> NWM 3.1.
+- Same reach: 3586192.
+- Lead: f001.
+- Both results used Kerchunk.
+- Kerchunk/native absolute difference at 11Z: 0.0 m3/s.
+- Kerchunk/native absolute difference at 12Z: 0.0 m3/s.
+- One manifest retained both model versions.
+
+### RouteLink crosswalk version evidence
+
+Published NWM 3.0.17 and 3.1.6 CONUS RouteLink crosswalks were compared
+exhaustively. The transition reproduced the independently documented
+crosswalk changes:
+
+- 80 gages added in 3.1.
+- 5 gages removed from 3.0.
+- 488 common gages moved to different NWM features.
+
+Canonical complete-crosswalk SHA-256 fingerprints:
+
+- NWM 3.0: `3e4232517ce3958bebfa7d9d66826f8ee59c34f0b5b90fb540c3d4ab159d2c68`
+- NWM 3.1: `c0ee33504fd74319e68ba07b370110d022efe09a76a022ccb7361921fc909ec6`
+
+The local RouteLink used for validation contains 8,735 gages and is an
+exact complete-crosswalk match to the published NWM 3.1.6 mapping.
+
+The classifier hashes the complete validated gage-to-feature mapping, not
+the NetCDF bytes, filename, metadata timestamp, or selected example gages.
+
+### Compatibility policy
+
+For `--gage` requests:
+
+- known matching request/RouteLink versions are allowed;
+- known mismatches are rejected before remote NWM retrieval;
+- a request spanning incompatible known network versions is rejected when
+  one version-specific RouteLink is supplied;
+- unknown RouteLink fingerprints remain allowed for backward
+  compatibility but are recorded explicitly as unknown.
+
+The run manifest records requested gages, resolved NWM feature IDs,
+RouteLink filename, canonical crosswalk hash, classified network version,
+gage count, compatibility status, and requested NWM versions.
+
+### Final live acceptance
+
+Real RouteLink:
+
+`troute-lab/repro/network_stats/data/RouteLink_CONUS.nc`
+
+Compatible request:
+
+- initialization: 2026-11-10 00Z;
+- derived NWM version: 3.1;
+- USGS gage: 07166500;
+- resolved NWM feature: 20955128;
+- RouteLink version: 3.1;
+- RouteLink canonical SHA-256: `c0ee33504fd74319e68ba07b370110d022efe09a76a022ccb7361921fc909ec6`;
+- retrieval method: Kerchunk;
+- CLI streamflow: 0.9399999789893628 m3/s;
+- direct native NetCDF: 0.9399999789893627 m3/s;
+- absolute difference: 1.1102230246251565e-16 m3/s.
+
+Acceptance artifacts:
+
+- `benchmarks/results/live_gage_routelink_v31_20261110_t00_f001.csv`
+  - rows: 1
+  - bytes: 243
+  - SHA-256: `fa0efeb1b108b8c944c5253bab8ab98f81bb91a89346a316db73af0925fa19ca`
+- `benchmarks/results/live_gage_routelink_v31_20261110_t00_f001.csv.manifest.json`
+  - bytes: 2607
+  - SHA-256: `ea3c40526b146706fb0959ee4894c9f6a1602aa75e4365450967a1de5b9f96db`
+
+Historical protection was validated with the same real RouteLink and an
+operational request initialized at 2026-04-19 00Z:
+
+- requested NWM version: 3.0;
+- RouteLink version: 3.1;
+- result: rejected as incompatible;
+- remote operational retrieval calls: 0;
+- output CSV created: no;
+- run manifest created: no.
+
+### Automated validation
+
+Final pre-documentation repository suite after implementation:
+
+- 103 operational CLI tests passed.
+- 165 focused version/RouteLink/provenance tests passed.
+- 815 full repository tests passed.
+- `git diff --check` passed.
+
+### Remaining scope
+
+RouteLink compatibility is established for USGS `--gage` resolution.
+This evidence does not establish exact version identity for hydrofabric
+geometry used by `--point`, `--bbox`, or `--polygon`. Geographic
+hydrofabric-version compatibility remains a separate validation task.

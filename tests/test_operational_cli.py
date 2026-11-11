@@ -1802,3 +1802,310 @@ def test_operational_cli_long_range_ensemble_empty_window(
         ])
 
     assert "reaches" not in calls
+
+def test_operational_cli_known_routelink_match_records_provenance(
+    tmp_path,
+    monkeypatch,
+    mock_operational,
+):
+    """Allow a known matching RouteLink and preserve provenance."""
+    from streamflow_getter import reach_resolution
+
+    calls, _ = mock_operational
+
+    monkeypatch.setattr(
+        reach_resolution,
+        "load_gage_index",
+        lambda path: {
+            "07166500": 20955128,
+        },
+    )
+
+    monkeypatch.setattr(
+        reach_resolution,
+        "classify_gage_index_version",
+        lambda index: {
+            "crosswalk_sha256": (
+                "c0ee33504fd74319e68ba07b370110d0"
+                "22efe09a76a022ccb7361921fc909ec6"
+            ),
+            "network_version": "3.1",
+            "gage_count": 8735,
+        },
+    )
+
+    assert main([
+        "nwm-operational",
+        "--date", "2026-11-10",
+        "--cycle", "0",
+        "--gage", "07166500",
+        "--routelink", str(
+            tmp_path
+            / "RouteLink_CONUS.nc"
+        ),
+        "--out", str(
+            tmp_path
+            / "forecast.csv"
+        ),
+    ]) == 0
+
+    assert calls[
+        "reaches"
+    ] == [
+        20955128,
+    ]
+
+    assert calls[
+        "manifest"
+    ][
+        "selection"
+    ][
+        "spatial"
+    ] == {
+        "gage_resolution": {
+            "gage_ids": [
+                "07166500",
+            ],
+            "resolved_gages": {
+                "07166500":
+                    20955128,
+            },
+            "routelink": {
+                "file_name":
+                    "RouteLink_CONUS.nc",
+                "crosswalk_sha256": (
+                    "c0ee33504fd74319e68ba07b370110d0"
+                    "22efe09a76a022ccb7361921fc909ec6"
+                ),
+                "network_version":
+                    "3.1",
+                "gage_count":
+                    8735,
+                "compatibility":
+                    "compatible",
+                "requested_nwm_versions":
+                    ["3.1"],
+                "unresolved_request_version_count":
+                    0,
+            },
+        },
+    }
+
+
+def test_operational_cli_known_routelink_mismatch_stops_before_fetch(
+    tmp_path,
+    monkeypatch,
+):
+    """Reject a known v3.1 RouteLink for an NWM 3.0 request."""
+    from streamflow_getter import (
+        operational_nwm,
+        reach_resolution,
+    )
+
+    monkeypatch.setattr(
+        reach_resolution,
+        "load_gage_index",
+        lambda path: {
+            "07166500": 20955128,
+        },
+    )
+
+    monkeypatch.setattr(
+        reach_resolution,
+        "classify_gage_index_version",
+        lambda index: {
+            "crosswalk_sha256": (
+                "c0ee33504fd74319e68ba07b370110d0"
+                "22efe09a76a022ccb7361921fc909ec6"
+            ),
+            "network_version": "3.1",
+            "gage_count": 8735,
+        },
+    )
+
+    def unexpected_fetch(
+        *args,
+        **kwargs,
+    ):
+        raise AssertionError(
+            "Remote NWM retrieval must not run"
+        )
+
+    monkeypatch.setattr(
+        operational_nwm,
+        "fetch_operational_series",
+        unexpected_fetch,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="incompatible",
+    ):
+        main([
+            "nwm-operational",
+            "--date", "2026-04-19",
+            "--cycle", "0",
+            "--gage", "07166500",
+            "--routelink", str(
+                tmp_path
+                / "RouteLink_CONUS.nc"
+            ),
+            "--out", str(
+                tmp_path
+                / "forecast.csv"
+            ),
+        ])
+
+
+def test_operational_cli_cross_version_period_stops_before_fetch(
+    tmp_path,
+    monkeypatch,
+):
+    """Reject one RouteLink for a request spanning NWM 3.0 and 3.1."""
+    from streamflow_getter import (
+        operational_requests,
+        reach_resolution,
+    )
+
+    monkeypatch.setattr(
+        reach_resolution,
+        "load_gage_index",
+        lambda path: {
+            "07166500": 20955128,
+        },
+    )
+
+    monkeypatch.setattr(
+        reach_resolution,
+        "classify_gage_index_version",
+        lambda index: {
+            "crosswalk_sha256": (
+                "c0ee33504fd74319e68ba07b370110d0"
+                "22efe09a76a022ccb7361921fc909ec6"
+            ),
+            "network_version": "3.1",
+            "gage_count": 8735,
+        },
+    )
+
+    def unexpected_fetch(
+        *args,
+        **kwargs,
+    ):
+        raise AssertionError(
+            "Remote NWM retrieval must not run"
+        )
+
+    monkeypatch.setattr(
+        operational_requests,
+        "fetch_operational_configs",
+        unexpected_fetch,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=r"3\.0, 3\.1",
+    ):
+        main([
+            "nwm-operational",
+            "--start-date", "2026-08-17",
+            "--end-date", "2026-08-18",
+            "--cycle", "12",
+            "--gage", "07166500",
+            "--routelink", str(
+                tmp_path
+                / "RouteLink_CONUS.nc"
+            ),
+            "--out", str(
+                tmp_path
+                / "forecast.csv"
+            ),
+        ])
+
+
+def test_operational_cli_unknown_routelink_allowed_and_recorded(
+    tmp_path,
+    monkeypatch,
+    mock_operational,
+):
+    """Unknown RouteLinks remain usable but explicitly unverified."""
+    from streamflow_getter import reach_resolution
+
+    calls, _ = mock_operational
+
+    monkeypatch.setattr(
+        reach_resolution,
+        "load_gage_index",
+        lambda path: {
+            "08165500": 3586192,
+        },
+    )
+
+    unknown_digest = (
+        "0" * 64
+    )
+
+    monkeypatch.setattr(
+        reach_resolution,
+        "classify_gage_index_version",
+        lambda index: {
+            "crosswalk_sha256":
+                unknown_digest,
+            "network_version":
+                None,
+            "gage_count":
+                1,
+        },
+    )
+
+    assert main([
+        "nwm-operational",
+        "--date", "2026-04-19",
+        "--gage", "08165500",
+        "--routelink", str(
+            tmp_path
+            / "custom.nc"
+        ),
+        "--out", str(
+            tmp_path
+            / "forecast.csv"
+        ),
+    ]) == 0
+
+    routelink = (
+        calls[
+            "manifest"
+        ][
+            "selection"
+        ][
+            "spatial"
+        ][
+            "gage_resolution"
+        ][
+            "routelink"
+        ]
+    )
+
+    assert routelink[
+        "network_version"
+    ] is None
+
+    assert routelink[
+        "crosswalk_sha256"
+    ] == unknown_digest
+
+    assert routelink[
+        "compatibility"
+    ] == (
+        "unknown_routelink_version"
+    )
+
+    assert routelink[
+        "requested_nwm_versions"
+    ] == [
+        "3.0",
+    ]
+
+    assert routelink[
+        "unresolved_request_version_count"
+    ] == 0

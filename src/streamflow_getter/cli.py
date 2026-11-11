@@ -409,6 +409,7 @@ def main(argv: list[str] | None = None) -> int:
             )
 
         reaches = list(args.reach)
+        routelink_selection = None
 
         # Resolve geographic bounding-box selections locally.
         if args.bbox:
@@ -512,14 +513,94 @@ def main(argv: list[str] | None = None) -> int:
 
         # Resolve USGS gages through the local RouteLink index.
         if args.gage:
+            from streamflow_getter.operational_versions import (
+                resolve_operational_nwm_version,
+            )
             from streamflow_getter.reach_resolution import (
+                classify_gage_index_version,
                 load_gage_index,
                 resolve_gages,
+                validate_routelink_compatibility,
             )
 
-            index = load_gage_index(args.routelink)
-            resolved = resolve_gages(args.gage, index)
-            reaches.extend(resolved.values())
+            index = load_gage_index(
+                args.routelink
+            )
+
+            routelink_provenance = (
+                classify_gage_index_version(
+                    index
+                )
+            )
+
+            request_versions = [
+                resolve_operational_nwm_version(
+                    config
+                )
+                for config in configs
+            ]
+
+            compatibility = (
+                validate_routelink_compatibility(
+                    request_versions,
+                    routelink_provenance[
+                        "network_version"
+                    ],
+                )
+            )
+
+            resolved = resolve_gages(
+                args.gage,
+                index,
+            )
+
+            reaches.extend(
+                resolved.values()
+            )
+
+            resolved_versions = sorted({
+                version
+                for version in request_versions
+                if version is not None
+            })
+
+            routelink_selection = {
+                "gage_resolution": {
+                    "gage_ids": list(
+                        args.gage
+                    ),
+                    "resolved_gages": dict(
+                        resolved
+                    ),
+                    "routelink": {
+                        "file_name": Path(
+                            args.routelink
+                        ).expanduser().name,
+                        "crosswalk_sha256":
+                            routelink_provenance[
+                                "crosswalk_sha256"
+                            ],
+                        "network_version":
+                            routelink_provenance[
+                                "network_version"
+                            ],
+                        "gage_count":
+                            routelink_provenance[
+                                "gage_count"
+                            ],
+                        "compatibility":
+                            compatibility,
+                        "requested_nwm_versions":
+                            resolved_versions,
+                        "unresolved_request_version_count":
+                            sum(
+                                version is None
+                                for version
+                                in request_versions
+                            ),
+                    },
+                },
+            }
 
         # Validate the combined reach selection.
         if any(reach <= 0 for reach in reaches):
@@ -603,6 +684,15 @@ def main(argv: list[str] | None = None) -> int:
         except Exception:
             package_version = "unknown"
 
+        manifest_selection = {
+            "temporal": temporal_selection,
+        }
+
+        if routelink_selection is not None:
+            manifest_selection[
+                "spatial"
+            ] = routelink_selection
+
         manifest = build_operational_run_manifest(
             manifest_frame,
             configs,
@@ -610,9 +700,7 @@ def main(argv: list[str] | None = None) -> int:
             args.start_hour,
             args.end_hour,
             include_t0=not args.no_t0,
-            selection={
-                "temporal": temporal_selection,
-            },
+            selection=manifest_selection,
             cache_policy=cache_policy,
             software={
                 "streamflow_getter_version": package_version,

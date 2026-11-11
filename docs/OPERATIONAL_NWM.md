@@ -198,7 +198,29 @@ uv run --locked --extra operational streamflow-getter nwm-operational \
   --out gage_forecast.csv
 ```
 
-Preserve leading zeros in USGS station identifiers. RouteLink provides the mapping between station IDs and NWM feature IDs. Compatibility with historical NWM network versions must be verified separately.
+Preserve leading zeros in USGS station identifiers. RouteLink provides the mapping between station IDs and NWM feature IDs. For `--gage`, RouteLink compatibility is now checked from the complete
+validated gage-to-feature crosswalk rather than from the filename or a
+selected set of gauges. The crosswalk is serialized canonically and
+compared by SHA-256 against known published CONUS RouteLink mappings.
+
+Known fingerprints currently identify the published NWM 3.0.17 and
+NWM 3.1.6 crosswalks. The operational model version is independently
+derived from each forecast initialization time.
+
+A known RouteLink/request-version mismatch is rejected before remote NWM
+retrieval. A request spanning both NWM 3.0 and NWM 3.1 is likewise rejected
+when only one known version-specific RouteLink is supplied.
+
+An unrecognized RouteLink fingerprint remains allowed for backward
+compatibility, but its network version is recorded as unknown rather than
+inferred. For `--gage` runs, the manifest records the RouteLink filename,
+canonical crosswalk SHA-256, classified network version, gage count,
+compatibility status, requested model versions, requested gages, and their
+resolved NWM feature IDs.
+
+This policy applies to RouteLink-based `--gage` resolution only.
+Hydrofabric version compatibility for `--point`, `--bbox`, and `--polygon`
+remains a separate evidence question.
 
 ### Geographic point
 
@@ -427,6 +449,40 @@ Recent selection does not weaken strict retrieval behavior. If an object
 within the resolved period is unavailable or another retrieval/validation
 failure occurs, that error remains visible rather than silently shortening
 the requested window.
+
+### Operational NWM version provenance
+
+Operational archive paths remain date/cycle based across the verified
+model-upgrade boundary, so `ForecastConfig` does not expose a
+user-selectable NWM version. Instead,
+`resolve_operational_nwm_version` derives the model version from the
+requested forecast initialization time.
+
+The roadmap-period transition registry is:
+
+| Operational version | Effective initialization (UTC) | NWS notice |
+|---|---|---|
+| 1.1 | active at the January 1, 2018 project baseline | prior operational version |
+| 1.2 | 2018-03-06 12Z | SCN18-16 |
+| 2.0 | 2019-06-19 12Z | SCN19-42 |
+| 2.1 | 2021-04-20 12Z | SCN20-119 |
+| 3.0 | 2023-09-20 12Z | SCN23-76 |
+| 3.1 | 2026-08-18 12Z | SCN26-64 |
+
+Dates before the January 1, 2018 project baseline resolve to an unknown
+version rather than receiving a guessed value.
+
+Each run-manifest configuration records its derived `nwm_version`.
+The manifest-level `model` section lists every resolved operational
+version represented by the request and counts any configurations whose
+version is unresolved. Requests that cross an upgrade boundary can
+therefore retain both versions without changing native or Kerchunk URL
+construction.
+
+Version provenance does not establish RouteLink or hydrofabric
+compatibility. NWM upgrades can change network definitions and spatial
+assets, so local resolution inputs remain a separate compatibility
+concern.
 
 ### Combined row and run-provenance contract
 

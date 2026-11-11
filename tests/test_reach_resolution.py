@@ -160,3 +160,268 @@ def test_reject_noninteger_feature_ids():
 
     with pytest.raises(ValueError, match="integer"):
         build_gage_index(ds)
+
+def test_canonical_gage_index_sha256_is_order_independent():
+    import hashlib
+
+    from streamflow_getter.reach_resolution import (
+        canonical_gage_index_sha256,
+    )
+
+    first = {
+        "08165500": 3586192,
+        "01646500": 1122645,
+    }
+
+    second = {
+        "01646500": 1122645,
+        "08165500": 3586192,
+    }
+
+    expected_payload = (
+        "01646500\t1122645\n"
+        "08165500\t3586192\n"
+    ).encode("utf-8")
+
+    expected = hashlib.sha256(
+        expected_payload
+    ).hexdigest()
+
+    assert canonical_gage_index_sha256(
+        first
+    ) == expected
+
+    assert canonical_gage_index_sha256(
+        second
+    ) == expected
+
+
+def test_canonical_gage_index_sha256_validates_values():
+    from streamflow_getter.reach_resolution import (
+        canonical_gage_index_sha256,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="nonempty strings",
+    ):
+        canonical_gage_index_sha256({
+            "": 101,
+        })
+
+    with pytest.raises(
+        ValueError,
+        match="positive integers",
+    ):
+        canonical_gage_index_sha256({
+            "08165500": 0,
+        })
+
+    with pytest.raises(
+        TypeError,
+        match="dictionary",
+    ):
+        canonical_gage_index_sha256(
+            []
+        )
+
+
+@pytest.mark.parametrize(
+    "digest,expected",
+    [
+        (
+            "3e4232517ce3958bebfa7d9d66826f8e"
+            "e59c34f0b5b90fb540c3d4ab159d2c68",
+            "3.0",
+        ),
+        (
+            "c0ee33504fd74319e68ba07b370110d0"
+            "22efe09a76a022ccb7361921fc909ec6",
+            "3.1",
+        ),
+        (
+            "0" * 64,
+            None,
+        ),
+    ],
+)
+def test_known_routelink_crosswalk_hashes(
+    digest,
+    expected,
+):
+    from streamflow_getter.reach_resolution import (
+        classify_routelink_crosswalk_sha256,
+    )
+
+    assert classify_routelink_crosswalk_sha256(
+        digest
+    ) == expected
+
+
+def test_routelink_crosswalk_hash_rejects_invalid_digest():
+    from streamflow_getter.reach_resolution import (
+        classify_routelink_crosswalk_sha256,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="SHA256",
+    ):
+        classify_routelink_crosswalk_sha256(
+            "not-a-sha"
+        )
+
+
+def test_classify_small_unknown_gage_index():
+    from streamflow_getter.reach_resolution import (
+        canonical_gage_index_sha256,
+        classify_gage_index_version,
+    )
+
+    index = {
+        "08165500": 3586192,
+        "01646500": 1122645,
+    }
+
+    result = classify_gage_index_version(
+        index
+    )
+
+    assert result == {
+        "crosswalk_sha256":
+            canonical_gage_index_sha256(
+                index
+            ),
+        "network_version": None,
+        "gage_count": 2,
+    }
+
+
+def test_load_gage_index_with_provenance(
+    tmp_path,
+    monkeypatch,
+):
+    from unittest.mock import MagicMock
+
+    from streamflow_getter.reach_resolution import (
+        canonical_gage_index_sha256,
+        load_gage_index_with_provenance,
+    )
+
+    path = (
+        tmp_path
+        / "RouteLink_CONUS.nc"
+    )
+
+    path.touch()
+
+    ds = xr.Dataset({
+        "link": (
+            "feature_id",
+            [3586192, 1122645],
+        ),
+        "gages": (
+            "feature_id",
+            [
+                b"08165500",
+                b"01646500",
+            ],
+        ),
+    })
+
+    context = MagicMock()
+    context.__enter__.return_value = ds
+
+    mocked_open = MagicMock(
+        return_value=context
+    )
+
+    monkeypatch.setattr(
+        "streamflow_getter.reach_resolution.xr.open_dataset",
+        mocked_open,
+    )
+
+    index, provenance = (
+        load_gage_index_with_provenance(
+            path,
+            engine="h5netcdf",
+        )
+    )
+
+    assert index == {
+        "08165500": 3586192,
+        "01646500": 1122645,
+    }
+
+    assert provenance == {
+        "crosswalk_sha256":
+            canonical_gage_index_sha256(
+                index
+            ),
+        "network_version": None,
+        "gage_count": 2,
+    }
+
+    mocked_open.assert_called_once_with(
+        path,
+        engine="h5netcdf",
+    )
+
+    context.__exit__.assert_called_once()
+
+
+def test_routelink_compatibility_matching_version():
+    from streamflow_getter.reach_resolution import (
+        validate_routelink_compatibility,
+    )
+
+    assert validate_routelink_compatibility(
+        ["3.1", "3.1"],
+        "3.1",
+    ) == "compatible"
+
+
+def test_routelink_compatibility_rejects_known_mismatch():
+    from streamflow_getter.reach_resolution import (
+        validate_routelink_compatibility,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="incompatible",
+    ):
+        validate_routelink_compatibility(
+            ["3.0"],
+            "3.1",
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="3.0, 3.1",
+    ):
+        validate_routelink_compatibility(
+            ["3.0", "3.1"],
+            "3.1",
+        )
+
+
+def test_routelink_compatibility_allows_unknown_asset():
+    from streamflow_getter.reach_resolution import (
+        validate_routelink_compatibility,
+    )
+
+    assert validate_routelink_compatibility(
+        ["3.1"],
+        None,
+    ) == "unknown_routelink_version"
+
+
+def test_routelink_compatibility_tracks_unresolved_request():
+    from streamflow_getter.reach_resolution import (
+        validate_routelink_compatibility,
+    )
+
+    assert validate_routelink_compatibility(
+        ["3.1", None],
+        "3.1",
+    ) == "unresolved_request_version"

@@ -420,3 +420,96 @@ def test_manifest_rejects_naive_created_timestamp():
             3,
             created_utc="2026-11-11T20:00:00",
         )
+
+def test_manifest_records_derived_nwm_version():
+    manifest = build_operational_run_manifest(
+        _combined_frame(),
+        _configs(),
+        [3586192],
+        3,
+        3,
+        created_utc="2026-11-12T02:00:00Z",
+    )
+
+    assert manifest["model"] == {
+        "name": "National Water Model",
+        "version_basis": "forecast_initialization_utc",
+        "operational_versions": ["3.0"],
+        "unresolved_config_count": 0,
+    }
+
+    assert {
+        config["nwm_version"]
+        for config in manifest["request"]["configs"]
+    } == {"3.0"}
+
+
+def test_manifest_can_record_request_crossing_v31_boundary():
+    configs = [
+        ForecastConfig(
+            date="2026-08-18",
+            cycle=11,
+            product="short_range",
+        ),
+        ForecastConfig(
+            date="2026-08-18",
+            cycle=12,
+            product="short_range",
+        ),
+    ]
+
+    rows = []
+
+    for config in configs:
+        reference_hour = config.cycle
+        valid_hour = config.cycle + 1
+
+        rows.append({
+            "forecast_date": config.date,
+            "forecast_cycle": config.cycle,
+            "requested_product": config.product,
+            "product": config.product,
+            "domain": config.domain,
+            "lead_hour": 1,
+            "feature_id": 3586192,
+            "valid_time": (
+                f"{config.date}T"
+                f"{valid_hour:02d}:00:00"
+            ),
+            "reference_time": (
+                f"{config.date}T"
+                f"{reference_hour:02d}:00:00"
+            ),
+            "streamflow_m3s": 0.41,
+            "method": "kerchunk",
+        })
+
+    frame = pd.DataFrame(
+        rows,
+        columns=COMBINED_OPERATIONAL_COLUMNS,
+    )
+
+    manifest = build_operational_run_manifest(
+        frame,
+        configs,
+        [3586192],
+        1,
+        1,
+        include_t0=False,
+        created_utc="2026-11-12T02:00:00Z",
+    )
+
+    assert manifest["model"]["operational_versions"] == [
+        "3.0",
+        "3.1",
+    ]
+
+    assert manifest["model"]["unresolved_config_count"] == 0
+
+    assert [
+        config["nwm_version"]
+        for config in manifest["request"]["configs"]
+    ] == [
+        "3.0",
+        "3.1",
+    ]

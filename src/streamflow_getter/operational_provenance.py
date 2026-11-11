@@ -9,6 +9,9 @@ import numbers
 import numpy as np
 
 from streamflow_getter.operational_nwm import ForecastConfig
+from streamflow_getter.operational_versions import (
+    resolve_operational_nwm_version,
+)
 
 
 MANIFEST_SCHEMA_VERSION = 1
@@ -489,6 +492,9 @@ def build_operational_run_manifest(
                     "forecast_cycle": config.cycle,
                     "requested_product": config.product,
                     "domain": config.domain,
+                    "nwm_version": resolve_operational_nwm_version(
+                        config
+                    ),
                 }
                 for config in requested_configs
             ],
@@ -496,6 +502,22 @@ def build_operational_run_manifest(
             "start_hour": start_hour,
             "end_hour": end_hour,
             "include_t0": include_t0,
+        },
+        "model": {
+            "name": "National Water Model",
+            "version_basis": "forecast_initialization_utc",
+            "operational_versions": sorted({
+                version
+                for version in (
+                    resolve_operational_nwm_version(config)
+                    for config in requested_configs
+                )
+                if version is not None
+            }),
+            "unresolved_config_count": sum(
+                resolve_operational_nwm_version(config) is None
+                for config in requested_configs
+            ),
         },
         "cache_policy": _json_mapping(
             cache_policy,

@@ -169,6 +169,7 @@ def test_single_date_cli_publishes_manifest_without_schema_drift(
             "forecast_cycle": 0,
             "requested_product": "short_range",
             "domain": "conus",
+            "nwm_version": "3.0",
         }
     ]
 
