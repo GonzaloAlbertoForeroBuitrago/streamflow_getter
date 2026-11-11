@@ -97,9 +97,24 @@ Validated in a local working tree based on `f8dde69cd7fa6bb33a3180a5637b4f3bf0d3
 
 These follow-up changes remain local at this checkpoint. The results do not establish hosted-CI success; verify GitHub Actions for the relevant PR head after publication. This documentation update preserves the validated production and test files.
 
+### Operational CLI cache policy — recorded November 10, 2026
+
+Validated in a working tree based on `b3995ee6b0a1173ec4e3bebb1123ac1c30cfd588`.
+
+- `nwm-operational` uses `~/.cache/streamflow_getter` by default.
+- `--cache-dir PATH` selects an explicit persistent reference cache.
+- `--no-cache` disables persistent reference caching.
+- `--cache-dir` and `--no-cache` are mutually exclusive.
+- Lower-level Python retrieval APIs retain their existing explicit `cache_dir=None` semantics.
+- Local automated result: **694 passed in 1.20 seconds**.
+- A live four-run acceptance case verified default cold creation, default warm reuse without cache-record modification, explicit override, and explicit no-cache behavior. All four runs returned identical short-range f001 streamflow for reach `3586192`.
+- See [PROGRESS Section 4.7](../benchmarks/PROGRESS.md#47-operational-cli-cache-policy) for the live artifact and bounded scope.
+
+These changes are separate from the previously published reference-reliability contribution and preserve its fallback/error contract.
+
 ## 3. Known Limitations and Remaining Work
 
-- Reference caching is optional rather than enabled by default.
+- Operational CLI reference caching is enabled by default at `~/.cache/streamflow_getter`; users can override the directory or disable persistent caching explicitly. Lower-level Python retrieval APIs retain explicit `cache_dir=None` semantics.
 - Explicit batch reference preparation is implemented; date-range, recent-period, and event request planning and CLI integration remain pending.
 - Shared analysis reference preparation does not yet share decoded t0 flow rows across ensemble series.
 - Cached retrieval falls back to native NetCDF only for a classified missing remote reference (`RemoteReferenceNotFoundError`); other cached errors propagate. Controlled live acceptance passed for one reference-metadata absence case. Broader live coverage remains unverified.
@@ -108,7 +123,7 @@ These follow-up changes remain local at this checkpoint. The results do not esta
 - Some analysis-to-forecast `t0` relationships require additional scientific review.
 - NRDS and GEOGLOWS adapters remain future development work.
 
-**Next backend task:** Define and implement the operational CLI cache policy: the default cache location, an explicit directory override, and an explicit opt-out, with documented cached-error behavior. Preserve the validated distinction between missing remote references, local cache I/O failures, and integrity failures. Then build date-range, recent-period, and event request planning on the existing configuration and reference-preparation APIs, with an execution policy that preserves native fallback when references are unavailable and the product/time/provenance coordination described below.
+**Next backend task:** Build date-range, recent-period, and event request planning on the existing configuration and reference-preparation APIs. Preserve the validated default-cache, override, opt-out, native-fallback, and error-classification behavior while introducing request orchestration and product/time/provenance reporting.
 
 ## 4. Next Research Phase — Alabama
 

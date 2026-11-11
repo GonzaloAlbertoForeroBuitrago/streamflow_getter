@@ -149,7 +149,23 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Exclude analysis_assim t0",
     )
-    operational.add_argument("--cache-dir")
+    cache_policy = operational.add_mutually_exclusive_group()
+    cache_policy.add_argument(
+        "--cache-dir",
+        default="~/.cache/streamflow_getter",
+        metavar="PATH",
+        help=(
+            "Kerchunk reference cache directory "
+            "(default: ~/.cache/streamflow_getter)"
+        ),
+    )
+    cache_policy.add_argument(
+        "--no-cache",
+        dest="cache_dir",
+        action="store_const",
+        const=None,
+        help="Disable persistent Kerchunk reference caching",
+    )
     operational.add_argument(
         "--format",
         choices=["csv", "parquet"],

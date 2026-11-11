@@ -297,6 +297,43 @@ The D3 automated validation and D4 live case used a working tree based on `f8dde
 
 The D4 CSV retains the complete seven-file working-tree map, including the documentation revisions used during that experiment. Subsequent evidence consolidation preserves the production and test fingerprints above. Automated results and publication status are recorded in [Development Status](../docs/DEVELOPMENT_STATUS.md).
 
+### 4.7 Operational CLI cache policy
+
+The operational CLI now implements the roadmap's configurable local reference-cache policy while leaving the lower-level Python API defaults unchanged.
+
+| CLI mode | `cache_dir` passed to retrieval |
+|---|---|
+| default | `~/.cache/streamflow_getter` |
+| `--cache-dir PATH` | the explicit path |
+| `--no-cache` | `None` |
+
+`--cache-dir` and `--no-cache` are mutually exclusive.
+
+Automated validation on macOS ARM64 with Python 3.14.6 passed **694 tests in 1.20 seconds**. Five focused policy tests verify parser defaults, CLI propagation, explicit override, explicit opt-out, and conflicting-option rejection.
+
+The live acceptance run used April 19, 2026, cycle 00, `short_range` f001, reach `3586192`, with analysis t0 disabled. The experiment isolated `HOME` in temporary directories so it did not modify the user's actual default cache.
+
+| Run | Method | Flow (m3/s) | Observed cache behavior |
+|---|---|---:|---|
+| default cold | `kerchunk` | `0.4099999908357858` | created one record under `.cache/streamflow_getter` |
+| default warm | `kerchunk` | `0.4099999908357858` | reused the same record unchanged |
+| explicit override | `kerchunk` | `0.4099999908357858` | wrote one record only under the requested cache directory |
+| `--no-cache` | `kerchunk` | `0.4099999908357858` | created no persistent reference cache |
+
+The maximum flow difference across the four runs was `0.0 m3/s`. All runs retained the same forecast reference and valid times.
+
+The default cache record path was:
+
+`~/.cache/streamflow_getter/nwm.20260419/short_range/nwm.t00z.short_range.channel_rt.f001.conus.nc.cache.json`
+
+Its cold-run cache-file SHA-256 was `1a5d8e4c10d0874a35b269e07c19f6ab86038a24786b428b5fc43efbc819895a`; the warm run left those bytes unchanged.
+
+| Local artifact under `benchmarks/results/` | Rows | Bytes | SHA-256 |
+|---|---:|---:|---|
+| `live_cli_cache_policy_20260419_t00_f001.csv` | 4 | 1,925 | `eaa0d734ac21b4cb115b69f98d27f591ecce0ff1bb3621e111d855595d5f4e8e` |
+
+Elapsed times in the artifact are acceptance context only and do not establish a cache-speed advantage. This case covers one CONUS short-range cycle, forecast lead, and reach. It does not establish full product/date/domain coverage or offline retrieval.
+
 ## 5. Operational NWM implementation
 
 The production implementation uses reusable modules for forecast configuration, source resolution, Kerchunk and native NetCDF retrieval, reach selection, reference validation, caching, and output serialization.

@@ -311,7 +311,9 @@ Cached references are reused when their metadata remains valid. Missing or inval
 
 Permission errors, directory misuse, and other local cache-read I/O errors propagate and stop reference-body download or cache replacement. A remote freshness-metadata check precedes the local cache read.
 
-Use `--cache-dir` to choose the cache location.
+Operational CLI retrieval uses `~/.cache/streamflow_getter` by default. Use `--cache-dir PATH` to select another persistent reference-cache directory, or `--no-cache` to disable persistent reference caching for that request. `--cache-dir` and `--no-cache` are mutually exclusive. The default, explicit override, and opt-out modes have been exercised through live CLI retrieval; see [PROGRESS Section 4.7](../benchmarks/PROGRESS.md#47-operational-cli-cache-policy).
+
+This default is a CLI policy. The lower-level Python retrieval functions retain their explicit `cache_dir=None` behavior so library callers do not begin writing persistent cache records implicitly.
 
 ### Preparing a reference before retrieval
 
