@@ -385,6 +385,72 @@ Each initialization retained its own 00Z `reference_time`, 01Z `valid_time`, and
 
 These live cases validate one date/cycle/lead/reach product group and one three-day short-range period. They do not establish current-date `--recent-days` archive availability, every product/cycle/date combination, a named-event catalogue, or partial-result behavior. Elapsed times in the local evidence are acceptance context rather than performance benchmarks.
 
+### 4.9 Stable operational output provenance and run manifests
+
+Operational retrieval now has an explicit separation between the exported streamflow rows and run-level provenance.
+
+The established one-product CSV/Parquet schema remains unchanged:
+
+- `forecast_date`
+- `forecast_cycle`
+- `product`
+- `domain`
+- `lead_hour`
+- `feature_id`
+- `valid_time`
+- `reference_time`
+- `streamflow_m3s`
+- `method`
+
+The internal combined-request contract additionally carries `requested_product`. Its stable row identity is `forecast_date`, `forecast_cycle`, `requested_product`, `domain`, `lead_hour`, and `feature_id`. `requested_product` records what the request asked for, while `product` remains the actual NWM source product. They match for forecast rows and may differ for analysis t0. Literal source `reference_time` is preserved rather than rewritten to equal the forecast cycle.
+
+Manifest schema version 1 records the resolved temporal selection, planned configurations, reaches, lead window, t0 policy, cache policy, software version, diagnostics, stable output contract, method/source counts, and strict expected-versus-actual row completeness. Version 1 represents complete strict runs only; missing or unplanned row identities cause manifest construction to fail.
+
+Manifest JSON publication is performed from a completely serialized temporary file and refuses to overwrite an existing destination. The combined data-plus-manifest helper validates both destinations before publication and removes a newly created data file if sidecar publication fails. These are in-process rollback semantics rather than a claim of portable two-file crash atomicity.
+
+The operational CLI now writes a sidecar beside every successful operational output:
+
+- `forecast.csv` + `forecast.csv.manifest.json`
+- `forecast.parquet` + `forecast.parquet.manifest.json`
+
+The CLI builds the manifest from the internal combined frame before dropping `requested_product`, preserving provenance without changing the established streamflow data schema.
+
+Local automated validation after CLI integration and test-fixture modernization: **780 passed in 1.08 seconds**.
+
+#### Live three-day data + manifest acceptance
+
+Scope: April 19-21, 2026, cycle 00, `short_range` f001, reach `3586192`, t0 disabled, and an explicit temporary persistent reference cache.
+
+The production CLI wrote three streamflow rows plus a strict JSON run manifest. Three separate Kerchunk cache records were created, one for each initialization date.
+
+Live streamflow matched the accepted native-download comparison exactly:
+
+| Forecast date | Live Kerchunk (m3/s) | Accepted native download (m3/s) | Absolute difference (m3/s) |
+|---|---:|---:|---:|
+| 2026-04-19 | 0.4099999908357858 | 0.4099999908357858 | 0.0 |
+| 2026-04-20 | 0.3699999917298555 | 0.3699999917298555 | 0.0 |
+| 2026-04-21 | 1.1299999747425318 | 1.1299999747425318 | 0.0 |
+
+The generated manifest recorded:
+
+- status `complete`;
+- three expected and three actual row identities;
+- zero missing and zero extra rows;
+- requested-product counts `{"short_range": 3}`;
+- source-product counts `{"short_range": 3}`;
+- method counts `{"kerchunk": 3}`;
+- explicit-period request dates;
+- the resolved reach and lead window;
+- t0 disabled;
+- the explicit persistent cache directory used by the run.
+
+| Local artifact under `benchmarks/results/` | Rows | Bytes | SHA-256 |
+|---|---:|---:|---|
+| `live_cli_manifest_period_20260419_20260421_t00_f001.csv` | 3 | 502 | `b8584682fadf4b43e7ec9a2a6b7bb5daa02d2b1b6793b0882bf38ff1b16ed83e` |
+| `live_cli_manifest_period_20260419_20260421_t00_f001.csv.manifest.json` | — | 2,279 | `dd5c7a4b02593db7ec959ea8b038e8b4f1dd4ad06635a572270b09c07238ae69` |
+
+The live acceptance scope is deliberately bounded. It verifies one three-day short-range request and does not establish every product/member/cycle, current-date archive availability, partial-result behavior, or crash recovery across two filesystem paths. Elapsed time is acceptance context rather than a performance benchmark.
+
 ## 5. Operational NWM implementation
 
 The production implementation uses reusable modules for forecast configuration, source resolution, Kerchunk and native NetCDF retrieval, reach selection, reference validation, caching, and output serialization.

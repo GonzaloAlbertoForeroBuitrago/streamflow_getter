@@ -428,6 +428,125 @@ within the resolved period is unavailable or another retrieval/validation
 failure occurs, that error remains visible rather than silently shortening
 the requested window.
 
+### Combined row and run-provenance contract
+
+Operational output now distinguishes two row contracts.
+
+The established single-configuration contract contains:
+
+    forecast_date
+    forecast_cycle
+    product
+    domain
+    lead_hour
+    feature_id
+    valid_time
+    reference_time
+    streamflow_m3s
+    method
+
+The combined-request contract adds `requested_product` immediately before
+the actual source `product`. Its stable row identity is:
+
+    forecast_date
+    forecast_cycle
+    requested_product
+    domain
+    lead_hour
+    feature_id
+
+`requested_product` describes the forecast product/member requested by the
+run. `product` describes the actual NWM source product used for that row.
+They normally match for forecast rows and may differ for analysis t0.
+
+`reference_time` is literal source metadata. It must not be rewritten to
+equal `forecast_date` plus `forecast_cycle`; operational analysis products
+can legitimately report a source reference time different from the t0
+valid time.
+
+`build_operational_run_manifest` validates a successful combined frame
+against the exact row identities implied by the planned configurations,
+reaches, lead window, and t0 policy. Manifest schema version 1 records the
+resolved request, selection context, cache policy, software provenance,
+diagnostics, row contract, result method/source counts, and strict
+completeness.
+
+The version-1 manifest describes complete strict runs only. Missing or
+unplanned rows cause manifest construction to fail. Future partial-result
+support can extend the existing `completeness` and `failures` fields
+without redefining the successful row identity.
+
+CSV/Parquet serialization remains separate from these semantics. The
+existing one-product CLI export is unchanged in this step; manifest
+publication and CLI integration are separate follow-up work.
+
+### Publishing a run manifest sidecar
+
+`write_manifest` publishes strict JSON from a fully serialized temporary
+file and refuses to overwrite an existing destination. The default sidecar
+name preserves the data extension, for example:
+
+    forecast.csv
+    forecast.csv.manifest.json
+
+or:
+
+    forecast.parquet
+    forecast.parquet.manifest.json
+
+`write_timeseries_with_manifest` treats the data file and manifest as one
+logical published result. It validates both destinations and serializes the
+manifest before creating the data output. If sidecar publication then
+fails, the newly created data file is removed before the original error is
+propagated. Pre-existing files are never intentionally removed or
+overwritten.
+
+These guarantees are in-process failure/rollback semantics. Two separate
+filesystem paths cannot be treated as a portable crash-atomic transaction;
+a sudden process, kernel, or storage failure between the two publications
+can still require external recovery.
+
+This publication helper does not change retrieval, request planning, or the
+current CLI. CLI/run-manifest integration is a separate step after the row
+and manifest contracts are validated independently.
+
+### Operational CLI run manifests
+
+A successful `nwm-operational` CLI request now publishes two files:
+
+    forecast.csv
+    forecast.csv.manifest.json
+
+or, for Parquet:
+
+    forecast.parquet
+    forecast.parquet.manifest.json
+
+The streamflow data file intentionally preserves the established
+one-product operational schema. `requested_product` is retained internally
+while the strict run manifest is built, then removed from the CSV/Parquet
+export. This avoids breaking existing data consumers while preserving the
+distinction between what the run requested and the actual NWM source
+product used for each row.
+
+The manifest records the resolved temporal selection, validated
+configurations, resolved NWM reaches, lead window, t0 policy, cache policy,
+package version when available, retrieval-method/source counts, stable
+combined-row contract, and exact strict completeness counts.
+
+For `--recent-days`, both the relative day count and the resolved absolute
+UTC dates are recorded. For a single-date or explicit-period request, the
+requested and resolved dates are recorded directly.
+
+Both output paths are checked before remote retrieval. Manifest publication
+uses the rollback behavior documented above: if sidecar publication fails
+after the data file is created, the newly created data file is removed and
+the error is propagated.
+
+This step does not enable partial results. A successful CLI manifest has
+`status: "complete"` and strict expected-versus-actual row counts; an
+incomplete combined result is rejected before publication.
+
 ### Executing planned forecast configurations
 
 `fetch_operational_configs` executes a finite collection of validated

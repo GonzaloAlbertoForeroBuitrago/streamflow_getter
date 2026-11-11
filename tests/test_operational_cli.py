@@ -10,47 +10,185 @@ from streamflow_getter import operational_nwm, output
 
 @pytest.fixture
 def mock_operational(monkeypatch):
-    """Mock retrieval and output without network access."""
+    """Mock realistic retrieval and manifest publication without network."""
+    from datetime import date, datetime, timedelta
+
     calls = {}
 
-    frame = pd.DataFrame({
-        "forecast_date": ["2026-04-19", "2026-04-19"],
-        "forecast_cycle": [0, 0],
-        "product": ["analysis_assim", "short_range"],
-        "domain": ["conus", "conus"],
-        "lead_hour": [0, 1],
-        "feature_id": [3586192, 3586192],
-        "valid_time": [
-            "2026-04-19T00:00:00",
-            "2026-04-19T01:00:00",
-        ],
-        "reference_time": [
-            "2026-04-18T21:00:00",
-            "2026-04-19T00:00:00",
-        ],
-        "streamflow_m3s": [0.41, 0.41],
-        "method": ["kerchunk", "kerchunk"],
-    })
+    columns = [
+        "forecast_date",
+        "forecast_cycle",
+        "product",
+        "domain",
+        "lead_hour",
+        "feature_id",
+        "valid_time",
+        "reference_time",
+        "streamflow_m3s",
+        "method",
+    ]
 
-    def fake_fetch(config, reaches, start_hour, end_hour, **kwargs):
+    def make_frame(
+        config,
+        reaches,
+        start_hour,
+        end_hour,
+        *,
+        include_t0,
+    ):
+        """Build rows consistent with the requested ForecastConfig."""
+        cycle_time = datetime.combine(
+            date.fromisoformat(
+                config.date
+            ),
+            datetime.min.time(),
+        ).replace(
+            hour=config.cycle
+        )
+
+        rows = []
+
+        if include_t0:
+            # Keep source provenance realistic. Analysis reference time
+            # is allowed to differ from analysis t0 valid time.
+            analysis_reference_time = (
+                cycle_time
+                - timedelta(hours=3)
+            )
+
+            for reach in reaches:
+                rows.append({
+                    "forecast_date": config.date,
+                    "forecast_cycle": config.cycle,
+                    "product": config.spec.analysis_product,
+                    "domain": config.domain,
+                    "lead_hour": 0,
+                    "feature_id": reach,
+                    "valid_time": (
+                        cycle_time.isoformat()
+                    ),
+                    "reference_time": (
+                        analysis_reference_time.isoformat()
+                    ),
+                    "streamflow_m3s": 0.41,
+                    "method": "kerchunk",
+                })
+
+        hours = config.forecast_hours(
+            start_hour,
+            end_hour,
+        )
+
+        for hour in hours:
+            valid_time = (
+                cycle_time
+                + timedelta(hours=hour)
+            )
+
+            for reach in reaches:
+                rows.append({
+                    "forecast_date": config.date,
+                    "forecast_cycle": config.cycle,
+                    "product": config.product,
+                    "domain": config.domain,
+                    "lead_hour": hour,
+                    "feature_id": reach,
+                    "valid_time": (
+                        valid_time.isoformat()
+                    ),
+                    "reference_time": (
+                        cycle_time.isoformat()
+                    ),
+                    "streamflow_m3s": 0.41,
+                    "method": "kerchunk",
+                })
+
+        return pd.DataFrame(
+            rows,
+            columns=columns,
+        )
+
+    # Preserve the expected default frame used by the original
+    # test_operational_cli_defaults assertion.
+    default_config = (
+        operational_nwm.ForecastConfig()
+    )
+
+    frame = make_frame(
+        default_config,
+        [3586192],
+        1,
+        18,
+        include_t0=True,
+    )
+
+    def fake_fetch(
+        config,
+        reaches,
+        start_hour,
+        end_hour,
+        **kwargs,
+    ):
         calls["config"] = config
         calls["reaches"] = reaches
         calls["start_hour"] = start_hour
         calls["end_hour"] = end_hour
         calls["fetch_kwargs"] = kwargs
-        return frame
 
-    def fake_write(data, path, **kwargs):
+        include_t0 = kwargs.get(
+            "include_t0",
+            True,
+        )
+
+        result = make_frame(
+            config,
+            reaches,
+            start_hour,
+            end_hour,
+            include_t0=include_t0,
+        )
+
+        calls["returned_frame"] = result
+
+        return result
+
+    def fake_write(
+        data,
+        path,
+        manifest,
+        **kwargs,
+    ):
         calls["written_frame"] = data
+        calls["manifest"] = manifest
         calls["output_path"] = path
         calls["write_kwargs"] = kwargs
-        return path
+
+        manifest_path = kwargs.get(
+            "manifest_path"
+        )
+
+        if manifest_path is None:
+            manifest_path = (
+                output.manifest_path_for(
+                    path
+                )
+            )
+
+        return (
+            path,
+            manifest_path,
+        )
 
     monkeypatch.setattr(
-        operational_nwm, "fetch_operational_series", fake_fetch
+        operational_nwm,
+        "fetch_operational_series",
+        fake_fetch,
     )
+
     monkeypatch.setattr(
-        output, "write_timeseries", fake_write
+        output,
+        "write_timeseries_with_manifest",
+        fake_write,
     )
 
     return calls, frame
@@ -73,7 +211,10 @@ def test_operational_cli_defaults(mock_operational):
     assert calls["start_hour"] == 1
     assert calls["end_hour"] == 18
     assert calls["fetch_kwargs"]["include_t0"] is True
-    assert calls["written_frame"] is frame
+    pd.testing.assert_frame_equal(
+        calls["written_frame"],
+        frame,
+    )
     assert calls["output_path"] == "forecast.csv"
 
 

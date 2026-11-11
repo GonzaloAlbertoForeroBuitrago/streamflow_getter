@@ -237,8 +237,12 @@ def main(argv: list[str] | None = None) -> int:
             resolve_recent_date_range,
         )
         from streamflow_getter.output import (
+            manifest_path_for,
             resolve_output_format,
-            write_timeseries,
+            write_timeseries_with_manifest,
+        )
+        from streamflow_getter.operational_provenance import (
+            build_operational_run_manifest,
         )
 
 
@@ -256,6 +260,13 @@ def main(argv: list[str] | None = None) -> int:
                 )
             ]
 
+            temporal_selection = {
+                "mode": "single_date",
+                "requested_date": args.date,
+                "resolved_start_date": args.date,
+                "resolved_end_date": args.date,
+            }
+
         elif args.start_date is not None:
             if args.end_date is None:
                 raise ValueError(
@@ -268,6 +279,14 @@ def main(argv: list[str] | None = None) -> int:
                 cycles=(args.cycle,),
                 products=(args.product,),
             )
+
+            temporal_selection = {
+                "mode": "explicit_period",
+                "requested_start_date": args.start_date,
+                "requested_end_date": args.end_date,
+                "resolved_start_date": args.start_date,
+                "resolved_end_date": args.end_date,
+            }
 
         else:
             if args.end_date is not None:
@@ -294,6 +313,13 @@ def main(argv: list[str] | None = None) -> int:
                 products=(args.product,),
             )
 
+            temporal_selection = {
+                "mode": "recent_days",
+                "requested_days": args.recent_days,
+                "resolved_start_date": recent_start,
+                "resolved_end_date": recent_end,
+            }
+
 
         # Reject invalid forecast-hour ranges before remote access.
         if args.start_hour < 1 or args.end_hour < args.start_hour:
@@ -311,13 +337,28 @@ def main(argv: list[str] | None = None) -> int:
             )
 
 
-        # Validate output before starting remote retrieval.
-        resolve_output_format(args.out, args.output_format)
+        # Validate data and manifest destinations before remote retrieval.
+        resolved_output_format = resolve_output_format(
+            args.out,
+            args.output_format,
+        )
 
-        destination_path = Path(args.out).expanduser()
+        destination_path = Path(
+            args.out
+        ).expanduser()
+
+        manifest_destination_path = manifest_path_for(
+            destination_path
+        )
+
         if destination_path.exists():
             raise FileExistsError(
                 f"Output already exists: {destination_path}"
+            )
+
+        if manifest_destination_path.exists():
+            raise FileExistsError(
+                f"Manifest already exists: {manifest_destination_path}"
             )
 
         # Validate reach-selection arguments before remote NWM access.
@@ -499,7 +540,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # Retrieve operational NWM streamflow after local validation.
         if args.date is not None:
-            frame = fetch_operational_series(
+            single_frame = fetch_operational_series(
                 configs[0],
                 reaches,
                 args.start_hour,
@@ -507,8 +548,23 @@ def main(argv: list[str] | None = None) -> int:
                 include_t0=not args.no_t0,
                 cache_dir=args.cache_dir,
             )
+
+            manifest_frame = single_frame.copy()
+
+            if "requested_product" in manifest_frame.columns:
+                raise ValueError(
+                    "Single-date operational result unexpectedly "
+                    "contains requested_product"
+                )
+
+            manifest_frame.insert(
+                2,
+                "requested_product",
+                args.product,
+            )
+
         else:
-            frame = fetch_operational_configs(
+            manifest_frame = fetch_operational_configs(
                 configs,
                 reaches,
                 args.start_hour,
@@ -518,8 +574,8 @@ def main(argv: list[str] | None = None) -> int:
             )
 
             if (
-                "requested_product" not in frame.columns
-                or not frame["requested_product"].eq(
+                "requested_product" not in manifest_frame.columns
+                or not manifest_frame["requested_product"].eq(
                     args.product
                 ).all()
             ):
@@ -528,18 +584,66 @@ def main(argv: list[str] | None = None) -> int:
                     "planned operational result"
                 )
 
-            # Preserve the existing one-product CLI export schema.
-            frame = frame.drop(
-                columns=["requested_product"]
-            )
+        if args.cache_dir is None:
+            cache_policy = {
+                "mode": "disabled",
+            }
+        else:
+            cache_policy = {
+                "mode": "persistent",
+                "directory": args.cache_dir,
+            }
 
-        destination = write_timeseries(
-            frame,
-            args.out,
-            output_format=args.output_format,
+        try:
+            from importlib.metadata import version
+
+            package_version = version(
+                "streamflow-getter"
+            )
+        except Exception:
+            package_version = "unknown"
+
+        manifest = build_operational_run_manifest(
+            manifest_frame,
+            configs,
+            reaches,
+            args.start_hour,
+            args.end_hour,
+            include_t0=not args.no_t0,
+            selection={
+                "temporal": temporal_selection,
+            },
+            cache_policy=cache_policy,
+            software={
+                "streamflow_getter_version": package_version,
+            },
+            diagnostics={
+                "execution_mode": "strict",
+            },
         )
 
-        print(f"wrote {len(frame)} rows to {destination}")
+        # Preserve the established one-product CLI data schema.
+        frame = manifest_frame.drop(
+            columns=["requested_product"]
+        )
+
+        destination, manifest_destination = (
+            write_timeseries_with_manifest(
+                frame,
+                args.out,
+                manifest,
+                output_format=resolved_output_format,
+                manifest_path=manifest_destination_path,
+            )
+        )
+
+        print(
+            f"wrote {len(frame)} rows to {destination}"
+        )
+        print(
+            f"wrote run manifest to {manifest_destination}"
+        )
+
         return 0
 
     return 0

@@ -3,7 +3,7 @@
 **Checkpoint date:** November 7, 2026
 **Updated:** November 11, 2026 (America/Chicago)
 **Branch:** `research/nwm-historical-coverage`
-**Status:** Operational NWM backend submitted in PR #6; reference preparation, cache/fallback reliability, default cache policy, and operational request planning are validated on the active PR branch; remaining provenance/output-contract and Alabama research work is pending.
+**Status:** Operational NWM backend submitted in PR #6; reference preparation, cache/fallback reliability, default cache policy, operational request planning, and strict run-provenance manifests are validated on the active PR branch. Named-event CLI exposure, broader availability/version documentation, and later research-source integration remain separate work.
 
 ## 1. Completed Work
 
@@ -128,6 +128,21 @@ Validated in a working tree based on `c7108c2f835ba23b843cbf22d2e6df30591b0805`.
 
 The planner and executor do not create a second retrieval implementation: existing source resolution, Kerchunk/native fallback, reference cache, timestamp validation, reach extraction, and output writing remain authoritative.
 
+### Operational run provenance — recorded November 11, 2026
+
+Validated in a working tree based on `2842ed05c03e4af6f5d9d60c4c2cb75ce6f2154d`.
+
+- Added explicit stable contracts for the established one-product operational row schema and the combined-request schema carrying `requested_product`.
+- Preserved actual source `product`, literal `reference_time`, forecast/reference/valid-time identity, and retrieval `method` independently from requested product/member identity.
+- Added strict manifest schema version 1 with resolved request, reaches, t0 policy, cache policy, software information, diagnostics, source/method counts, output-contract metadata, and expected-versus-actual completeness.
+- Added safe JSON manifest sidecar publication with no-overwrite behavior and in-process rollback of newly created data if sidecar publication fails.
+- Integrated run-manifest publication into the operational CLI without adding `requested_product` to the established CSV/Parquet streamflow export.
+- Updated the legacy CLI test fixture to emit product-aware and schedule-aware rows so the production provenance validator remains strict.
+- Local full-suite result after CLI integration: **780 passed in 1.08 seconds**.
+- Live April 19-21, 2026 CLI acceptance produced three exact native-agreement streamflow rows plus a complete strict manifest; see [PROGRESS Section 4.9](../benchmarks/PROGRESS.md#49-stable-operational-output-provenance-and-run-manifests).
+
+The manifest currently represents successful strict runs only. Partial-success/failure manifests are intentionally not inferred from incomplete output.
+
 ## 3. Known Limitations and Remaining Work
 
 - Operational CLI reference caching is enabled by default at `~/.cache/streamflow_getter`; users can override the directory or disable persistent caching explicitly. Lower-level Python retrieval APIs retain explicit `cache_dir=None` semantics.
@@ -139,7 +154,7 @@ The planner and executor do not create a second retrieval implementation: existi
 - Some analysis-to-forecast `t0` relationships require additional scientific review.
 - NRDS and GEOGLOWS adapters remain future development work.
 
-**Next backend task:** Define the stable combined-request output and run-provenance contract before adding another data source or exposing named events in the CLI. Preserve requested product/member separately from actual source product, carry cache/fallback diagnostics into run evidence, retain forecast initialization/reference/valid-time identity, and add an explicit completeness/manifest contract for strict and future partial-result workflows.
+**Next backend task:** Start a separate backend contribution for the remaining request-surface and availability work. First audit how named events should be exposed now that the manifest can retain event provenance, and document operational product/version/date availability before broadening CLI product/cycle selection. Do not mix NRDS/Alabama research-source work into this backend unit.
 
 ## 4. Next Research Phase — Alabama
 
