@@ -1011,3 +1011,99 @@ RouteLink compatibility is established for USGS `--gage` resolution.
 This evidence does not establish exact version identity for hydrofabric
 geometry used by `--point`, `--bbox`, or `--polygon`. Geographic
 hydrofabric-version compatibility remains a separate validation task.
+
+
+## Operational source-availability boundaries — November 12, 2026
+
+### Objective
+
+Resolve the roadmap requirement to document operational data date ranges
+by source and product without inferring archive continuity from isolated
+successful retrievals.
+
+### Method
+
+Two read-only metadata audits were run against the source paths generated
+by the production operational configuration.
+
+H1B sampled all 13 currently supported CONUS forecast products across 12
+dates from September 2018 through November 2026. Each row checked:
+
+- NOAA Google Cloud Storage native NetCDF;
+- CIROH Kerchunk reference storage;
+- NOAA `noaa-nwm-pds` S3.
+
+Representative leads were selected according to the current product
+schedules:
+
+- short range: f001;
+- medium range: f003;
+- long range: f006.
+
+H1C2 then refined transitions at valid initialization-cycle resolution.
+GCS and CIROH were required to agree at each tested initialization.
+
+### Verified current-path boundaries
+
+| Product family | Previous valid initialization | First observed available initialization | Representative lead | NWM version at boundary |
+|---|---|---|---:|---|
+| Short range | 2018-09-16 23Z | **2018-09-17 00Z** | f001 | 1.2 |
+| Long-range members 1–4 | 2018-09-16 18Z | **2018-09-17 00Z** | f006 | 1.2 |
+| Medium-range members 1–6 | 2019-06-19 06Z | **2019-06-19 12Z** | f003 | 2.0 |
+| Medium-range no-DA | 2021-04-20 06Z | **2021-04-20 12Z** | f003 | 2.1 |
+| Medium-range blend | 2023-09-19 00Z | **2023-09-19 06Z** | f003 | 2.1 |
+
+GCS native and CIROH Kerchunk paths had identical status at these tested
+boundaries.
+
+The six medium-range ensemble paths align exactly with the registered NWM
+2.0 transition. The no-DA path aligns exactly with NWM 2.1.
+
+The medium-range blend path does **not** align with the NWM 3.0 transition:
+it is present from 2023-09-19 06Z while the registered NWM 3.0 transition
+is 2023-09-20 12Z. No causal version-transition claim is made for blend.
+
+### NOAA S3
+
+All 13 tested current product paths had the same observed NOAA
+`noaa-nwm-pds` transition:
+
+- final valid initialization on 2024-12-31: missing;
+- 2025-01-01 00Z: present.
+
+For short range the immediately preceding valid initialization was 23Z.
+For the tested medium- and long-range products it was 18Z.
+
+### Evidence artifacts
+
+`benchmarks/results/h1b_source_availability_matrix.csv`
+
+- rows: 156
+- bytes: 90,127
+- SHA-256: `45e61c3edb7afddb4e38fcf80ad5fc2294cda6b961d2706abe535598a12e3ca3`
+- metadata/probe errors: 0
+
+`benchmarks/results/h1c_exact_initialization_boundaries.csv`
+
+- rows: 488
+- bytes: 97,600
+- SHA-256: `e31d3de9676a2e9bac3699957337ee1642d21696a76313c85d66b581ffe63bbe`
+- repository source changes during audit: none
+
+Both artifacts remain generated local evidence under the existing ignore
+policy.
+
+### Interpretation and limitations
+
+These are boundaries for the **current streamflow_getter source-path
+conventions and representative valid leads**.
+
+A missing current path does not prove that a differently named historical
+product, file layout, or archive object did not exist.
+
+The broad matrix plus exact transition windows substantially improve the
+archive evidence, but they do not constitute an exhaustive check of every
+forecast initialization after each boundary. Continuous gap-free coverage
+therefore remains a stronger claim than this audit supports.
+
+No production retrieval code changed during H1B or H1C2.

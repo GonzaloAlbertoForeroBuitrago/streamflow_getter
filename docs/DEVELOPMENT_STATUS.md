@@ -1,9 +1,9 @@
 # Development Status — NWM Implementation Checkpoint
 
 **Checkpoint date:** November 7, 2026
-**Updated:** November 11, 2026 (America/Chicago)
+**Updated:** November 12, 2026 (America/Chicago)
 **Branch:** `research/nwm-historical-coverage`
-**Status:** Operational NWM backend submitted in PR #6; reference preparation, cache/fallback reliability, default cache policy, operational request planning, and strict run-provenance manifests are validated on the active PR branch. Named-event CLI exposure, broader availability/version documentation, and later research-source integration remain separate work.
+**Status:** Operational NWM backend remains published in PR #6. Reference/cache reliability, request planning, strict run provenance, operational model/RouteLink compatibility, and current CONUS source-path availability boundaries are validated on the active PR branch. Named-event CLI exposure and later research-source integration remain separate work.
 
 ## 1. Completed Work
 
@@ -154,7 +154,7 @@ The manifest currently represents successful strict runs only. Partial-success/f
 - Some analysis-to-forecast `t0` relationships require additional scientific review.
 - NRDS and GEOGLOWS adapters remain future development work.
 
-**Next backend task:** Start a separate backend contribution for the remaining request-surface and availability work. First audit how named events should be exposed now that the manifest can retain event provenance, and document operational product/version/date availability before broadening CLI product/cycle selection. Do not mix NRDS/Alabama research-source work into this backend unit.
+**Next backend task:** Audit and design named-event CLI exposure now that request provenance, version compatibility, and operational source-path availability are documented. Do not mix NRDS/Alabama research-source work into this backend unit.
 
 ## 4. Next Research Phase — Alabama
 
@@ -210,3 +210,38 @@ Current validation baseline for this contribution: **815 passing tests**.
 Remaining version work is intentionally separate: version compatibility
 for hydrofabric geometry used by point, bounding-box, and polygon
 selection has not been inferred from the RouteLink result.
+
+
+## November 12, 2026 — Operational source availability
+
+The current operational source-path boundaries have now been audited
+separately from retrieval correctness.
+
+Verified GCS-native/CIROH-Kerchunk boundaries for representative valid
+leads:
+
+- `short_range`: 2018-09-17 00Z, f001;
+- `long_range_mem1`–`long_range_mem4`: 2018-09-17 00Z, f006;
+- `medium_range_mem1`–`medium_range_mem6`: 2019-06-19 12Z, f003;
+- `medium_range_no_da`: 2021-04-20 12Z, f003;
+- `medium_range_blend`: 2023-09-19 06Z, f003.
+
+The six medium-range members align with the registered NWM 2.0 transition
+and no-DA aligns with NWM 2.1. Blend does not align with NWM 3.0 and is
+documented without a causal version-transition claim.
+
+All 13 supported current product paths were missing from NOAA
+`noaa-nwm-pds` at their final valid initialization on December 31, 2024
+and present at 2025-01-01 00Z.
+
+H1B recorded 156 metadata-only matrix rows with zero probe errors.
+H1C2 recorded 488 exact-boundary probes.
+
+Evidence fingerprints:
+
+- H1B: `45e61c3edb7afddb4e38fcf80ad5fc2294cda6b961d2706abe535598a12e3ca3`
+- H1C2: `e31d3de9676a2e9bac3699957337ee1642d21696a76313c85d66b581ffe63bbe`
+
+These results document current source-path boundaries. They do not prove
+that differently named historical files were absent or that every
+initialization after each boundary is gap-free.
