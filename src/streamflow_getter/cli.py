@@ -54,7 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     operational = sub.add_parser(
         "nwm-operational",
-        help="Operational NWM CONUS forecasts",
+        help="Operational NWM CONUS forecasts and analyses",
     )
     date_selection = operational.add_mutually_exclusive_group(
         required=True
@@ -85,6 +85,8 @@ def build_parser() -> argparse.ArgumentParser:
     operational.add_argument(
         "--product",
         choices=[
+            "analysis_assim",
+            "analysis_assim_no_da",
             "short_range",
             "medium_range_mem1",
             "medium_range_mem2",
@@ -170,7 +172,7 @@ def build_parser() -> argparse.ArgumentParser:
     operational.add_argument(
         "--no-t0",
         action="store_true",
-        help="Exclude analysis_assim t0",
+        help="Exclude paired analysis t0 from forecast products",
     )
     cache_policy = operational.add_mutually_exclusive_group()
     cache_policy.add_argument(
@@ -328,7 +330,13 @@ def main(argv: list[str] | None = None) -> int:
                 "positive and end_hour must not precede start_hour"
             )
 
-
+        if args.no_t0 and any(
+            config.spec.analysis_only
+            for config in configs
+        ):
+            raise ValueError(
+                "Analysis-only products cannot be used with --no-t0"
+            )
         # Validate product-specific forecast hours before remote access.
         for config in configs:
             config.forecast_hours(

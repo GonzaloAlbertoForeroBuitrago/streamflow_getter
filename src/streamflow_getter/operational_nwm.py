@@ -19,10 +19,29 @@ class ProductSpec:
     max_hour: int
     lead_step_hours: int = 1
     analysis_product: str = "analysis_assim"
+    analysis_only: bool = False
 
 
 
 PRODUCT_SPECS = {
+        "analysis_assim": ProductSpec(
+        directory="analysis_assim",
+        filename_product="analysis_assim",
+        channel_family="channel_rt",
+        cycles=tuple(range(24)),
+        max_hour=0,
+        analysis_product="analysis_assim",
+        analysis_only=True,
+    ),
+    "analysis_assim_no_da": ProductSpec(
+        directory="analysis_assim_no_da",
+        filename_product="analysis_assim_no_da",
+        channel_family="channel_rt",
+        cycles=tuple(range(24)),
+        max_hour=0,
+        analysis_product="analysis_assim_no_da",
+        analysis_only=True,
+    ),
     "short_range": ProductSpec(
         directory="short_range",
         filename_product="short_range",
@@ -210,6 +229,9 @@ class ForecastConfig:
         if start_hour < 1 or end_hour < start_hour:
             raise ValueError("Invalid forecast hour range")
 
+        if self.spec.analysis_only:
+            return []
+
         if end_hour > self.spec.max_hour:
             raise ValueError(
                 f"Forecast hour must not exceed {self.spec.max_hour} "
@@ -233,7 +255,10 @@ class ForecastConfig:
         """Build a validated operational channel forecast filename."""
         if isinstance(hour, bool) or not isinstance(hour, int):
             raise ValueError("Forecast lead hour must be an integer")
-
+        if self.spec.analysis_only:
+            raise ValueError(
+                f"{self.product} is analysis-only and has no forecast leads"
+            )
         if not 1 <= hour <= self.spec.max_hour:
             raise ValueError(
                 f"Forecast hour must be between 1 and "
@@ -540,7 +565,14 @@ def prepare_operational_references(
     for config in requested:
         if not isinstance(config, ForecastConfig):
             raise TypeError("configs must contain ForecastConfig instances")
+
+        if config.spec.analysis_only and not include_t0:
+            raise ValueError(
+                f"{config.product} is analysis-only and requires include_t0=True"
+            )
+
         hours = config.forecast_hours(start_hour, end_hour)
+
         if include_t0:
             hours.insert(0, 0)
         for hour in hours:
@@ -748,6 +780,11 @@ def fetch_operational_series(
 
     if not isinstance(include_t0, bool):
         raise ValueError("include_t0 must be a boolean")
+
+    if config.spec.analysis_only and not include_t0:
+        raise ValueError(
+            f"{config.product} is analysis-only and requires include_t0=True"
+        )
 
     requested = list(reach_ids)
 
