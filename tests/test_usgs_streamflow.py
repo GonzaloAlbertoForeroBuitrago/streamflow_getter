@@ -564,3 +564,65 @@ def test_invalid_gage_id(gage_id):
             "2025-07-04T07:00:00Z",
             "2025-07-04T08:00:00Z",
         )
+
+
+def test_identical_usgs_observations_are_deduplicated(monkeypatch):
+    """Equal observations at one UTC timestamp produce one row."""
+    install_payloads(
+        monkeypatch,
+        [{
+            "features": [
+                continuous_feature(
+                    "2025-07-04T07:00:00Z",
+                    10.0,
+                    time_series_id="series-2",
+                ),
+                continuous_feature(
+                    "2025-07-04T07:00:00Z",
+                    10.0,
+                    time_series_id="series-1",
+                ),
+            ],
+            "links": [],
+        }],
+    )
+
+    frame = usgs_streamflow.fetch_usgs_streamflow(
+        "08165500",
+        "2025-07-04T07:00:00Z",
+        "2025-07-04T08:00:00Z",
+    )
+
+    assert len(frame) == 1
+    assert frame.iloc[0]["time_series_id"] == "series-1"
+    assert frame.iloc[0]["native_value"] == 10.0
+
+
+@pytest.mark.parametrize(
+    "value",
+    [float("nan"), float("inf"), float("-inf")],
+)
+def test_usgs_rejects_nonfinite_discharge(monkeypatch, value):
+    """Non-finite discharge must never enter the output."""
+    install_payloads(
+        monkeypatch,
+        [{
+            "features": [
+                continuous_feature(
+                    "2025-07-04T07:00:00Z",
+                    value,
+                )
+            ],
+            "links": [],
+        }],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid USGS discharge value",
+    ):
+        usgs_streamflow.fetch_usgs_streamflow(
+            "08165500",
+            "2025-07-04T07:00:00Z",
+            "2025-07-04T08:00:00Z",
+        )

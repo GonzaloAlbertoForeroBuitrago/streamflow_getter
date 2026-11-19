@@ -421,6 +421,86 @@ def fetch_usgs_monitoring_location(
     }
 
 
+def _parse_continuous_feature(
+    feature: dict,
+    *,
+    location_id: str,
+    gage: str,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+) -> dict | None:
+    """Validate one USGS discharge feature and normalize its values."""
+    properties = feature.get("properties", {})
+
+    if not isinstance(properties, dict):
+        raise ValueError(
+            "USGS continuous feature has invalid properties"
+        )
+
+    if (
+        properties.get("monitoring_location_id") != location_id
+        or properties.get("parameter_code") != DISCHARGE_PARAMETER_CODE
+    ):
+        return None
+
+    timestamp = pd.to_datetime(
+        properties.get("time"),
+        utc=True,
+        errors="coerce",
+    )
+
+    if pd.isna(timestamp):
+        raise ValueError(
+            "USGS continuous feature has an invalid timestamp"
+        )
+
+    # Preserve the explicitly half-open interval [start, end).
+    if not start <= timestamp < end:
+        return None
+
+    value = _optional_float(
+        properties.get("value"),
+        name="discharge value",
+    )
+
+    if value is None:
+        return None
+
+    native_unit = str(
+        properties.get("unit_of_measure", "")
+    ).strip()
+
+    factor = _DISCHARGE_UNIT_FACTORS.get(native_unit)
+
+    if factor is None:
+        raise ValueError(
+            "Unrecognized USGS discharge "
+            f"unit: {native_unit!r}"
+        )
+
+    return {
+        "source": "usgs",
+        "series": "observation",
+        "source_id": gage,
+        "usgs_gage_id": gage,
+        "valid_time": timestamp,
+        "interval_start": timestamp,
+        "interval_end": timestamp,
+        "time_support": "instantaneous",
+        "aggregation": "native",
+        "streamflow_m3s": value * factor,
+        "unit": "m3/s",
+        "method": "usgs_api",
+        "parameter_code": properties.get("parameter_code"),
+        "statistic_id": properties.get("statistic_id"),
+        "time_series_id": properties.get("time_series_id"),
+        "approval_status": properties.get("approval_status"),
+        "qualifier": properties.get("qualifier"),
+        "native_value": value,
+        "native_unit": native_unit,
+    }
+
+
 def fetch_usgs_streamflow(
     gage_id: str,
     start_time,
@@ -476,86 +556,15 @@ def fetch_usgs_streamflow(
     rows = []
 
     for feature in features:
-        properties = feature.get("properties", {})
-
-        if not isinstance(properties, dict):
-            raise ValueError(
-                "USGS continuous feature has invalid properties"
-            )
-
-        if (
-            properties.get("monitoring_location_id")
-            != location_id
-            or properties.get("parameter_code")
-            != DISCHARGE_PARAMETER_CODE
-        ):
-            continue
-
-        timestamp = pd.to_datetime(
-            properties.get("time"),
-            utc=True,
-            errors="coerce",
+        row = _parse_continuous_feature(
+            feature,
+            location_id=location_id,
+            gage=gage,
+            start=start,
+            end=end,
         )
-
-        if pd.isna(timestamp):
-            raise ValueError(
-                "USGS continuous feature has an invalid timestamp"
-            )
-
-        # OGC interval behavior may include the end point.
-        # The package contract is explicitly half-open [start, end).
-        if not start <= timestamp < end:
-            continue
-
-        value = _optional_float(
-            properties.get("value"),
-            name="discharge value",
-        )
-
-        if value is None:
-            continue
-
-        native_unit = str(
-            properties.get("unit_of_measure", "")
-        ).strip()
-
-        factor = _DISCHARGE_UNIT_FACTORS.get(native_unit)
-
-        if factor is None:
-            raise ValueError(
-                "Unrecognized USGS discharge "
-                f"unit: {native_unit!r}"
-            )
-
-        rows.append(
-            {
-                "source": "usgs",
-                "series": "observation",
-                "source_id": gage,
-                "usgs_gage_id": gage,
-                "valid_time": timestamp,
-                "interval_start": timestamp,
-                "interval_end": timestamp,
-                "time_support": "instantaneous",
-                "aggregation": "native",
-                "streamflow_m3s": value * factor,
-                "unit": "m3/s",
-                "method": "usgs_api",
-                "parameter_code": properties.get(
-                    "parameter_code"
-                ),
-                "statistic_id": properties.get("statistic_id"),
-                "time_series_id": properties.get(
-                    "time_series_id"
-                ),
-                "approval_status": properties.get(
-                    "approval_status"
-                ),
-                "qualifier": properties.get("qualifier"),
-                "native_value": value,
-                "native_unit": native_unit,
-            }
-        )
+        if row is not None:
+            rows.append(row)
 
     frame = pd.DataFrame(
         rows,
