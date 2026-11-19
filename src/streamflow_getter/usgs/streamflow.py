@@ -15,7 +15,6 @@ from urllib.request import Request, urlopen
 import numpy as np
 import pandas as pd
 
-
 USGS_OGC_BASE_URL = "https://api.waterdata.usgs.gov/ogcapi/v1"
 DISCHARGE_PARAMETER_CODE = "00060"
 
@@ -62,9 +61,7 @@ def _normalize_gage_id(gage_id: str) -> str:
     gage = gage_id.strip()
 
     if not gage or not gage.isascii() or not gage.isdecimal():
-        raise ValueError(
-            "USGS gage ID must contain only ASCII digits"
-        )
+        raise ValueError("USGS gage ID must contain only ASCII digits")
 
     return gage
 
@@ -78,25 +75,17 @@ def _utc_timestamp(value, *, name: str) -> pd.Timestamp:
     try:
         timestamp = pd.Timestamp(value)
     except (TypeError, ValueError, OverflowError) as exc:
-        raise ValueError(
-            f"{name} must be a valid datetime"
-        ) from exc
+        raise ValueError(f"{name} must be a valid datetime") from exc
 
     if timestamp.tzinfo is None:
-        raise ValueError(
-            f"{name} must include an explicit timezone"
-        )
+        raise ValueError(f"{name} must include an explicit timezone")
 
     return timestamp.tz_convert("UTC")
 
 
 def _resolved_api_key(api_key: str | None) -> str | None:
     """Prefer an explicit key, otherwise use USGS_API_KEY."""
-    key = (
-        api_key
-        if api_key is not None
-        else os.environ.get("USGS_API_KEY")
-    )
+    key = api_key if api_key is not None else os.environ.get("USGS_API_KEY")
 
     if key is None:
         return None
@@ -111,17 +100,10 @@ def _collection_url(
 ) -> str:
     """Build a credential-free USGS OGC collection URL."""
     query = urlencode(
-        {
-            key: value
-            for key, value in parameters.items()
-            if value is not None
-        }
+        {key: value for key, value in parameters.items() if value is not None}
     )
 
-    return (
-        f"{USGS_OGC_BASE_URL}/collections/"
-        f"{collection}/items?{query}"
-    )
+    return f"{USGS_OGC_BASE_URL}/collections/{collection}/items?{query}"
 
 
 def _request_json(
@@ -157,9 +139,7 @@ def _request_json(
         payload = json.load(response)
 
     if not isinstance(payload, dict):
-        raise ValueError(
-            "USGS API returned an unexpected JSON document"
-        )
+        raise ValueError("USGS API returned an unexpected JSON document")
 
     return payload
 
@@ -174,9 +154,7 @@ def _next_page_url(
     links = payload.get("links", [])
 
     if not isinstance(links, list):
-        raise ValueError(
-            "USGS API returned invalid pagination metadata"
-        )
+        raise ValueError("USGS API returned invalid pagination metadata")
 
     for link in links:
         if not isinstance(link, dict):
@@ -191,9 +169,7 @@ def _next_page_url(
         )
 
         if urlsplit(next_url).netloc != expected_host:
-            raise ValueError(
-                "USGS pagination redirected to an unexpected host"
-            )
+            raise ValueError("USGS pagination redirected to an unexpected host")
 
         return next_url
 
@@ -221,9 +197,7 @@ def _fetch_features(
             return features
 
         if current_url in seen_urls:
-            raise ValueError(
-                "USGS pagination repeated the same URL"
-            )
+            raise ValueError("USGS pagination repeated the same URL")
 
         seen_urls.add(current_url)
 
@@ -236,15 +210,9 @@ def _fetch_features(
         page = payload.get("features", [])
 
         if not isinstance(page, list):
-            raise ValueError(
-                "USGS API returned invalid features"
-            )
+            raise ValueError("USGS API returned invalid features")
 
-        features.extend(
-            feature
-            for feature in page
-            if isinstance(feature, dict)
-        )
+        features.extend(feature for feature in page if isinstance(feature, dict))
 
         current_url = _next_page_url(
             payload,
@@ -252,9 +220,7 @@ def _fetch_features(
             expected_host=expected_host,
         )
 
-    raise ValueError(
-        "USGS pagination exceeded max_pages"
-    )
+    raise ValueError("USGS pagination exceeded max_pages")
 
 
 def _optional_float(
@@ -269,14 +235,10 @@ def _optional_float(
     try:
         number = float(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(
-            f"Invalid USGS {name}: {value!r}"
-        ) from exc
+        raise ValueError(f"Invalid USGS {name}: {value!r}") from exc
 
     if not math.isfinite(number):
-        raise ValueError(
-            f"Invalid USGS {name}: {value!r}"
-        )
+        raise ValueError(f"Invalid USGS {name}: {value!r}")
 
     return number
 
@@ -323,43 +285,27 @@ def fetch_usgs_monitoring_location(
         if (
             feature.get("id") == location_id
             or properties.get("id") == location_id
-            or properties.get("monitoring_location_id")
-            == location_id
+            or properties.get("monitoring_location_id") == location_id
         ):
             matches.append(feature)
 
     if not matches:
-        raise ValueError(
-            f"USGS monitoring location not found: {gage}"
-        )
+        raise ValueError(f"USGS monitoring location not found: {gage}")
 
     if len(matches) != 1:
-        raise ValueError(
-            "USGS monitoring-location query "
-            f"was ambiguous for {gage}"
-        )
+        raise ValueError(f"USGS monitoring-location query was ambiguous for {gage}")
 
     feature = matches[0]
     properties = feature.get("properties", {})
     geometry = feature.get("geometry")
 
-    if (
-        not isinstance(geometry, dict)
-        or geometry.get("type") != "Point"
-    ):
-        raise ValueError(
-            "USGS monitoring location must have Point geometry"
-        )
+    if not isinstance(geometry, dict) or geometry.get("type") != "Point":
+        raise ValueError("USGS monitoring location must have Point geometry")
 
     coordinates = geometry.get("coordinates")
 
-    if (
-        not isinstance(coordinates, (list, tuple))
-        or len(coordinates) < 2
-    ):
-        raise ValueError(
-            "USGS monitoring location has invalid coordinates"
-        )
+    if not isinstance(coordinates, (list, tuple)) or len(coordinates) < 2:
+        raise ValueError("USGS monitoring location has invalid coordinates")
 
     longitude = _optional_float(
         coordinates[0],
@@ -376,9 +322,7 @@ def fetch_usgs_monitoring_location(
         or not -180 <= longitude <= 180
         or not -90 <= latitude <= 90
     ):
-        raise ValueError(
-            "USGS monitoring location has invalid longitude/latitude"
-        )
+        raise ValueError("USGS monitoring location has invalid longitude/latitude")
 
     drainage_sqmi = _optional_float(
         properties.get("drainage_area"),
@@ -394,26 +338,18 @@ def fetch_usgs_monitoring_location(
         "source": "usgs",
         "source_id": gage,
         "monitoring_location_id": location_id,
-        "monitoring_location_name": properties.get(
-            "monitoring_location_name"
-        ),
+        "monitoring_location_name": properties.get("monitoring_location_name"),
         "longitude": longitude,
         "latitude": latitude,
         "site_type": properties.get("site_type"),
-        "hydrologic_unit_code": properties.get(
-            "hydrologic_unit_code"
-        ),
+        "hydrologic_unit_code": properties.get("hydrologic_unit_code"),
         "drainage_area_sqmi": drainage_sqmi,
         "drainage_area_km2": (
-            None
-            if drainage_sqmi is None
-            else drainage_sqmi * SQMI_TO_KM2
+            None if drainage_sqmi is None else drainage_sqmi * SQMI_TO_KM2
         ),
         "contributing_drainage_area_sqmi": contributing_sqmi,
         "contributing_drainage_area_km2": (
-            None
-            if contributing_sqmi is None
-            else contributing_sqmi * SQMI_TO_KM2
+            None if contributing_sqmi is None else contributing_sqmi * SQMI_TO_KM2
         ),
         "horizontal_positional_accuracy": properties.get(
             "horizontal_positional_accuracy"
@@ -433,9 +369,7 @@ def _parse_continuous_feature(
     properties = feature.get("properties", {})
 
     if not isinstance(properties, dict):
-        raise ValueError(
-            "USGS continuous feature has invalid properties"
-        )
+        raise ValueError("USGS continuous feature has invalid properties")
 
     if (
         properties.get("monitoring_location_id") != location_id
@@ -450,9 +384,7 @@ def _parse_continuous_feature(
     )
 
     if pd.isna(timestamp):
-        raise ValueError(
-            "USGS continuous feature has an invalid timestamp"
-        )
+        raise ValueError("USGS continuous feature has an invalid timestamp")
 
     # Preserve the explicitly half-open interval [start, end).
     if not start <= timestamp < end:
@@ -466,17 +398,12 @@ def _parse_continuous_feature(
     if value is None:
         return None
 
-    native_unit = str(
-        properties.get("unit_of_measure", "")
-    ).strip()
+    native_unit = str(properties.get("unit_of_measure", "")).strip()
 
     factor = _DISCHARGE_UNIT_FACTORS.get(native_unit)
 
     if factor is None:
-        raise ValueError(
-            "Unrecognized USGS discharge "
-            f"unit: {native_unit!r}"
-        )
+        raise ValueError(f"Unrecognized USGS discharge unit: {native_unit!r}")
 
     return {
         "source": "usgs",
@@ -527,13 +454,10 @@ def fetch_usgs_streamflow(
     )
 
     if end <= start:
-        raise ValueError(
-            "end_time must be after start_time"
-        )
+        raise ValueError("end_time must be after start_time")
 
     interval = (
-        f"{start.strftime('%Y-%m-%dT%H:%M:%SZ')}/"
-        f"{end.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+        f"{start.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end.strftime('%Y-%m-%dT%H:%M:%SZ')}"
     )
 
     url = _collection_url(
@@ -575,23 +499,16 @@ def fetch_usgs_streamflow(
         return frame
 
     if not frame["streamflow_m3s"].pipe(np.isfinite).all():
-        raise ValueError(
-            "USGS discharge contains non-finite values"
-        )
+        raise ValueError("USGS discharge contains non-finite values")
 
     conflicts = (
-        frame.groupby("valid_time")["streamflow_m3s"]
-        .nunique(dropna=False)
-        .gt(1)
+        frame.groupby("valid_time")["streamflow_m3s"].nunique(dropna=False).gt(1)
     )
 
     if conflicts.any():
         timestamp = conflicts[conflicts].index[0]
 
-        raise ValueError(
-            "Conflicting USGS discharge "
-            f"values at {timestamp}"
-        )
+        raise ValueError(f"Conflicting USGS discharge values at {timestamp}")
 
     return (
         frame.sort_values(

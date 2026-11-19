@@ -7,19 +7,15 @@ separate so retrieval is independent from spatial and hydrologic QA.
 
 from __future__ import annotations
 
+import numbers
 from functools import lru_cache
 from threading import Lock
-import numbers
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-
-GEOGLOWS_V2_HOURLY_ZARR = (
-    "s3://geoglows-v2/"
-    "retrospective/hourly.zarr"
-)
+GEOGLOWS_V2_HOURLY_ZARR = "s3://geoglows-v2/retrospective/hourly.zarr"
 
 GEOGLOWS_RETROSPECTIVE_COLUMNS = [
     "source",
@@ -53,9 +49,7 @@ def _river_id(value: int) -> int:
         or not isinstance(value, numbers.Integral)
         or int(value) <= 0
     ):
-        raise ValueError(
-            "GEOGLOWS river ID must be a positive integer"
-        )
+        raise ValueError("GEOGLOWS river ID must be a positive integer")
 
     return int(value)
 
@@ -69,23 +63,15 @@ def _utc_hour(
     try:
         timestamp = pd.Timestamp(value)
     except (TypeError, ValueError, OverflowError) as exc:
-        raise ValueError(
-            f"{name} must be a valid datetime"
-        ) from exc
+        raise ValueError(f"{name} must be a valid datetime") from exc
 
     if timestamp.tzinfo is None:
-        raise ValueError(
-            f"{name} must include an explicit timezone"
-        )
+        raise ValueError(f"{name} must include an explicit timezone")
 
-    timestamp = timestamp.tz_convert(
-        "UTC"
-    )
+    timestamp = timestamp.tz_convert("UTC")
 
     if timestamp != timestamp.floor("h"):
-        raise ValueError(
-            f"{name} must fall on a whole UTC hour"
-        )
+        raise ValueError(f"{name} must fall on a whole UTC hour")
 
     return timestamp
 
@@ -98,13 +84,8 @@ def _cached_open_geoglows_retrospective_dataset(
     dataset_uri: str = GEOGLOWS_V2_HOURLY_ZARR,
 ) -> xr.Dataset:
     """Open and cache a remote GEOGLOWS hourly retrospective dataset."""
-    if (
-        not isinstance(dataset_uri, str)
-        or not dataset_uri.strip()
-    ):
-        raise ValueError(
-            "dataset_uri must be a nonempty string"
-        )
+    if not isinstance(dataset_uri, str) or not dataset_uri.strip():
+        raise ValueError("dataset_uri must be a nonempty string")
 
     dataset = xr.open_dataset(
         dataset_uri,
@@ -116,9 +97,7 @@ def _cached_open_geoglows_retrospective_dataset(
 
     try:
         if "Q" not in dataset:
-            raise ValueError(
-                "GEOGLOWS dataset does not contain Q"
-            )
+            raise ValueError("GEOGLOWS dataset does not contain Q")
 
         discharge = dataset["Q"]
 
@@ -126,9 +105,7 @@ def _cached_open_geoglows_retrospective_dataset(
             "time",
             "river_id",
         }.issubset(discharge.dims):
-            raise ValueError(
-                "GEOGLOWS Q must use time and river_id dimensions"
-            )
+            raise ValueError("GEOGLOWS Q must use time and river_id dimensions")
 
         units = str(
             discharge.attrs.get(
@@ -138,23 +115,21 @@ def _cached_open_geoglows_retrospective_dataset(
         ).strip()
 
         if units not in _ACCEPTED_DISCHARGE_UNITS:
-            raise ValueError(
-                "Unexpected GEOGLOWS discharge units: "
-                f"{units!r}"
-            )
+            raise ValueError(f"Unexpected GEOGLOWS discharge units: {units!r}")
 
-        aggregation = str(
-            discharge.attrs.get(
-                "aggregation_method",
-                "",
+        aggregation = (
+            str(
+                discharge.attrs.get(
+                    "aggregation_method",
+                    "",
+                )
             )
-        ).strip().casefold()
+            .strip()
+            .casefold()
+        )
 
         if aggregation != "mean":
-            raise ValueError(
-                "Unexpected GEOGLOWS aggregation method: "
-                f"{aggregation!r}"
-            )
+            raise ValueError(f"Unexpected GEOGLOWS aggregation method: {aggregation!r}")
 
     except Exception as validation_error:
         try:
@@ -169,15 +144,12 @@ def _cached_open_geoglows_retrospective_dataset(
     return dataset
 
 
-
 def open_geoglows_retrospective_dataset(
     dataset_uri: str = GEOGLOWS_V2_HOURLY_ZARR,
 ) -> xr.Dataset:
     """Reuse one validated dataset per cached URI under concurrency."""
     with _DATASET_OPEN_LOCK:
-        return _cached_open_geoglows_retrospective_dataset(
-            dataset_uri
-        )
+        return _cached_open_geoglows_retrospective_dataset(dataset_uri)
 
 
 def _clear_cached_geoglows_datasets() -> None:
@@ -190,9 +162,7 @@ def _clear_cached_geoglows_datasets() -> None:
 open_geoglows_retrospective_dataset.cache_info = (
     _cached_open_geoglows_retrospective_dataset.cache_info
 )
-open_geoglows_retrospective_dataset.cache_clear = (
-    _clear_cached_geoglows_datasets
-)
+open_geoglows_retrospective_dataset.cache_clear = _clear_cached_geoglows_datasets
 
 
 def clear_geoglows_dataset_cache() -> None:
@@ -213,9 +183,7 @@ def fetch_geoglows_retrospective(
     one-hour mean interval. The adapter preserves the source values and
     does not perform temporal interpolation or cross-source alignment.
     """
-    river = _river_id(
-        river_id
-    )
+    river = _river_id(river_id)
 
     start = _utc_hour(
         start_time,
@@ -227,30 +195,17 @@ def fetch_geoglows_retrospective(
     )
 
     if end <= start:
-        raise ValueError(
-            "end_time must be after start_time"
-        )
+        raise ValueError("end_time must be after start_time")
 
-    dataset = (
-        open_geoglows_retrospective_dataset(
-            dataset_uri
-        )
-    )
+    dataset = open_geoglows_retrospective_dataset(dataset_uri)
 
     discharge = dataset["Q"]
 
     # xarray's public GEOGLOWS time coordinate is timezone-naive but
     # semantically UTC. Use a half-open selection to avoid reading the
     # value at end_time.
-    start_naive = start.tz_localize(
-        None
-    )
-    end_naive = (
-        end.tz_localize(None)
-        - pd.Timedelta(
-            nanoseconds=1
-        )
-    )
+    start_naive = start.tz_localize(None)
+    end_naive = end.tz_localize(None) - pd.Timedelta(nanoseconds=1)
 
     try:
         selected = discharge.sel(
@@ -261,23 +216,13 @@ def fetch_geoglows_retrospective(
             ),
         ).load()
     except KeyError as exc:
-        raise ValueError(
-            "GEOGLOWS river ID not found: "
-            f"{river}"
-        ) from exc
+        raise ValueError(f"GEOGLOWS river ID not found: {river}") from exc
 
-    frame = (
-        selected
-        .to_dataframe(
-            name="streamflow_m3s"
-        )
-        .reset_index()
-    )
+    frame = selected.to_dataframe(name="streamflow_m3s").reset_index()
 
     if frame.empty:
         raise ValueError(
-            "No GEOGLOWS hourly retrospective data "
-            "inside the requested window"
+            "No GEOGLOWS hourly retrospective data inside the requested window"
         )
 
     frame["valid_time"] = pd.to_datetime(
@@ -286,69 +231,38 @@ def fetch_geoglows_retrospective(
         errors="raise",
     )
 
-    inside_window = (
-        frame["valid_time"]
-        .ge(start)
-        & frame["valid_time"]
-        .lt(end)
-    )
+    inside_window = frame["valid_time"].ge(start) & frame["valid_time"].lt(end)
 
-    frame = (
-        frame.loc[
-            inside_window
-        ]
-        .reset_index(drop=True)
-    )
+    frame = frame.loc[inside_window].reset_index(drop=True)
 
     if frame.empty:
         raise ValueError(
-            "No GEOGLOWS hourly retrospective data "
-            "inside the requested window"
+            "No GEOGLOWS hourly retrospective data inside the requested window"
         )
 
     if frame["valid_time"].duplicated().any():
-        raise ValueError(
-            "Duplicate GEOGLOWS retrospective timestamps"
-        )
+        raise ValueError("Duplicate GEOGLOWS retrospective timestamps")
 
-    if not (
-        frame["streamflow_m3s"]
-        .pipe(np.isfinite)
-        .all()
-    ):
-        raise ValueError(
-            "GEOGLOWS streamflow contains "
-            "non-finite values"
-        )
+    if not (frame["streamflow_m3s"].pipe(np.isfinite).all()):
+        raise ValueError("GEOGLOWS streamflow contains non-finite values")
 
     frame["source"] = "geoglows"
     frame["series"] = "retrospective_hourly"
     frame["source_id"] = river
     frame["geoglows_river_id"] = river
 
-    frame["interval_start"] = (
-        frame["valid_time"]
-    )
-    frame["interval_end"] = (
-        frame["valid_time"]
-        + pd.Timedelta(hours=1)
-    )
+    frame["interval_start"] = frame["valid_time"]
+    frame["interval_end"] = frame["valid_time"] + pd.Timedelta(hours=1)
 
     frame["time_support"] = "hourly_mean"
     frame["aggregation"] = "mean"
     frame["unit"] = "m3/s"
     frame["method"] = "geoglows_zarr"
     frame["model_version"] = "rfs-v2"
-    frame["dataset"] = (
-        "retrospective_hourly"
-    )
+    frame["dataset"] = "retrospective_hourly"
 
     return (
-        frame[
-            GEOGLOWS_RETROSPECTIVE_COLUMNS
-        ]
-        .sort_values(
-            "valid_time"
-        )
+        frame[GEOGLOWS_RETROSPECTIVE_COLUMNS]
+        .sort_values("valid_time")
         .reset_index(drop=True)
     )

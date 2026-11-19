@@ -12,7 +12,6 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
-
 _SOURCE_COLUMNS = [
     "valid_time",
     "streamflow_m3s",
@@ -30,9 +29,7 @@ _PARTIAL_INTERVAL = object()
 def _normalized_label(label: str) -> str:
     """Return a validated comparison-source label."""
     if not isinstance(label, str) or not label.strip():
-        raise ValueError(
-            "Source labels must be nonempty strings"
-        )
+        raise ValueError("Source labels must be nonempty strings")
 
     return label.strip()
 
@@ -55,9 +52,7 @@ def _optional_utc_series(
     invalid = parsed.isna() & ~originally_missing
 
     if invalid.any():
-        raise ValueError(
-            f"{label} contains invalid {column} values"
-        )
+        raise ValueError(f"{label} contains invalid {column} values")
 
     return parsed
 
@@ -70,27 +65,17 @@ def _validated_source_frame(
     label = _normalized_label(label)
 
     if not isinstance(frame, pd.DataFrame):
-        raise TypeError(
-            f"{label} must be a pandas DataFrame"
-        )
+        raise TypeError(f"{label} must be a pandas DataFrame")
 
-    missing_columns = set(
-        _SOURCE_COLUMNS
-    ).difference(
-        frame.columns
-    )
+    missing_columns = set(_SOURCE_COLUMNS).difference(frame.columns)
 
     if missing_columns:
         raise ValueError(
             f"{label} is missing required columns: "
-            + ", ".join(
-                sorted(missing_columns)
-            )
+            + ", ".join(sorted(missing_columns))
         )
 
-    result = frame[
-        _SOURCE_COLUMNS
-    ].copy()
+    result = frame[_SOURCE_COLUMNS].copy()
 
     result["valid_time"] = pd.to_datetime(
         result["valid_time"],
@@ -99,14 +84,10 @@ def _validated_source_frame(
     )
 
     if result["valid_time"].isna().any():
-        raise ValueError(
-            f"{label} contains invalid or missing valid_time values"
-        )
+        raise ValueError(f"{label} contains invalid or missing valid_time values")
 
     if result["valid_time"].duplicated().any():
-        raise ValueError(
-            f"{label} contains duplicate valid_time values"
-        )
+        raise ValueError(f"{label} contains duplicate valid_time values")
 
     for column in (
         "interval_start",
@@ -128,31 +109,21 @@ def _validated_source_frame(
             dtype=float,
         )
     ).all():
-        raise ValueError(
-            f"{label} contains non-finite streamflow values"
-        )
+        raise ValueError(f"{label} contains non-finite streamflow values")
 
     result["streamflow_m3s"] = values
 
     if not result["unit"].eq("m3/s").all():
-        raise ValueError(
-            f"{label} must use normalized m3/s units"
-        )
+        raise ValueError(f"{label} must use normalized m3/s units")
 
     for column in (
         "time_support",
         "aggregation",
     ):
         if result[column].isna().any():
-            raise ValueError(
-                f"{label} contains missing {column} values"
-            )
+            raise ValueError(f"{label} contains missing {column} values")
 
-    return (
-        result
-        .sort_values("valid_time")
-        .reset_index(drop=True)
-    )
+    return result.sort_values("valid_time").reset_index(drop=True)
 
 
 def _single_metadata_value(
@@ -162,17 +133,10 @@ def _single_metadata_value(
     label: str,
 ) -> str:
     """Return one required source-level metadata value."""
-    values = (
-        frame[column]
-        .astype(str)
-        .unique()
-        .tolist()
-    )
+    values = frame[column].astype(str).unique().tolist()
 
     if len(values) != 1:
-        raise ValueError(
-            f"{label} contains mixed {column} values"
-        )
+        raise ValueError(f"{label} contains mixed {column} values")
 
     return values[0]
 
@@ -230,9 +194,7 @@ def _namespaced_frame(
         if column != "valid_time"
     }
 
-    return source.rename(
-        columns=rename
-    )
+    return source.rename(columns=rename)
 
 
 def _interval_signature(
@@ -240,12 +202,8 @@ def _interval_signature(
     label: str,
 ):
     """Return complete interval identity or its missing/partial state."""
-    start = row[
-        f"{label}_interval_start"
-    ]
-    end = row[
-        f"{label}_interval_end"
-    ]
+    start = row[f"{label}_interval_start"]
+    end = row[f"{label}_interval_end"]
 
     if pd.isna(start) and pd.isna(end):
         return None
@@ -264,34 +222,13 @@ def _row_support_compatible(
     labels: list[str],
 ) -> bool:
     """Return whether all sources describe the same temporal statistic."""
-    if not all(
-        pd.notna(
-            row[
-                f"{label}_streamflow_m3s"
-            ]
-        )
-        for label in labels
-    ):
+    if not all(pd.notna(row[f"{label}_streamflow_m3s"]) for label in labels):
         return False
 
-    if len(
-        {
-            row[
-                f"{label}_time_support"
-            ]
-            for label in labels
-        }
-    ) != 1:
+    if len({row[f"{label}_time_support"] for label in labels}) != 1:
         return False
 
-    if len(
-        {
-            row[
-                f"{label}_aggregation"
-            ]
-            for label in labels
-        }
-    ) != 1:
+    if len({row[f"{label}_aggregation"] for label in labels}) != 1:
         return False
 
     intervals = [
@@ -305,22 +242,13 @@ def _row_support_compatible(
     if _PARTIAL_INTERVAL in intervals:
         return False
 
-    if all(
-        interval is None
-        for interval in intervals
-    ):
+    if all(interval is None for interval in intervals):
         return True
 
-    if any(
-        interval is None
-        for interval in intervals
-    ):
+    if any(interval is None for interval in intervals):
         return False
 
-    return len(
-        set(intervals)
-    ) == 1
-
+    return len(set(intervals)) == 1
 
 
 def _vectorized_support_compatible(
@@ -328,56 +256,32 @@ def _vectorized_support_compatible(
     labels: list[str],
 ) -> pd.Series:
     """Check temporal compatibility across entire columns."""
+
     def columns_for(suffix: str) -> pd.DataFrame:
-        return comparison[
-            [f"{label}_{suffix}" for label in labels]
-        ]
+        return comparison[[f"{label}_{suffix}" for label in labels]]
 
     def same_values(columns: pd.DataFrame) -> pd.Series:
-        return (
-            columns.eq(columns.iloc[:, 0], axis=0)
-            .fillna(False)
-            .all(axis=1)
-            | columns.isna().all(axis=1)
-        )
+        return columns.eq(columns.iloc[:, 0], axis=0).fillna(False).all(
+            axis=1
+        ) | columns.isna().all(axis=1)
 
     present = columns_for("streamflow_m3s").notna().all(axis=1)
 
-    same_support = same_values(
-        columns_for("time_support")
-    )
-    same_aggregation = same_values(
-        columns_for("aggregation")
-    )
+    same_support = same_values(columns_for("time_support"))
+    same_aggregation = same_values(columns_for("aggregation"))
 
     starts = columns_for("interval_start")
     ends = columns_for("interval_end")
 
-    all_absent = (
-        starts.isna().all(axis=1)
-        & ends.isna().all(axis=1)
+    all_absent = starts.isna().all(axis=1) & ends.isna().all(axis=1)
+
+    all_complete = starts.notna().all(axis=1) & ends.notna().all(axis=1)
+
+    matching_intervals = all_absent | (
+        all_complete & same_values(starts) & same_values(ends)
     )
 
-    all_complete = (
-        starts.notna().all(axis=1)
-        & ends.notna().all(axis=1)
-    )
-
-    matching_intervals = (
-        all_absent
-        | (
-            all_complete
-            & same_values(starts)
-            & same_values(ends)
-        )
-    )
-
-    return (
-        present
-        & same_support
-        & same_aggregation
-        & matching_intervals
-    ).astype(bool)
+    return (present & same_support & same_aggregation & matching_intervals).astype(bool)
 
 
 def _comparison_labels(
@@ -387,15 +291,10 @@ def _comparison_labels(
     ],
 ) -> list[str]:
     """Validate labels and prevent namespace collisions."""
-    labels = [
-        _normalized_label(label)
-        for label in series
-    ]
+    labels = [_normalized_label(label) for label in series]
 
     if len(labels) != len(set(labels)):
-        raise ValueError(
-            "Source labels must remain unique after trimming whitespace"
-        )
+        raise ValueError("Source labels must remain unique after trimming whitespace")
 
     return labels
 
@@ -414,26 +313,19 @@ def build_exact_time_comparison(
     temporal_support_compatible field records that distinction explicitly.
     """
     if not isinstance(series, Mapping) or not series:
-        raise ValueError(
-            "series must contain at least one source"
-        )
+        raise ValueError("series must contain at least one source")
 
     if how not in _ALLOWED_JOIN_MODES:
-        raise ValueError(
-            "how must be 'inner' or 'outer'"
-        )
+        raise ValueError("how must be 'inner' or 'outer'")
 
-    labels = _comparison_labels(
-        series
-    )
+    labels = _comparison_labels(series)
 
     frames = [
         _namespaced_frame(
             normalized_label,
             series[original_label],
         )
-        for original_label, normalized_label
-        in zip(
+        for original_label, normalized_label in zip(
             series.keys(),
             labels,
             strict=True,
@@ -451,38 +343,18 @@ def build_exact_time_comparison(
             sort=True,
         )
 
-    value_columns = [
-        f"{label}_streamflow_m3s"
-        for label in labels
-    ]
+    value_columns = [f"{label}_streamflow_m3s" for label in labels]
 
-    comparison[
-        "all_sources_present"
-    ] = (
-        comparison[
-            value_columns
-        ]
-        .notna()
-        .all(axis=1)
-    )
+    comparison["all_sources_present"] = comparison[value_columns].notna().all(axis=1)
 
-    comparison[
-        "temporal_support_compatible"
-    ] = _vectorized_support_compatible(
+    comparison["temporal_support_compatible"] = _vectorized_support_compatible(
         comparison,
         labels,
     )
 
-    comparison[
-        "temporal_comparison_note"
-    ] = np.where(
-        comparison[
-            "temporal_support_compatible"
-        ],
-        (
-            "Sources share the same UTC timestamp "
-            "and compatible temporal support."
-        ),
+    comparison["temporal_comparison_note"] = np.where(
+        comparison["temporal_support_compatible"],
+        ("Sources share the same UTC timestamp and compatible temporal support."),
         (
             "Sources may share a UTC timestamp but "
             "do not necessarily represent the same "
@@ -490,8 +362,4 @@ def build_exact_time_comparison(
         ),
     )
 
-    return (
-        comparison
-        .sort_values("valid_time")
-        .reset_index(drop=True)
-    )
+    return comparison.sort_values("valid_time").reset_index(drop=True)

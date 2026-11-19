@@ -10,11 +10,11 @@ semantics.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import partial
 from time import perf_counter
-from typing import Callable
 
 import pandas as pd
 
@@ -28,7 +28,6 @@ from streamflow_getter.nwm.streamflow import (
 from streamflow_getter.usgs.streamflow import (
     fetch_usgs_streamflow,
 )
-
 
 DEFAULT_NWM_ANALYSIS_PRODUCTS = (
     "analysis_assim",
@@ -101,38 +100,23 @@ def _product_tuple(
 ) -> tuple[str, ...]:
     """Return normalized, unique NWM product names."""
     if isinstance(products, str):
-        raise ValueError(
-            f"{name} must be an iterable of product names"
-        )
+        raise ValueError(f"{name} must be an iterable of product names")
 
     try:
         values = tuple(products)
     except TypeError as exc:
-        raise ValueError(
-            f"{name} must be an iterable of product names"
-        ) from exc
+        raise ValueError(f"{name} must be an iterable of product names") from exc
 
     normalized = []
 
     for product in values:
-        if (
-            not isinstance(product, str)
-            or not product.strip()
-        ):
-            raise ValueError(
-                f"{name} must contain nonempty strings"
-            )
+        if not isinstance(product, str) or not product.strip():
+            raise ValueError(f"{name} must contain nonempty strings")
 
-        normalized.append(
-            product.strip()
-        )
+        normalized.append(product.strip())
 
-    if len(normalized) != len(
-        set(normalized)
-    ):
-        raise ValueError(
-            f"{name} contains duplicate products"
-        )
+    if len(normalized) != len(set(normalized)):
+        raise ValueError(f"{name} contains duplicate products")
 
     return tuple(normalized)
 
@@ -145,18 +129,13 @@ def _timed_call(
 
     frame = task.call()
 
-    elapsed = (
-        perf_counter()
-        - started
-    )
+    elapsed = perf_counter() - started
 
     if not isinstance(
         frame,
         pd.DataFrame,
     ):
-        raise TypeError(
-            f"{task.label} retrieval did not return a DataFrame"
-        )
+        raise TypeError(f"{task.label} retrieval did not return a DataFrame")
 
     return (
         frame,
@@ -170,28 +149,17 @@ def _validate_product_groups(
     forecast_reference_time,
 ) -> None:
     """Validate relationships between requested NWM product groups."""
-    overlap = set(
-        analysis_products
-    ).intersection(
-        forecast_products
-    )
+    overlap = set(analysis_products).intersection(forecast_products)
 
     if overlap:
         raise ValueError(
             "NWM products cannot be requested as both "
-            "analysis and forecast: "
-            + ", ".join(
-                sorted(overlap)
-            )
+            "analysis and forecast: " + ", ".join(sorted(overlap))
         )
 
-    if (
-        forecast_products
-        and forecast_reference_time is None
-    ):
+    if forecast_products and forecast_reference_time is None:
         raise ValueError(
-            "forecast_reference_time is required "
-            "when forecast products are requested"
+            "forecast_reference_time is required when forecast products are requested"
         )
 
 
@@ -358,6 +326,7 @@ def _build_tasks(
         tuple(omitted),
     )
 
+
 def _run_tasks(
     tasks: list[_FetchTask],
     *,
@@ -379,12 +348,7 @@ def _run_tasks(
     )
 
     if worker_count == 1:
-        completed = {
-            task.label: _timed_call(
-                task
-            )
-            for task in tasks
-        }
+        completed = {task.label: _timed_call(task) for task in tasks}
 
     else:
         with ThreadPoolExecutor(
@@ -400,17 +364,9 @@ def _run_tasks(
                 )
             )
 
-    series = {
-        label: result[0]
-        for label, result
-        in completed.items()
-    }
+    series = {label: result[0] for label, result in completed.items()}
 
-    timings = {
-        label: result[1]
-        for label, result
-        in completed.items()
-    }
+    timings = {label: result[1] for label, result in completed.items()}
 
     return (
         series,
@@ -424,9 +380,7 @@ def fetch_multi_source_streamflow(
     end_time,
     *,
     forecast_reference_time=None,
-    nwm_analysis_products=(
-        DEFAULT_NWM_ANALYSIS_PRODUCTS
-    ),
+    nwm_analysis_products=(DEFAULT_NWM_ANALYSIS_PRODUCTS),
     nwm_forecast_products=(),
     usgs_gage_id: str | None = None,
     geoglows_river_id: int | None = None,
@@ -440,9 +394,7 @@ def fetch_multi_source_streamflow(
     GEOGLOWS identifiers are normal omissions. Requested-source failures
     are propagated rather than silently ignored.
     """
-    workers = _positive_worker_count(
-        max_workers
-    )
+    workers = _positive_worker_count(max_workers)
 
     analyses = _product_tuple(
         nwm_analysis_products,
@@ -458,23 +410,17 @@ def fetch_multi_source_streamflow(
         feature_id=feature_id,
         start_time=start_time,
         end_time=end_time,
-        forecast_reference_time=(
-            forecast_reference_time
-        ),
+        forecast_reference_time=(forecast_reference_time),
         analysis_products=analyses,
         forecast_products=forecasts,
         usgs_gage_id=usgs_gage_id,
-        geoglows_river_id=(
-            geoglows_river_id
-        ),
+        geoglows_river_id=(geoglows_river_id),
         cache_dir=cache_dir,
         usgs_api_key=usgs_api_key,
     )
 
     if not tasks:
-        raise ValueError(
-            "No streamflow sources were requested"
-        )
+        raise ValueError("No streamflow sources were requested")
 
     started = perf_counter()
 
@@ -483,10 +429,7 @@ def fetch_multi_source_streamflow(
         max_workers=workers,
     )
 
-    total_elapsed = (
-        perf_counter()
-        - started
-    )
+    total_elapsed = perf_counter() - started
 
     return MultiSourceStreamflowResult(
         series=series,
