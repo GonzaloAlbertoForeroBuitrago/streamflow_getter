@@ -8,9 +8,9 @@ separate so retrieval is independent from spatial and hydrologic QA.
 from __future__ import annotations
 
 from functools import lru_cache
-import math
 import numbers
 
+import numpy as np
 import pandas as pd
 import xarray as xr
 
@@ -280,7 +280,7 @@ def fetch_geoglows_retrospective(
 
     if not (
         frame["streamflow_m3s"]
-        .map(math.isfinite)
+        .pipe(np.isfinite)
         .all()
     ):
         raise ValueError(

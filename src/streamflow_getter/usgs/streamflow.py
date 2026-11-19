@@ -12,6 +12,7 @@ import os
 from urllib.parse import urlencode, urljoin, urlsplit
 from urllib.request import Request, urlopen
 
+import numpy as np
 import pandas as pd
 
 
@@ -564,7 +565,7 @@ def fetch_usgs_streamflow(
     if frame.empty:
         return frame
 
-    if not frame["streamflow_m3s"].map(math.isfinite).all():
+    if not frame["streamflow_m3s"].pipe(np.isfinite).all():
         raise ValueError(
             "USGS discharge contains non-finite values"
         )
