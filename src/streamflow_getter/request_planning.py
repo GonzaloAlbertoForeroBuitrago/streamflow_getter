@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, UTC
 
 from streamflow_getter.operational_nwm import ForecastConfig
 
@@ -76,7 +76,7 @@ def resolve_recent_date_range(
         )
 
     if as_of is None:
-        last = datetime.now(timezone.utc).date()
+        last = datetime.now(UTC).date()
     else:
         last = _parse_iso_date(as_of, "as_of")
 

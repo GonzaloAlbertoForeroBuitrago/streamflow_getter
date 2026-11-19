@@ -236,9 +236,7 @@ def load_fresh_reference(
 
     raw = downloader()
 
-    if isinstance(raw, bytes):
-        reference = json.loads(raw)
-    elif isinstance(raw, str):
+    if isinstance(raw, bytes) or isinstance(raw, str):
         reference = json.loads(raw)
     else:
         raise TypeError("Downloader must return JSON bytes or text")

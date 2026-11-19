@@ -155,7 +155,6 @@ def _publish_manifest_payload(
 ):
     """Atomically expose a fully serialized manifest without overwrite."""
     from pathlib import Path
-    import os
     import tempfile
 
     path = Path(destination).expanduser()

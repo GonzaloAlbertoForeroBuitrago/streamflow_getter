@@ -1,7 +1,7 @@
 """Operational National Water Model version provenance."""
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, UTC
 
 from streamflow_getter.operational_nwm import ForecastConfig
 
@@ -14,7 +14,7 @@ OPERATIONAL_VERSION_BASELINE_UTC = datetime(
     1,
     1,
     0,
-    tzinfo=timezone.utc,
+    tzinfo=UTC,
 )
 
 
@@ -35,7 +35,7 @@ OPERATIONAL_VERSION_TRANSITIONS = (
             3,
             6,
             12,
-            tzinfo=timezone.utc,
+            tzinfo=UTC,
         ),
         notice="NWS SCN18-16",
     ),
@@ -46,7 +46,7 @@ OPERATIONAL_VERSION_TRANSITIONS = (
             6,
             19,
             12,
-            tzinfo=timezone.utc,
+            tzinfo=UTC,
         ),
         notice="NWS SCN19-42",
     ),
@@ -57,7 +57,7 @@ OPERATIONAL_VERSION_TRANSITIONS = (
             4,
             20,
             12,
-            tzinfo=timezone.utc,
+            tzinfo=UTC,
         ),
         notice="NWS SCN20-119",
     ),
@@ -68,7 +68,7 @@ OPERATIONAL_VERSION_TRANSITIONS = (
             9,
             20,
             12,
-            tzinfo=timezone.utc,
+            tzinfo=UTC,
         ),
         notice="NWS SCN23-76",
     ),
@@ -79,7 +79,7 @@ OPERATIONAL_VERSION_TRANSITIONS = (
             8,
             18,
             12,
-            tzinfo=timezone.utc,
+            tzinfo=UTC,
         ),
         notice="NWS SCN26-64",
     ),
@@ -104,7 +104,7 @@ def forecast_initialization_utc(
         ),
         time(
             hour=config.cycle,
-            tzinfo=timezone.utc,
+            tzinfo=UTC,
         ),
     )
 

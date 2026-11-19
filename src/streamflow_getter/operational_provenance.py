@@ -2,7 +2,7 @@
 
 from collections import Counter
 from collections.abc import Iterable, Mapping
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 import json
 import numbers
 
@@ -88,7 +88,7 @@ def _created_utc(value: str | None) -> str:
     """Return one explicit timezone-aware UTC run timestamp."""
     if value is None:
         return datetime.now(
-            timezone.utc
+            UTC
         ).isoformat()
 
     if not isinstance(value, str) or not value.strip():
@@ -117,7 +117,7 @@ def _created_utc(value: str | None) -> str:
         )
 
     return parsed.astimezone(
-        timezone.utc
+        UTC
     ).isoformat()
 
 
