@@ -322,6 +322,64 @@ def _row_support_compatible(
     ) == 1
 
 
+
+def _vectorized_support_compatible(
+    comparison: pd.DataFrame,
+    labels: list[str],
+) -> pd.Series:
+    """Check temporal compatibility across entire columns."""
+    def columns_for(suffix: str) -> pd.DataFrame:
+        return comparison[
+            [f"{label}_{suffix}" for label in labels]
+        ]
+
+    def same_values(columns: pd.DataFrame) -> pd.Series:
+        return (
+            columns.eq(columns.iloc[:, 0], axis=0)
+            .fillna(False)
+            .all(axis=1)
+            | columns.isna().all(axis=1)
+        )
+
+    present = columns_for("streamflow_m3s").notna().all(axis=1)
+
+    same_support = same_values(
+        columns_for("time_support")
+    )
+    same_aggregation = same_values(
+        columns_for("aggregation")
+    )
+
+    starts = columns_for("interval_start")
+    ends = columns_for("interval_end")
+
+    all_absent = (
+        starts.isna().all(axis=1)
+        & ends.isna().all(axis=1)
+    )
+
+    all_complete = (
+        starts.notna().all(axis=1)
+        & ends.notna().all(axis=1)
+    )
+
+    matching_intervals = (
+        all_absent
+        | (
+            all_complete
+            & same_values(starts)
+            & same_values(ends)
+        )
+    )
+
+    return (
+        present
+        & same_support
+        & same_aggregation
+        & matching_intervals
+    ).astype(bool)
+
+
 def _comparison_labels(
     series: Mapping[
         str,
@@ -410,10 +468,9 @@ def build_exact_time_comparison(
 
     comparison[
         "temporal_support_compatible"
-    ] = comparison.apply(
-        _row_support_compatible,
-        axis=1,
-        labels=labels,
+    ] = _vectorized_support_compatible(
+        comparison,
+        labels,
     )
 
     comparison[
