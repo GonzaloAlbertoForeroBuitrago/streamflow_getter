@@ -579,3 +579,48 @@ def test_geoglows_cleanup_preserves_validation_error(monkeypatch):
         )
     finally:
         adapter.clear_geoglows_dataset_cache()
+
+
+def test_concurrent_geoglows_open_reuses_one_dataset(monkeypatch):
+    """Simultaneous cache misses must share one dataset instance."""
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier, Lock
+    import time
+
+    from streamflow_getter.geoglows import streamflow as adapter
+
+    adapter.clear_geoglows_dataset_cache()
+
+    barrier = Barrier(6)
+    counter_lock = Lock()
+    opens = []
+
+    def fake_open(*args, **kwargs):
+        with counter_lock:
+            opens.append(1)
+        time.sleep(0.03)
+        return fake_dataset()
+
+    monkeypatch.setattr(
+        adapter.xr,
+        "open_dataset",
+        fake_open,
+    )
+
+    def worker(_):
+        barrier.wait()
+        return adapter.open_geoglows_retrospective_dataset()
+
+    try:
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            datasets = list(executor.map(worker, range(6)))
+
+        assert len(opens) == 1
+        assert len({id(dataset) for dataset in datasets}) == 1
+        assert (
+            adapter.open_geoglows_retrospective_dataset
+            .cache_info()
+            .currsize == 1
+        )
+    finally:
+        adapter.clear_geoglows_dataset_cache()

@@ -8,6 +8,7 @@ separate so retrieval is independent from spatial and hydrologic QA.
 from __future__ import annotations
 
 from functools import lru_cache
+from threading import Lock
 import numbers
 
 import numpy as np
@@ -89,8 +90,11 @@ def _utc_hour(
     return timestamp
 
 
+_DATASET_OPEN_LOCK = Lock()
+
+
 @lru_cache(maxsize=2)
-def open_geoglows_retrospective_dataset(
+def _cached_open_geoglows_retrospective_dataset(
     dataset_uri: str = GEOGLOWS_V2_HOURLY_ZARR,
 ) -> xr.Dataset:
     """Open and cache a remote GEOGLOWS hourly retrospective dataset."""
@@ -163,6 +167,32 @@ def open_geoglows_retrospective_dataset(
         raise
 
     return dataset
+
+
+
+def open_geoglows_retrospective_dataset(
+    dataset_uri: str = GEOGLOWS_V2_HOURLY_ZARR,
+) -> xr.Dataset:
+    """Reuse one validated dataset per cached URI under concurrency."""
+    with _DATASET_OPEN_LOCK:
+        return _cached_open_geoglows_retrospective_dataset(
+            dataset_uri
+        )
+
+
+def _clear_cached_geoglows_datasets() -> None:
+    """Invalidate cached handles without closing active datasets."""
+    with _DATASET_OPEN_LOCK:
+        _cached_open_geoglows_retrospective_dataset.cache_clear()
+
+
+# Preserve existing cache inspection and invalidation interfaces.
+open_geoglows_retrospective_dataset.cache_info = (
+    _cached_open_geoglows_retrospective_dataset.cache_info
+)
+open_geoglows_retrospective_dataset.cache_clear = (
+    _clear_cached_geoglows_datasets
+)
 
 
 def clear_geoglows_dataset_cache() -> None:
