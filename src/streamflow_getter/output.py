@@ -1,6 +1,7 @@
 
 """CSV and Parquet output for streamflow time series."""
 
+from contextlib import suppress
 import os
 import tempfile
 from pathlib import Path
@@ -201,14 +202,10 @@ def _publish_manifest_payload(
 
     finally:
         if temporary_path is not None:
-            try:
-                temporary_path.unlink(
-                    missing_ok=True
-                )
-            except OSError:
-                # A leaked hidden temporary file is preferable to turning
-                # a successfully published manifest into a false failure.
-                pass
+            # A leaked hidden temporary file is preferable to turning
+            # a successfully published manifest into a false failure.
+            with suppress(OSError):
+                temporary_path.unlink(missing_ok=True)
 
 
 def write_manifest(
@@ -312,13 +309,11 @@ def write_timeseries_with_manifest(
                 missing_ok=True
             )
         except OSError as cleanup_error:
-            try:
+            with suppress(AttributeError):
                 exc.add_note(
                     "Failed to remove data output after "
                     f"manifest publication failure: {cleanup_error}"
                 )
-            except AttributeError:
-                pass
 
         raise
 
