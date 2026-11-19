@@ -58,10 +58,7 @@ def valid_byte_range(value, templates=None) -> bool:
     if type(offset) is not int or offset < 0:
         return False
 
-    if type(length) is not int or length <= 0:
-        return False
-
-    return True
+    return type(length) is int and length > 0
 
 
 def validate_reference(reference) -> bool:

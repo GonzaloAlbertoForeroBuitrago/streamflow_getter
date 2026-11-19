@@ -662,21 +662,23 @@ def read_native_forecast(
     source = resolve_operational_source(config, hour)
     url = source["native_url"]
 
-    with fsspec.open(
-        url,
-        mode="rb",
-        block_size=1024 * 1024,
-        cache_type="bytes",
-    ) as remote_file:
-        with xr.open_dataset(remote_file, engine="h5netcdf") as ds:
-            flows = extract_streamflow(ds, reach_ids)
-            valid_time = ds.time.values[0]
-            reference_time = ds.reference_time.values[0]
+    with (
+        fsspec.open(
+            url,
+            mode="rb",
+            block_size=1024 * 1024,
+            cache_type="bytes",
+        ) as remote_file,
+        xr.open_dataset(remote_file, engine="h5netcdf") as ds,
+    ):
+        flows = extract_streamflow(ds, reach_ids)
+        valid_time = ds.time.values[0]
+        reference_time = ds.reference_time.values[0]
 
-            if hour == 0:
-                config.validate_analysis_timestamps(valid_time, reference_time)
-            else:
-                config.validate_timestamps(hour, valid_time, reference_time)
+        if hour == 0:
+            config.validate_analysis_timestamps(valid_time, reference_time)
+        else:
+            config.validate_timestamps(hour, valid_time, reference_time)
 
     return {
         "forecast_date": config.date,
