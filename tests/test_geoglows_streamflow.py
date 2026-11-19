@@ -515,3 +515,67 @@ def test_nonfinite_streamflow_is_rejected(
                 "2025-07-04T12:00:00Z",
             )
         )
+
+
+def test_invalid_geoglows_dataset_closes_resources(monkeypatch):
+    """A dataset rejected during validation releases its resources."""
+    import xarray as xr
+    from streamflow_getter.geoglows import streamflow as adapter
+
+    closed = []
+    dataset = xr.Dataset()
+    dataset.set_close(lambda: closed.append(True))
+
+    monkeypatch.setattr(
+        adapter.xr,
+        "open_dataset",
+        lambda *args, **kwargs: dataset,
+    )
+
+    adapter.clear_geoglows_dataset_cache()
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="does not contain Q",
+        ):
+            adapter.open_geoglows_retrospective_dataset()
+
+        assert closed == [True]
+    finally:
+        adapter.clear_geoglows_dataset_cache()
+
+
+def test_geoglows_cleanup_preserves_validation_error(monkeypatch):
+    """A failed close must not mask the validation exception."""
+    import xarray as xr
+    from streamflow_getter.geoglows import streamflow as adapter
+
+    dataset = xr.Dataset()
+
+    def failing_close():
+        raise OSError("simulated close failure")
+
+    dataset.set_close(failing_close)
+
+    monkeypatch.setattr(
+        adapter.xr,
+        "open_dataset",
+        lambda *args, **kwargs: dataset,
+    )
+
+    adapter.clear_geoglows_dataset_cache()
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match="does not contain Q",
+        ) as error:
+            adapter.open_geoglows_retrospective_dataset()
+
+        assert any(
+            "simulated close failure" in note
+            for note in error.value.__notes__
+        )
+    finally:
+        adapter.clear_geoglows_dataset_cache()

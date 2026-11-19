@@ -110,46 +110,57 @@ def open_geoglows_retrospective_dataset(
         },
     )
 
-    if "Q" not in dataset:
-        raise ValueError(
-            "GEOGLOWS dataset does not contain Q"
-        )
+    try:
+        if "Q" not in dataset:
+            raise ValueError(
+                "GEOGLOWS dataset does not contain Q"
+            )
 
-    discharge = dataset["Q"]
+        discharge = dataset["Q"]
 
-    if not {
-        "time",
-        "river_id",
-    }.issubset(discharge.dims):
-        raise ValueError(
-            "GEOGLOWS Q must use time and river_id dimensions"
-        )
+        if not {
+            "time",
+            "river_id",
+        }.issubset(discharge.dims):
+            raise ValueError(
+                "GEOGLOWS Q must use time and river_id dimensions"
+            )
 
-    units = str(
-        discharge.attrs.get(
-            "units",
-            "",
-        )
-    ).strip()
+        units = str(
+            discharge.attrs.get(
+                "units",
+                "",
+            )
+        ).strip()
 
-    if units not in _ACCEPTED_DISCHARGE_UNITS:
-        raise ValueError(
-            "Unexpected GEOGLOWS discharge units: "
-            f"{units!r}"
-        )
+        if units not in _ACCEPTED_DISCHARGE_UNITS:
+            raise ValueError(
+                "Unexpected GEOGLOWS discharge units: "
+                f"{units!r}"
+            )
 
-    aggregation = str(
-        discharge.attrs.get(
-            "aggregation_method",
-            "",
-        )
-    ).strip().casefold()
+        aggregation = str(
+            discharge.attrs.get(
+                "aggregation_method",
+                "",
+            )
+        ).strip().casefold()
 
-    if aggregation != "mean":
-        raise ValueError(
-            "Unexpected GEOGLOWS aggregation method: "
-            f"{aggregation!r}"
-        )
+        if aggregation != "mean":
+            raise ValueError(
+                "Unexpected GEOGLOWS aggregation method: "
+                f"{aggregation!r}"
+            )
+
+    except Exception as validation_error:
+        try:
+            dataset.close()
+        except Exception as cleanup_error:
+            validation_error.add_note(
+                "GEOGLOWS dataset cleanup failed: "
+                f"{type(cleanup_error).__name__}: {cleanup_error}"
+            )
+        raise
 
     return dataset
 
@@ -218,15 +229,7 @@ def fetch_geoglows_retrospective(
                 start_naive,
                 end_naive,
             ),
-        )
-    except KeyError as exc:
-        raise ValueError(
-            "GEOGLOWS river ID not found: "
-            f"{river}"
-        ) from exc
-
-    try:
-        selected = selected.load()
+        ).load()
     except KeyError as exc:
         raise ValueError(
             "GEOGLOWS river ID not found: "
