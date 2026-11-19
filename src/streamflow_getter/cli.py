@@ -683,13 +683,14 @@ def main(argv: list[str] | None = None) -> int:
                 "directory": args.cache_dir,
             }
 
-        try:
-            from importlib.metadata import version
+        from importlib.metadata import (
+            PackageNotFoundError,
+            version,
+        )
 
-            package_version = version(
-                "streamflow-getter"
-            )
-        except Exception:
+        try:
+            package_version = version("streamflow-getter")
+        except PackageNotFoundError:
             package_version = "unknown"
 
         manifest_selection = {
