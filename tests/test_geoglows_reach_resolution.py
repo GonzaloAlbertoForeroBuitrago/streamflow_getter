@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from streamflow_getter.experimental import (
-    geoglows_reach_resolution,
+from streamflow_getter.geoglows import (
+    reach_resolution as geoglows_reach_resolution,
 )
 
 

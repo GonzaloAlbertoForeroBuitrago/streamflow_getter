@@ -3,8 +3,8 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from streamflow_getter.experimental import (
-    geoglows_streamflow,
+from streamflow_getter.geoglows import (
+    streamflow as geoglows_streamflow,
 )
 
 

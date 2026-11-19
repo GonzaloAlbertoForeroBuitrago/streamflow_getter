@@ -1,8 +1,8 @@
-"""Experimental GEOGLOWS retrospective streamflow access.
+"""GEOGLOWS retrospective streamflow retrieval.
 
-This adapter reads the RFS V2 hourly retrospective directly from the
-public Zarr store. River matching is intentionally handled separately so
-data retrieval can remain independent from spatial/hydrologic QA.
+Experimental integration. This adapter reads the RFS V2 hourly
+retrospective directly from the public Zarr store. River matching remains
+separate so retrieval is independent from spatial and hydrologic QA.
 """
 
 from __future__ import annotations

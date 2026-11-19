@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from streamflow_getter import nwm_streamflow
+from streamflow_getter.nwm import streamflow as nwm_streamflow
 
 
 def operational_frame(

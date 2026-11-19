@@ -1,8 +1,8 @@
-"""Experimental GEOGLOWS river-reach resolution.
+"""GEOGLOWS river-reach resolution.
 
-This module discovers nearby GEOGLOWS river geometries and reports
-spatial/hydrographic evidence. Streamflow retrieval and cross-source
-basin comparison remain separate concerns.
+Experimental integration. This module discovers nearby GEOGLOWS river
+geometries and reports spatial and hydrographic evidence. Streamflow
+retrieval and cross-source basin comparison remain separate concerns.
 """
 
 from __future__ import annotations

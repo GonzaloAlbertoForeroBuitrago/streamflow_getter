@@ -4,7 +4,7 @@ from urllib.parse import parse_qs, urlsplit
 import pandas as pd
 import pytest
 
-from streamflow_getter import usgs_streamflow
+from streamflow_getter.usgs import streamflow as usgs_streamflow
 
 
 class FakeResponse:
