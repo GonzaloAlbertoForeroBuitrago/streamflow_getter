@@ -444,7 +444,7 @@ def extract_streamflow(ds, reach_ids: list[int]) -> dict[int, float]:
         raise ValueError("Unexpected streamflow shape")
     if not np.isfinite(flows).all():
         raise ValueError("Non-finite streamflow values found")
-    return {reach: float(flow) for reach, flow in zip(requested, flows)}
+    return {reach: float(flow) for reach, flow in zip(requested, flows, strict=True)}
 
 def prepare_operational_reference(
     config: ForecastConfig,

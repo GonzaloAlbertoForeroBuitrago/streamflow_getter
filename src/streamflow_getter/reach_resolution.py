@@ -28,7 +28,7 @@ def build_gage_index(ds: xr.Dataset) -> dict[str, int]:
 
     mapping = defaultdict(set)
 
-    for link, raw_gage in zip(links, gages):
+    for link, raw_gage in zip(links, gages, strict=True):
         if isinstance(raw_gage, bytes):
             gage = raw_gage.decode("utf-8").strip()
         else:
