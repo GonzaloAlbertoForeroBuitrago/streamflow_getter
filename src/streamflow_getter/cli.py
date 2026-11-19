@@ -201,6 +201,56 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _validate_operational_reach_arguments(args) -> None:
+    """Validate operational reach-selection CLI arguments."""
+    # Validate reach-selection arguments before remote NWM access.
+    if not (
+        args.reach or args.gage or args.point
+        or args.bbox or args.polygon
+    ):
+        raise ValueError(
+            "Provide at least one --reach, --gage, "
+            "--point, --bbox, or --polygon"
+        )
+
+    if (
+        args.point or args.bbox or args.polygon
+    ) and not args.hydrofabric:
+        raise ValueError(
+            "--hydrofabric is required for geographic selection"
+        )
+
+    if args.point and (
+        not math.isfinite(args.max_distance_m)
+        or args.max_distance_m <= 0
+    ):
+        raise ValueError(
+            "max_distance_m must be positive and finite"
+        )
+
+    if args.hydrofabric and not (
+        args.point or args.bbox or args.polygon
+    ):
+        raise ValueError(
+            "--hydrofabric requires --point, --bbox, or --polygon"
+        )
+
+    if args.max_reaches < 1:
+        raise ValueError(
+            "max_reaches must be a positive integer"
+        )
+
+    if args.gage and not args.routelink:
+        raise ValueError(
+            "--routelink is required when using --gage"
+        )
+
+    if args.routelink and not args.gage:
+        raise ValueError(
+            "--routelink requires at least one --gage"
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -369,52 +419,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"Manifest already exists: {manifest_destination_path}"
             )
 
-        # Validate reach-selection arguments before remote NWM access.
-        if not (
-            args.reach or args.gage or args.point
-            or args.bbox or args.polygon
-        ):
-            raise ValueError(
-                "Provide at least one --reach, --gage, "
-                "--point, --bbox, or --polygon"
-            )
-
-        if (
-            args.point or args.bbox or args.polygon
-        ) and not args.hydrofabric:
-            raise ValueError(
-                "--hydrofabric is required for geographic selection"
-            )
-
-        if args.point and (
-            not math.isfinite(args.max_distance_m)
-            or args.max_distance_m <= 0
-        ):
-            raise ValueError(
-                "max_distance_m must be positive and finite"
-            )
-
-        if args.hydrofabric and not (
-            args.point or args.bbox or args.polygon
-        ):
-            raise ValueError(
-                "--hydrofabric requires --point, --bbox, or --polygon"
-            )
-
-        if args.max_reaches < 1:
-            raise ValueError(
-                "max_reaches must be a positive integer"
-            )
-
-        if args.gage and not args.routelink:
-            raise ValueError(
-                "--routelink is required when using --gage"
-            )
-
-        if args.routelink and not args.gage:
-            raise ValueError(
-                "--routelink requires at least one --gage"
-            )
+        _validate_operational_reach_arguments(args)
 
         reaches = list(args.reach)
         routelink_selection = None
