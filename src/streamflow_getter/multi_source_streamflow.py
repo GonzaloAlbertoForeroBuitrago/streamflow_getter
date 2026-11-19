@@ -391,20 +391,14 @@ def _run_tasks(
             max_workers=worker_count,
             thread_name_prefix="streamflow-getter",
         ) as executor:
-            futures = {
-                task.label: executor.submit(
-                    _timed_call,
-                    task,
+            results = executor.map(_timed_call, tasks)
+            completed = dict(
+                zip(
+                    (task.label for task in tasks),
+                    results,
+                    strict=True,
                 )
-                for task in tasks
-            }
-
-            completed = {
-                task.label: futures[
-                    task.label
-                ].result()
-                for task in tasks
-            }
+            )
 
     series = {
         label: result[0]

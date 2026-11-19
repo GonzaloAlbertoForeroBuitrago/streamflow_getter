@@ -501,3 +501,49 @@ def test_worker_count_above_maximum_is_rejected(
                 max_workers=8,
             )
         )
+
+
+def test_run_tasks_preserves_completion_order_and_errors():
+    """Parallel completion must preserve request order and failures."""
+    import time
+
+    from streamflow_getter.multi_source_streamflow import (
+        _FetchTask,
+        _run_tasks,
+    )
+
+    def make_task(label, delay):
+        def retrieve():
+            time.sleep(delay)
+            return pd.DataFrame({"value": [label]})
+
+        return _FetchTask(label=label, call=retrieve)
+
+    tasks = [
+        make_task("slow", 0.03),
+        make_task("fast", 0.0),
+        make_task("middle", 0.01),
+    ]
+
+    series, timings = _run_tasks(tasks, max_workers=3)
+
+    assert list(series) == ["slow", "fast", "middle"]
+    assert list(timings) == ["slow", "fast", "middle"]
+
+    for label in series:
+        assert series[label]["value"].iloc[0] == label
+        assert timings[label] >= 0
+
+    def failure():
+        raise RuntimeError("expected retrieval failure")
+
+    failing_tasks = [
+        make_task("valid", 0.0),
+        _FetchTask(label="failing", call=failure),
+    ]
+
+    with pytest.raises(
+        RuntimeError,
+        match="expected retrieval failure",
+    ):
+        _run_tasks(failing_tasks, max_workers=2)
