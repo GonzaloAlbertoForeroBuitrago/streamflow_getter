@@ -41,6 +41,10 @@ DEFAULT_NWM_FORECAST_PRODUCTS = (
     "medium_range_no_da",
 )
 
+DEFAULT_MAX_WORKERS = 4
+RECOMMENDED_MIN_WORKERS = 4
+MAX_WORKERS = 7
+
 
 @dataclass(frozen=True, slots=True)
 class MultiSourceStreamflowResult:
@@ -71,14 +75,20 @@ class _FetchTask:
 def _positive_worker_count(
     value: int,
 ) -> int:
-    """Return a validated positive thread count."""
+    """Return a validated retrieval-worker count."""
     if (
         isinstance(value, bool)
         or not isinstance(value, int)
         or value <= 0
+        or value > MAX_WORKERS
     ):
         raise ValueError(
-            "max_workers must be a positive integer"
+            "max_workers must be an integer from 1 through "
+            f"{MAX_WORKERS}. The conservative default is "
+            f"{DEFAULT_MAX_WORKERS}; values from "
+            f"{RECOMMENDED_MIN_WORKERS} through "
+            f"{MAX_WORKERS} are recommended for the current "
+            "multi-source workflow."
         )
 
     return value
@@ -428,7 +438,7 @@ def fetch_multi_source_streamflow(
     geoglows_river_id: int | None = None,
     cache_dir=None,
     usgs_api_key: str | None = None,
-    max_workers: int = 4,
+    max_workers: int = DEFAULT_MAX_WORKERS,
 ) -> MultiSourceStreamflowResult:
     """Retrieve independent streamflow sources concurrently.
 

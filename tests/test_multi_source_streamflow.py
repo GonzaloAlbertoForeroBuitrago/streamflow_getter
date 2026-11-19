@@ -402,7 +402,7 @@ def test_invalid_worker_count(
 
     with pytest.raises(
         ValueError,
-        match="positive integer",
+        match="integer from 1 through 7",
     ):
         (
             multi_source_streamflow
@@ -433,5 +433,71 @@ def test_no_sources_is_rejected(
                 "2025-07-04T07:00:00Z",
                 "2025-07-04T10:00:00Z",
                 nwm_analysis_products=(),
+            )
+        )
+
+
+def test_worker_policy_constants():
+    assert (
+        multi_source_streamflow
+        .DEFAULT_MAX_WORKERS
+        == 4
+    )
+
+    assert (
+        multi_source_streamflow
+        .RECOMMENDED_MIN_WORKERS
+        == 4
+    )
+
+    assert (
+        multi_source_streamflow
+        .MAX_WORKERS
+        == 7
+    )
+
+
+def test_workers_above_task_count_are_safely_capped(
+    monkeypatch,
+):
+    _install_fetchers(
+        monkeypatch
+    )
+
+    result = (
+        multi_source_streamflow
+        .fetch_multi_source_streamflow(
+            3586192,
+            "2025-07-04T07:00:00Z",
+            "2025-07-04T10:00:00Z",
+            max_workers=7,
+        )
+    )
+
+    assert result.requested_sources == (
+        "analysis_assim",
+        "analysis_assim_no_da",
+    )
+
+
+
+def test_worker_count_above_maximum_is_rejected(
+    monkeypatch,
+):
+    _install_fetchers(
+        monkeypatch
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="1 through 7",
+    ):
+        (
+            multi_source_streamflow
+            .fetch_multi_source_streamflow(
+                3586192,
+                "2025-07-04T07:00:00Z",
+                "2025-07-04T10:00:00Z",
+                max_workers=8,
             )
         )
