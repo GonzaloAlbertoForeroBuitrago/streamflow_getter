@@ -7,6 +7,8 @@ import xarray as xr
 from streamflow_getter.reach_resolution import (
     build_gage_index,
     resolve_gages,
+    build_nwm_to_usgs_index,
+    resolve_nwm_reach_to_usgs,
 )
 
 
@@ -425,3 +427,105 @@ def test_routelink_compatibility_tracks_unresolved_request():
         ["3.1", None],
         "3.1",
     ) == "unresolved_request_version"
+
+def test_build_nwm_to_usgs_index():
+    gage_index = {
+        "08165500": 3586192,
+        "01646500": 1234567,
+    }
+
+    result = build_nwm_to_usgs_index(
+        gage_index
+    )
+
+    assert result == {
+        3586192: "08165500",
+        1234567: "01646500",
+    }
+
+
+def test_build_nwm_to_usgs_preserves_leading_zero():
+    result = build_nwm_to_usgs_index({
+        "08165500": 3586192,
+    })
+
+    assert result[3586192] == "08165500"
+
+
+def test_build_nwm_to_usgs_rejects_ambiguous_reach():
+    with pytest.raises(
+        ValueError,
+        match="Multiple USGS gages map",
+    ):
+        build_nwm_to_usgs_index({
+            "08165500": 3586192,
+            "08165501": 3586192,
+        })
+
+
+def test_build_nwm_to_usgs_requires_dictionary():
+    with pytest.raises(
+        TypeError,
+        match="gage_index must be a dictionary",
+    ):
+        build_nwm_to_usgs_index(
+            [("08165500", 3586192)]
+        )
+
+
+def test_resolve_nwm_reach_to_usgs():
+    index = {
+        3586192: "08165500",
+    }
+
+    assert (
+        resolve_nwm_reach_to_usgs(
+            3586192,
+            index,
+        )
+        == "08165500"
+    )
+
+
+def test_resolve_unmapped_nwm_reach_returns_none():
+    assert (
+        resolve_nwm_reach_to_usgs(
+            9999999,
+            {3586192: "08165500"},
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "feature_id",
+    [
+        0,
+        -1,
+        True,
+        3586192.0,
+        "3586192",
+    ],
+)
+def test_resolve_nwm_reach_rejects_invalid_id(
+    feature_id,
+):
+    with pytest.raises(
+        ValueError,
+        match="positive integer",
+    ):
+        resolve_nwm_reach_to_usgs(
+            feature_id,
+            {},
+        )
+
+
+def test_resolve_nwm_reach_requires_dictionary():
+    with pytest.raises(
+        TypeError,
+        match="index must be a dictionary",
+    ):
+        resolve_nwm_reach_to_usgs(
+            3586192,
+            [],
+        )

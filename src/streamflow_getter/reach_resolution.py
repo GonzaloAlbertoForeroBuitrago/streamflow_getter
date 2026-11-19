@@ -74,6 +74,83 @@ def resolve_gages(
     return result
 
 
+def build_nwm_to_usgs_index(
+    gage_index: dict[str, int],
+) -> dict[int, str]:
+    """Invert a validated USGS-gage-to-NWM-reach index.
+
+    USGS identifiers remain strings so leading zeros are preserved.
+    A reach associated with more than one distinct gage is rejected
+    rather than silently choosing one mapping.
+    """
+    if not isinstance(gage_index, dict):
+        raise TypeError("gage_index must be a dictionary")
+
+    reverse: dict[int, str] = {}
+
+    for gage_id, feature_id in gage_index.items():
+        if not isinstance(gage_id, str) or not gage_id.strip():
+            raise ValueError(
+                "USGS gage IDs must be nonempty strings"
+            )
+
+        if (
+            isinstance(feature_id, bool)
+            or not isinstance(feature_id, int)
+            or feature_id <= 0
+        ):
+            raise ValueError(
+                "NWM feature IDs must be positive integers"
+            )
+
+        normalized_gage = gage_id.strip()
+        existing_gage = reverse.get(feature_id)
+
+        if (
+            existing_gage is not None
+            and existing_gage != normalized_gage
+        ):
+            raise ValueError(
+                "Multiple USGS gages map to NWM feature ID "
+                f"{feature_id}: "
+                f"{existing_gage}, {normalized_gage}"
+            )
+
+        reverse[feature_id] = normalized_gage
+
+    return reverse
+
+
+def resolve_nwm_reach_to_usgs(
+    feature_id: int,
+    index: dict[int, str],
+) -> str | None:
+    """Return the USGS gage mapped to an NWM reach, if available."""
+    if (
+        isinstance(feature_id, bool)
+        or not isinstance(feature_id, int)
+        or feature_id <= 0
+    ):
+        raise ValueError(
+            "NWM feature ID must be a positive integer"
+        )
+
+    if not isinstance(index, dict):
+        raise TypeError(
+            "index must be a dictionary"
+        )
+
+    gage_id = index.get(feature_id)
+
+    if gage_id is None:
+        return None
+
+    if not isinstance(gage_id, str) or not gage_id.strip():
+        raise ValueError(
+            "Mapped USGS gage ID must be a nonempty string"
+        )
+
+    return gage_id.strip()
 
 def load_gage_index(
     path,
