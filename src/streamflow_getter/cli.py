@@ -440,6 +440,104 @@ def _extend_operational_geographic_reaches(args, reaches: list[int]) -> None:
         )
 
 
+def _extend_operational_gage_reaches(args, configs, reaches: list[int]):
+    """Resolve USGS gages and record RouteLink provenance."""
+    routelink_selection = None
+
+    # Resolve USGS gages through the local RouteLink index.
+    if args.gage:
+        from streamflow_getter.operational_versions import (
+            resolve_operational_nwm_version,
+        )
+        from streamflow_getter.reach_resolution import (
+            classify_gage_index_version,
+            load_gage_index,
+            resolve_gages,
+            validate_routelink_compatibility,
+        )
+
+        index = load_gage_index(
+            args.routelink
+        )
+
+        routelink_provenance = (
+            classify_gage_index_version(
+                index
+            )
+        )
+
+        request_versions = [
+            resolve_operational_nwm_version(
+                config
+            )
+            for config in configs
+        ]
+
+        compatibility = (
+            validate_routelink_compatibility(
+                request_versions,
+                routelink_provenance[
+                    "network_version"
+                ],
+            )
+        )
+
+        resolved = resolve_gages(
+            args.gage,
+            index,
+        )
+
+        reaches.extend(
+            resolved.values()
+        )
+
+        resolved_versions = sorted({
+            version
+            for version in request_versions
+            if version is not None
+        })
+
+        routelink_selection = {
+            "gage_resolution": {
+                "gage_ids": list(
+                    args.gage
+                ),
+                "resolved_gages": dict(
+                    resolved
+                ),
+                "routelink": {
+                    "file_name": Path(
+                        args.routelink
+                    ).expanduser().name,
+                    "crosswalk_sha256":
+                        routelink_provenance[
+                            "crosswalk_sha256"
+                        ],
+                    "network_version":
+                        routelink_provenance[
+                            "network_version"
+                        ],
+                    "gage_count":
+                        routelink_provenance[
+                            "gage_count"
+                        ],
+                    "compatibility":
+                        compatibility,
+                    "requested_nwm_versions":
+                        resolved_versions,
+                    "unresolved_request_version_count":
+                        sum(
+                            version is None
+                            for version
+                            in request_versions
+                        ),
+                },
+            },
+        }
+
+    return routelink_selection
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -534,100 +632,10 @@ def main(argv: list[str] | None = None) -> int:
         _validate_operational_reach_arguments(args)
 
         reaches = list(args.reach)
-        routelink_selection = None
 
         _extend_operational_geographic_reaches(args, reaches)
 
-        # Resolve USGS gages through the local RouteLink index.
-        if args.gage:
-            from streamflow_getter.operational_versions import (
-                resolve_operational_nwm_version,
-            )
-            from streamflow_getter.reach_resolution import (
-                classify_gage_index_version,
-                load_gage_index,
-                resolve_gages,
-                validate_routelink_compatibility,
-            )
-
-            index = load_gage_index(
-                args.routelink
-            )
-
-            routelink_provenance = (
-                classify_gage_index_version(
-                    index
-                )
-            )
-
-            request_versions = [
-                resolve_operational_nwm_version(
-                    config
-                )
-                for config in configs
-            ]
-
-            compatibility = (
-                validate_routelink_compatibility(
-                    request_versions,
-                    routelink_provenance[
-                        "network_version"
-                    ],
-                )
-            )
-
-            resolved = resolve_gages(
-                args.gage,
-                index,
-            )
-
-            reaches.extend(
-                resolved.values()
-            )
-
-            resolved_versions = sorted({
-                version
-                for version in request_versions
-                if version is not None
-            })
-
-            routelink_selection = {
-                "gage_resolution": {
-                    "gage_ids": list(
-                        args.gage
-                    ),
-                    "resolved_gages": dict(
-                        resolved
-                    ),
-                    "routelink": {
-                        "file_name": Path(
-                            args.routelink
-                        ).expanduser().name,
-                        "crosswalk_sha256":
-                            routelink_provenance[
-                                "crosswalk_sha256"
-                            ],
-                        "network_version":
-                            routelink_provenance[
-                                "network_version"
-                            ],
-                        "gage_count":
-                            routelink_provenance[
-                                "gage_count"
-                            ],
-                        "compatibility":
-                            compatibility,
-                        "requested_nwm_versions":
-                            resolved_versions,
-                        "unresolved_request_version_count":
-                            sum(
-                                version is None
-                                for version
-                                in request_versions
-                            ),
-                    },
-                },
-            }
+        routelink_selection = _extend_operational_gage_reaches(args, configs, reaches)
 
         # Validate the combined reach selection.
         if any(reach <= 0 for reach in reaches):
