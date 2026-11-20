@@ -388,6 +388,35 @@ def resolve_operational_source(
         "lead_hour": hour,
     }
 
+def _resolve_nwm_feature_indices(ds, requested: list[int]) -> list[int]:
+    """Resolve requested NWM feature IDs to dataset positions."""
+    if "feature_id" not in ds or "streamflow" not in ds:
+        raise ValueError("NWM dataset requires feature_id and streamflow")
+    ids = np.asarray(ds["feature_id"].values)
+    if ids.ndim != 1:
+        raise ValueError("feature_id must be one-dimensional")
+
+    mapping = {}
+    wanted = set(requested)
+    for position, raw_id in enumerate(ids):
+        if isinstance(raw_id, (bool, np.bool_)) or not isinstance(
+            raw_id, numbers.Integral
+        ):
+            raise ValueError("NWM feature IDs must be integers")
+        feature_id = int(raw_id)
+        if feature_id in wanted:
+            if feature_id in mapping:
+                raise ValueError(f"Duplicate feature ID {feature_id}")
+            mapping[feature_id] = position
+
+    missing = wanted - mapping.keys()
+    if missing:
+        raise ValueError(f"Missing reaches: {sorted(missing)}")
+    indices = [mapping[reach] for reach in requested]
+
+    return indices
+
+
 def extract_streamflow(ds, reach_ids: list[int]) -> dict[int, float]:
     """Extract one-timestep streamflow by exact NWM feature ID.
 
@@ -412,29 +441,7 @@ def extract_streamflow(ds, reach_ids: list[int]) -> dict[int, float]:
     if len(requested) != len(set(requested)):
         raise ValueError("Duplicate reach IDs are not allowed")
 
-    if "feature_id" not in ds or "streamflow" not in ds:
-        raise ValueError("NWM dataset requires feature_id and streamflow")
-    ids = np.asarray(ds["feature_id"].values)
-    if ids.ndim != 1:
-        raise ValueError("feature_id must be one-dimensional")
-
-    mapping = {}
-    wanted = set(requested)
-    for position, raw_id in enumerate(ids):
-        if isinstance(raw_id, (bool, np.bool_)) or not isinstance(
-            raw_id, numbers.Integral
-        ):
-            raise ValueError("NWM feature IDs must be integers")
-        feature_id = int(raw_id)
-        if feature_id in wanted:
-            if feature_id in mapping:
-                raise ValueError(f"Duplicate feature ID {feature_id}")
-            mapping[feature_id] = position
-
-    missing = wanted - mapping.keys()
-    if missing:
-        raise ValueError(f"Missing reaches: {sorted(missing)}")
-    indices = [mapping[reach] for reach in requested]
+    indices = _resolve_nwm_feature_indices(ds, requested)
     selected_ids = np.asarray(ds["feature_id"].isel(feature_id=indices).values)
     if not np.array_equal(selected_ids, np.asarray(requested)):
         raise ValueError("Feature-ID mismatch during streamflow extraction")
