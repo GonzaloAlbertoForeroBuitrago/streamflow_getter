@@ -321,26 +321,8 @@ def reaches_in_polygon(
 
 
 
-def load_geojson_polygon(path):
-    """Load one valid Polygon or MultiPolygon from GeoJSON.
-
-    Accepts a GeoJSON geometry, Feature, or FeatureCollection
-    containing exactly one feature.
-
-    Coordinates must be geographic longitude/latitude (EPSG:4326).
-    """
-    import json
-
-    from shapely.geometry import MultiPolygon, Polygon, shape
-
-    path = Path(path)
-
-    if not path.is_file():
-        raise FileNotFoundError(f"GeoJSON file not found: {path}")
-
-    with path.open("r", encoding="utf-8") as file:
-        data = json.load(file)
-
+def _extract_geojson_polygon_geometry(data):
+    """Extract a Polygon or MultiPolygon definition from GeoJSON."""
     if not isinstance(data, dict):
         raise ValueError("GeoJSON root must be an object")
 
@@ -374,6 +356,31 @@ def load_geojson_polygon(path):
         raise ValueError(
             "GeoJSON geometry must be Polygon or MultiPolygon"
         )
+
+    return geometry_data
+
+
+def load_geojson_polygon(path):
+    """Load one valid Polygon or MultiPolygon from GeoJSON.
+
+    Accepts a GeoJSON geometry, Feature, or FeatureCollection
+    containing exactly one feature.
+
+    Coordinates must be geographic longitude/latitude (EPSG:4326).
+    """
+    import json
+
+    from shapely.geometry import MultiPolygon, Polygon, shape
+
+    path = Path(path)
+
+    if not path.is_file():
+        raise FileNotFoundError(f"GeoJSON file not found: {path}")
+
+    with path.open("r", encoding="utf-8") as file:
+        data = json.load(file)
+
+    geometry_data = _extract_geojson_polygon_geometry(data)
 
     try:
         polygon = shape(geometry_data)
