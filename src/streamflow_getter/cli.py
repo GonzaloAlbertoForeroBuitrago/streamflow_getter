@@ -251,6 +251,91 @@ def _validate_operational_reach_arguments(args) -> None:
         )
 
 
+def _resolve_operational_temporal_selection(args):
+    """Resolve operational dates and selection provenance."""
+    from streamflow_getter.operational_nwm import ForecastConfig
+    from streamflow_getter.request_planning import (
+        plan_operational_configs,
+        resolve_recent_date_range,
+    )
+
+    if args.date is not None:
+        if args.end_date is not None:
+            raise ValueError(
+                "--end-date cannot be used with --date"
+            )
+
+        configs = [
+            ForecastConfig(
+                date=args.date,
+                cycle=args.cycle,
+                product=args.product,
+            )
+        ]
+
+        temporal_selection = {
+            "mode": "single_date",
+            "requested_date": args.date,
+            "resolved_start_date": args.date,
+            "resolved_end_date": args.date,
+        }
+
+    elif args.start_date is not None:
+        if args.end_date is None:
+            raise ValueError(
+                "--end-date is required with --start-date"
+            )
+
+        configs = plan_operational_configs(
+            args.start_date,
+            args.end_date,
+            cycles=(args.cycle,),
+            products=(args.product,),
+        )
+
+        temporal_selection = {
+            "mode": "explicit_period",
+            "requested_start_date": args.start_date,
+            "requested_end_date": args.end_date,
+            "resolved_start_date": args.start_date,
+            "resolved_end_date": args.end_date,
+        }
+
+    else:
+        if args.end_date is not None:
+            raise ValueError(
+                "--end-date requires --start-date"
+            )
+
+        recent_start, recent_end = (
+            resolve_recent_date_range(
+                args.recent_days
+            )
+        )
+
+        print(
+            f"Resolved --recent-days {args.recent_days} "
+            f"to UTC dates {recent_start} through "
+            f"{recent_end}"
+        )
+
+        configs = plan_operational_configs(
+            recent_start,
+            recent_end,
+            cycles=(args.cycle,),
+            products=(args.product,),
+        )
+
+        temporal_selection = {
+            "mode": "recent_days",
+            "requested_days": args.recent_days,
+            "resolved_start_date": recent_start,
+            "resolved_end_date": recent_end,
+        }
+
+    return configs, temporal_selection
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -278,15 +363,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.source == "nwm-operational":
         # Import operational dependencies only when requested.
         from streamflow_getter.operational_nwm import (
-            ForecastConfig,
             fetch_operational_series,
         )
         from streamflow_getter.operational_requests import (
             fetch_operational_configs,
-        )
-        from streamflow_getter.request_planning import (
-            plan_operational_configs,
-            resolve_recent_date_range,
         )
         from streamflow_getter.output import (
             manifest_path_for,
@@ -298,79 +378,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
 
-        if args.date is not None:
-            if args.end_date is not None:
-                raise ValueError(
-                    "--end-date cannot be used with --date"
-                )
-
-            configs = [
-                ForecastConfig(
-                    date=args.date,
-                    cycle=args.cycle,
-                    product=args.product,
-                )
-            ]
-
-            temporal_selection = {
-                "mode": "single_date",
-                "requested_date": args.date,
-                "resolved_start_date": args.date,
-                "resolved_end_date": args.date,
-            }
-
-        elif args.start_date is not None:
-            if args.end_date is None:
-                raise ValueError(
-                    "--end-date is required with --start-date"
-                )
-
-            configs = plan_operational_configs(
-                args.start_date,
-                args.end_date,
-                cycles=(args.cycle,),
-                products=(args.product,),
-            )
-
-            temporal_selection = {
-                "mode": "explicit_period",
-                "requested_start_date": args.start_date,
-                "requested_end_date": args.end_date,
-                "resolved_start_date": args.start_date,
-                "resolved_end_date": args.end_date,
-            }
-
-        else:
-            if args.end_date is not None:
-                raise ValueError(
-                    "--end-date requires --start-date"
-                )
-
-            recent_start, recent_end = (
-                resolve_recent_date_range(
-                    args.recent_days
-                )
-            )
-
-            print(
-                f"Resolved --recent-days {args.recent_days} "
-                f"to UTC dates {recent_start} through "
-                f"{recent_end}"
-            )
-
-            configs = plan_operational_configs(
-                recent_start,
-                recent_end,
-                cycles=(args.cycle,),
-                products=(args.product,),
-            )
-
-            temporal_selection = {
-                "mode": "recent_days",
-                "requested_days": args.recent_days,
-                "resolved_start_date": recent_start,
-                "resolved_end_date": recent_end,
-            }
+        configs, temporal_selection = _resolve_operational_temporal_selection(args)
 
 
         # Reject invalid forecast-hour ranges before remote access.
