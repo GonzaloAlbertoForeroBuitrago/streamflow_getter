@@ -13,5 +13,9 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - name: Install test dependencies
         run: uv sync --locked --extra operational --extra spatial --extra parquet
+      - name: Check Ruff formatting
+        run: uvx ruff==0.17.6 format src/streamflow_getter tests --check
+      - name: Check Ruff lint and complexity
+        run: uvx ruff==0.17.6 check src/streamflow_getter
       - name: Run tests
         run: uv run --locked --extra operational --extra spatial --extra parquet pytest -q -ra
