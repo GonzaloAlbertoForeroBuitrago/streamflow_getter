@@ -538,6 +538,63 @@ def _extend_operational_gage_reaches(args, configs, reaches: list[int]):
     return routelink_selection
 
 
+def _fetch_operational_manifest_frame(args, configs, reaches):
+    """Retrieve operational data with manifest-ready columns."""
+    from streamflow_getter.operational_nwm import (
+        fetch_operational_series,
+    )
+    from streamflow_getter.operational_requests import (
+        fetch_operational_configs,
+    )
+
+    if args.date is not None:
+        single_frame = fetch_operational_series(
+            configs[0],
+            reaches,
+            args.start_hour,
+            args.end_hour,
+            include_t0=not args.no_t0,
+            cache_dir=args.cache_dir,
+        )
+
+        manifest_frame = single_frame.copy()
+
+        if "requested_product" in manifest_frame.columns:
+            raise ValueError(
+                "Single-date operational result unexpectedly "
+                "contains requested_product"
+            )
+
+        manifest_frame.insert(
+            2,
+            "requested_product",
+            args.product,
+        )
+
+    else:
+        manifest_frame = fetch_operational_configs(
+            configs,
+            reaches,
+            args.start_hour,
+            args.end_hour,
+            include_t0=not args.no_t0,
+            cache_dir=args.cache_dir,
+        )
+
+        if (
+            "requested_product" not in manifest_frame.columns
+            or not manifest_frame["requested_product"].eq(
+                args.product
+            ).all()
+        ):
+            raise ValueError(
+                "Unexpected requested product in "
+                "planned operational result"
+            )
+
+    return manifest_frame
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -564,12 +621,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.source == "nwm-operational":
         # Import operational dependencies only when requested.
-        from streamflow_getter.operational_nwm import (
-            fetch_operational_series,
-        )
-        from streamflow_getter.operational_requests import (
-            fetch_operational_configs,
-        )
         from streamflow_getter.output import (
             manifest_path_for,
             resolve_output_format,
@@ -655,50 +706,7 @@ def main(argv: list[str] | None = None) -> int:
             )
 
         # Retrieve operational NWM streamflow after local validation.
-        if args.date is not None:
-            single_frame = fetch_operational_series(
-                configs[0],
-                reaches,
-                args.start_hour,
-                args.end_hour,
-                include_t0=not args.no_t0,
-                cache_dir=args.cache_dir,
-            )
-
-            manifest_frame = single_frame.copy()
-
-            if "requested_product" in manifest_frame.columns:
-                raise ValueError(
-                    "Single-date operational result unexpectedly "
-                    "contains requested_product"
-                )
-
-            manifest_frame.insert(
-                2,
-                "requested_product",
-                args.product,
-            )
-
-        else:
-            manifest_frame = fetch_operational_configs(
-                configs,
-                reaches,
-                args.start_hour,
-                args.end_hour,
-                include_t0=not args.no_t0,
-                cache_dir=args.cache_dir,
-            )
-
-            if (
-                "requested_product" not in manifest_frame.columns
-                or not manifest_frame["requested_product"].eq(
-                    args.product
-                ).all()
-            ):
-                raise ValueError(
-                    "Unexpected requested product in "
-                    "planned operational result"
-                )
+        manifest_frame = _fetch_operational_manifest_frame(args, configs, reaches)
 
         if args.cache_dir is None:
             cache_policy = {
