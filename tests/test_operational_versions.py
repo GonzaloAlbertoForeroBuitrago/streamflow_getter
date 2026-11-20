@@ -18,9 +18,7 @@ def test_initialization_is_timezone_aware_utc():
         cycle=12,
     )
 
-    assert forecast_initialization_utc(
-        config
-    ) == datetime(
+    assert forecast_initialization_utc(config) == datetime(
         2026,
         8,
         18,
@@ -52,29 +50,31 @@ def test_resolve_operational_version_boundaries(
     cycle,
     expected,
 ):
-    assert resolve_operational_nwm_version(
-        ForecastConfig(
-            date=date_value,
-            cycle=cycle,
+    assert (
+        resolve_operational_nwm_version(
+            ForecastConfig(
+                date=date_value,
+                cycle=cycle,
+            )
         )
-    ) == expected
+        == expected
+    )
 
 
 def test_dates_before_project_version_baseline_are_unresolved():
-    assert resolve_operational_nwm_version(
-        ForecastConfig(
-            date="2017-12-31",
-            cycle=23,
+    assert (
+        resolve_operational_nwm_version(
+            ForecastConfig(
+                date="2017-12-31",
+                cycle=23,
+            )
         )
-    ) is None
+        is None
+    )
 
 
 def test_transition_registry_is_ordered_and_verified():
-    assert [
-        transition.version
-        for transition
-        in OPERATIONAL_VERSION_TRANSITIONS
-    ] == [
+    assert [transition.version for transition in OPERATIONAL_VERSION_TRANSITIONS] == [
         "1.2",
         "2.0",
         "2.1",
@@ -82,11 +82,7 @@ def test_transition_registry_is_ordered_and_verified():
         "3.1",
     ]
 
-    assert [
-        transition.notice
-        for transition
-        in OPERATIONAL_VERSION_TRANSITIONS
-    ] == [
+    assert [transition.notice for transition in OPERATIONAL_VERSION_TRANSITIONS] == [
         "NWS SCN18-16",
         "NWS SCN19-42",
         "NWS SCN20-119",
@@ -95,14 +91,10 @@ def test_transition_registry_is_ordered_and_verified():
     ]
 
     effective = [
-        transition.effective_utc
-        for transition
-        in OPERATIONAL_VERSION_TRANSITIONS
+        transition.effective_utc for transition in OPERATIONAL_VERSION_TRANSITIONS
     ]
 
-    assert effective == sorted(
-        effective
-    )
+    assert effective == sorted(effective)
 
 
 def test_version_resolution_rejects_non_config():
@@ -110,6 +102,4 @@ def test_version_resolution_rejects_non_config():
         TypeError,
         match="ForecastConfig",
     ):
-        resolve_operational_nwm_version(
-            object()
-        )
+        resolve_operational_nwm_version(object())

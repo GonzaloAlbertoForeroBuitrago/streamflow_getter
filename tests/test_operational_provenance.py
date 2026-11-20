@@ -133,9 +133,7 @@ def test_column_contracts_are_explicit_and_distinct():
 def test_combined_contract_accepts_literal_analysis_source_time():
     frame = _combined_frame()
 
-    validate_combined_operational_frame(
-        frame
-    )
+    validate_combined_operational_frame(frame)
 
     assert (
         frame.loc[
@@ -222,18 +220,12 @@ def test_manifest_records_complete_strict_run():
     assert manifest["schema_version"] == MANIFEST_SCHEMA_VERSION
     assert manifest["status"] == "complete"
 
-    assert manifest["created_utc"] == (
-        "2026-11-12T02:00:00+00:00"
-    )
+    assert manifest["created_utc"] == ("2026-11-12T02:00:00+00:00")
 
     assert manifest["selection"]["mode"] == "event"
-    assert manifest["selection"]["name"] == (
-        "Alabama April 2026"
-    )
+    assert manifest["selection"]["name"] == ("Alabama April 2026")
 
-    assert manifest["request"]["reach_ids"] == [
-        3586192
-    ]
+    assert manifest["request"]["reach_ids"] == [3586192]
 
     assert manifest["result"]["row_count"] == 4
 
@@ -323,9 +315,7 @@ def test_contract_rejects_duplicate_row_identity():
         ValueError,
         match="Duplicate combined operational row identity",
     ):
-        validate_combined_operational_frame(
-            frame
-        )
+        validate_combined_operational_frame(frame)
 
 
 def test_contract_rejects_forecast_source_product_mismatch():
@@ -340,9 +330,7 @@ def test_contract_rejects_forecast_source_product_mismatch():
         ValueError,
         match="differs from requested product",
     ):
-        validate_combined_operational_frame(
-            frame
-        )
+        validate_combined_operational_frame(frame)
 
 
 def test_contract_rejects_column_drift():
@@ -353,9 +341,7 @@ def test_contract_rejects_column_drift():
         ValueError,
         match="stable contract",
     ):
-        validate_combined_operational_frame(
-            frame
-        )
+        validate_combined_operational_frame(frame)
 
 
 @pytest.mark.parametrize(
@@ -421,6 +407,7 @@ def test_manifest_rejects_naive_created_timestamp():
             created_utc="2026-11-11T20:00:00",
         )
 
+
 def test_manifest_records_derived_nwm_version():
     manifest = build_operational_run_manifest(
         _combined_frame(),
@@ -438,10 +425,9 @@ def test_manifest_records_derived_nwm_version():
         "unresolved_config_count": 0,
     }
 
-    assert {
-        config["nwm_version"]
-        for config in manifest["request"]["configs"]
-    } == {"3.0"}
+    assert {config["nwm_version"] for config in manifest["request"]["configs"]} == {
+        "3.0"
+    }
 
 
 def test_manifest_can_record_request_crossing_v31_boundary():
@@ -464,25 +450,21 @@ def test_manifest_can_record_request_crossing_v31_boundary():
         reference_hour = config.cycle
         valid_hour = config.cycle + 1
 
-        rows.append({
-            "forecast_date": config.date,
-            "forecast_cycle": config.cycle,
-            "requested_product": config.product,
-            "product": config.product,
-            "domain": config.domain,
-            "lead_hour": 1,
-            "feature_id": 3586192,
-            "valid_time": (
-                f"{config.date}T"
-                f"{valid_hour:02d}:00:00"
-            ),
-            "reference_time": (
-                f"{config.date}T"
-                f"{reference_hour:02d}:00:00"
-            ),
-            "streamflow_m3s": 0.41,
-            "method": "kerchunk",
-        })
+        rows.append(
+            {
+                "forecast_date": config.date,
+                "forecast_cycle": config.cycle,
+                "requested_product": config.product,
+                "product": config.product,
+                "domain": config.domain,
+                "lead_hour": 1,
+                "feature_id": 3586192,
+                "valid_time": (f"{config.date}T{valid_hour:02d}:00:00"),
+                "reference_time": (f"{config.date}T{reference_hour:02d}:00:00"),
+                "streamflow_m3s": 0.41,
+                "method": "kerchunk",
+            }
+        )
 
     frame = pd.DataFrame(
         rows,
@@ -506,10 +488,7 @@ def test_manifest_can_record_request_crossing_v31_boundary():
 
     assert manifest["model"]["unresolved_config_count"] == 0
 
-    assert [
-        config["nwm_version"]
-        for config in manifest["request"]["configs"]
-    ] == [
+    assert [config["nwm_version"] for config in manifest["request"]["configs"]] == [
         "3.0",
         "3.1",
     ]

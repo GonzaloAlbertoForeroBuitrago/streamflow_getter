@@ -31,35 +31,36 @@ def _frame(
 
     if include_t0:
         for reach in reaches:
-            rows.append({
-                "forecast_date": config.date,
-                "forecast_cycle": config.cycle,
-                "product": config.spec.analysis_product,
-                "domain": config.domain,
-                "lead_hour": 0,
-                "feature_id": reach,
-                "valid_time": cycle_time.isoformat(),
-                "reference_time": cycle_time.isoformat(),
-                "streamflow_m3s": 0.4,
-                "method": "kerchunk",
-            })
+            rows.append(
+                {
+                    "forecast_date": config.date,
+                    "forecast_cycle": config.cycle,
+                    "product": config.spec.analysis_product,
+                    "domain": config.domain,
+                    "lead_hour": 0,
+                    "feature_id": reach,
+                    "valid_time": cycle_time.isoformat(),
+                    "reference_time": cycle_time.isoformat(),
+                    "streamflow_m3s": 0.4,
+                    "method": "kerchunk",
+                }
+            )
 
     for reach in reaches:
-        rows.append({
-            "forecast_date": config.date,
-            "forecast_cycle": config.cycle,
-            "product": config.product,
-            "domain": config.domain,
-            "lead_hour": lead_hour,
-            "feature_id": reach,
-            "valid_time": (
-                cycle_time
-                + timedelta(hours=lead_hour)
-            ).isoformat(),
-            "reference_time": cycle_time.isoformat(),
-            "streamflow_m3s": 0.5,
-            "method": "kerchunk",
-        })
+        rows.append(
+            {
+                "forecast_date": config.date,
+                "forecast_cycle": config.cycle,
+                "product": config.product,
+                "domain": config.domain,
+                "lead_hour": lead_hour,
+                "feature_id": reach,
+                "valid_time": (cycle_time + timedelta(hours=lead_hour)).isoformat(),
+                "reference_time": cycle_time.isoformat(),
+                "streamflow_m3s": 0.5,
+                "method": "kerchunk",
+            }
+        )
 
     return pd.DataFrame(rows)
 
@@ -151,10 +152,7 @@ def test_executor_reuses_shared_analysis_t0(
 
     forecasts = result.loc[result["lead_hour"].eq(3)]
 
-    assert (
-        forecasts["requested_product"]
-        == forecasts["product"]
-    ).all()
+    assert (forecasts["requested_product"] == forecasts["product"]).all()
 
 
 def test_executor_omits_t0_when_requested(
@@ -183,9 +181,7 @@ def test_executor_omits_t0_when_requested(
         include_t0=True,
         cache_dir=None,
     ):
-        calls.append(
-            (config.product, include_t0)
-        )
+        calls.append((config.product, include_t0))
 
         return _frame(
             config,
@@ -256,10 +252,7 @@ def test_executor_materializes_reach_generator_for_every_config(
         fake_fetch,
     )
 
-    reaches = (
-        reach
-        for reach in [3586192, 3586194]
-    )
+    reaches = (reach for reach in [3586192, 3586194])
 
     result = fetch_operational_configs(
         configs,
@@ -294,9 +287,7 @@ def test_executor_validates_all_lead_windows_before_retrieval(
     ]
 
     fetch = Mock(
-        side_effect=AssertionError(
-            "Retrieval started before complete validation"
-        )
+        side_effect=AssertionError("Retrieval started before complete validation")
     )
 
     monkeypatch.setattr(
@@ -326,11 +317,7 @@ def test_executor_rejects_duplicate_configs_before_retrieval(
 
     config = ForecastConfig()
 
-    fetch = Mock(
-        side_effect=AssertionError(
-            "Retrieval started for duplicate configs"
-        )
-    )
+    fetch = Mock(side_effect=AssertionError("Retrieval started for duplicate configs"))
 
     monkeypatch.setattr(
         operational_nwm,
@@ -403,9 +390,7 @@ def test_executor_strict_failure_propagates_and_stops(
         "2026-04-21",
     )
 
-    failure = OSError(
-        "Controlled second-configuration failure"
-    )
+    failure = OSError("Controlled second-configuration failure")
 
     calls = []
 
@@ -424,9 +409,7 @@ def test_executor_strict_failure_propagates_and_stops(
             raise failure
 
         if len(calls) > 2:
-            raise AssertionError(
-                "Execution continued after failure"
-            )
+            raise AssertionError("Execution continued after failure")
 
         return _frame(
             config,

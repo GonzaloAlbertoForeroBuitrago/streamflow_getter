@@ -1,4 +1,3 @@
-
 """Tests for operational NWM forecast time-series assembly."""
 
 import pytest
@@ -23,13 +22,9 @@ def test_series_includes_analysis_t0(monkeypatch):
             "domain": config.domain,
             "lead_hour": hour,
             "method": "kerchunk",
-            "valid_time": (
-                f"2026-04-19T{hour:02d}:00:00"
-            ),
+            "valid_time": (f"2026-04-19T{hour:02d}:00:00"),
             "reference_time": (
-                "2026-04-18T21:00:00"
-                if hour == 0
-                else "2026-04-19T00:00:00"
+                "2026-04-18T21:00:00" if hour == 0 else "2026-04-19T00:00:00"
             ),
             "streamflow_m3s": {3586192: 0.41 + hour},
         }
@@ -54,12 +49,8 @@ def test_series_includes_analysis_t0(monkeypatch):
         "short_range",
     ]
 
-    assert frame.iloc[0]["reference_time"] == (
-        "2026-04-18T21:00:00"
-    )
-    assert frame.iloc[1]["reference_time"] == (
-        "2026-04-19T00:00:00"
-    )
+    assert frame.iloc[0]["reference_time"] == ("2026-04-18T21:00:00")
+    assert frame.iloc[1]["reference_time"] == ("2026-04-19T00:00:00")
 
 
 def test_series_without_t0(monkeypatch):
@@ -117,7 +108,6 @@ def test_invalid_forecast_range(start, end):
         )
 
 
-
 @pytest.mark.parametrize(
     "field,invalid_value,error",
     [
@@ -128,9 +118,7 @@ def test_invalid_forecast_range(start, end):
         ("reference_time", "2026-04-19T03:00:00", "reference time"),
     ],
 )
-def test_series_rejects_inconsistent_forecast(
-    monkeypatch, field, invalid_value, error
-):
+def test_series_rejects_inconsistent_forecast(monkeypatch, field, invalid_value, error):
     config = ForecastConfig()
 
     def fake_fetch(config, hour, reach_ids):
@@ -166,9 +154,7 @@ def test_series_rejects_inconsistent_forecast(
 
 
 @pytest.mark.parametrize("invalid_flow", [float("nan"), float("inf")])
-def test_series_rejects_nonfinite_streamflow(
-    monkeypatch, invalid_flow
-):
+def test_series_rejects_nonfinite_streamflow(monkeypatch, invalid_flow):
     config = ForecastConfig()
 
     def fake_fetch(config, hour, reach_ids):
@@ -199,6 +185,7 @@ def test_series_rejects_nonfinite_streamflow(
             include_t0=False,
         )
 
+
 @pytest.mark.parametrize(
     "reach_ids",
     [
@@ -209,9 +196,7 @@ def test_series_rejects_nonfinite_streamflow(
         [True],
     ],
 )
-def test_series_rejects_invalid_reach_ids(
-    monkeypatch, reach_ids
-):
+def test_series_rejects_invalid_reach_ids(monkeypatch, reach_ids):
     def unexpected_fetch(*args, **kwargs):
         raise AssertionError("Remote retrieval must not run")
 

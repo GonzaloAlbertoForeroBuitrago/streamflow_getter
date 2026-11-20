@@ -35,9 +35,7 @@ def test_build_gage_index(routelink):
 def test_resolve_gages(routelink):
     index = build_gage_index(routelink)
 
-    assert resolve_gages(["08165500"], index) == {
-        "08165500": 3586192
-    }
+    assert resolve_gages(["08165500"], index) == {"08165500": 3586192}
 
 
 def test_unknown_gage(routelink):
@@ -71,20 +69,15 @@ def test_ambiguous_gage():
         build_gage_index(ds)
 
 
-
 def test_seven_digit_gage_exact_match():
     index = {
         "1234567": 101,
         "01234567": 181,
     }
 
-    assert resolve_gages(["1234567"], index) == {
-        "1234567": 101
-    }
+    assert resolve_gages(["1234567"], index) == {"1234567": 101}
 
-    assert resolve_gages(["01234567"], index) == {
-        "01234567": 181
-    }
+    assert resolve_gages(["01234567"], index) == {"01234567": 181}
 
 
 def test_no_automatic_zero_padding():
@@ -97,11 +90,7 @@ def test_no_automatic_zero_padding():
 def test_nonnumeric_gage_preserved():
     index = {"08AB123": 500}
 
-    assert resolve_gages(["08AB123"], index) == {
-        "08AB123": 500
-    }
-
-
+    assert resolve_gages(["08AB123"], index) == {"08AB123": 500}
 
 
 def test_load_gage_index(tmp_path, monkeypatch):
@@ -113,13 +102,15 @@ def test_load_gage_index(tmp_path, monkeypatch):
     path = tmp_path / "routelink.nc"
     path.touch()
 
-    ds = xr.Dataset({
-        "link": ("feature_id", [3586192, 1122645]),
-        "gages": (
-            "feature_id",
-            [b"08165500", b"01646500"],
-        ),
-    })
+    ds = xr.Dataset(
+        {
+            "link": ("feature_id", [3586192, 1122645]),
+            "gages": (
+                "feature_id",
+                [b"08165500", b"01646500"],
+            ),
+        }
+    )
 
     context = MagicMock()
     context.__enter__.return_value = ds
@@ -146,7 +137,6 @@ def test_load_gage_index(tmp_path, monkeypatch):
     context.__exit__.assert_called_once()
 
 
-
 def test_load_gage_index_missing_file(tmp_path):
     from streamflow_getter.reach_resolution import load_gage_index
 
@@ -155,13 +145,16 @@ def test_load_gage_index_missing_file(tmp_path):
 
 
 def test_reject_noninteger_feature_ids():
-    ds = xr.Dataset({
-        "link": ("feature_id", [3586192.5, 1122645.0]),
-        "gages": ("feature_id", [b"08165500", b"01646500"]),
-    })
+    ds = xr.Dataset(
+        {
+            "link": ("feature_id", [3586192.5, 1122645.0]),
+            "gages": ("feature_id", [b"08165500", b"01646500"]),
+        }
+    )
 
     with pytest.raises(ValueError, match="integer"):
         build_gage_index(ds)
+
 
 def test_canonical_gage_index_sha256_is_order_independent():
     import hashlib
@@ -180,22 +173,13 @@ def test_canonical_gage_index_sha256_is_order_independent():
         "08165500": 3586192,
     }
 
-    expected_payload = (
-        "01646500\t1122645\n"
-        "08165500\t3586192\n"
-    ).encode("utf-8")
+    expected_payload = ("01646500\t1122645\n08165500\t3586192\n").encode("utf-8")
 
-    expected = hashlib.sha256(
-        expected_payload
-    ).hexdigest()
+    expected = hashlib.sha256(expected_payload).hexdigest()
 
-    assert canonical_gage_index_sha256(
-        first
-    ) == expected
+    assert canonical_gage_index_sha256(first) == expected
 
-    assert canonical_gage_index_sha256(
-        second
-    ) == expected
+    assert canonical_gage_index_sha256(second) == expected
 
 
 def test_canonical_gage_index_sha256_validates_values():
@@ -207,38 +191,38 @@ def test_canonical_gage_index_sha256_validates_values():
         ValueError,
         match="nonempty strings",
     ):
-        canonical_gage_index_sha256({
-            "": 101,
-        })
+        canonical_gage_index_sha256(
+            {
+                "": 101,
+            }
+        )
 
     with pytest.raises(
         ValueError,
         match="positive integers",
     ):
-        canonical_gage_index_sha256({
-            "08165500": 0,
-        })
+        canonical_gage_index_sha256(
+            {
+                "08165500": 0,
+            }
+        )
 
     with pytest.raises(
         TypeError,
         match="dictionary",
     ):
-        canonical_gage_index_sha256(
-            []
-        )
+        canonical_gage_index_sha256([])
 
 
 @pytest.mark.parametrize(
     "digest,expected",
     [
         (
-            "3e4232517ce3958bebfa7d9d66826f8e"
-            "e59c34f0b5b90fb540c3d4ab159d2c68",
+            "3e4232517ce3958bebfa7d9d66826f8ee59c34f0b5b90fb540c3d4ab159d2c68",
             "3.0",
         ),
         (
-            "c0ee33504fd74319e68ba07b370110d0"
-            "22efe09a76a022ccb7361921fc909ec6",
+            "c0ee33504fd74319e68ba07b370110d022efe09a76a022ccb7361921fc909ec6",
             "3.1",
         ),
         (
@@ -255,9 +239,7 @@ def test_known_routelink_crosswalk_hashes(
         classify_routelink_crosswalk_sha256,
     )
 
-    assert classify_routelink_crosswalk_sha256(
-        digest
-    ) == expected
+    assert classify_routelink_crosswalk_sha256(digest) == expected
 
 
 def test_routelink_crosswalk_hash_rejects_invalid_digest():
@@ -269,9 +251,7 @@ def test_routelink_crosswalk_hash_rejects_invalid_digest():
         ValueError,
         match="SHA256",
     ):
-        classify_routelink_crosswalk_sha256(
-            "not-a-sha"
-        )
+        classify_routelink_crosswalk_sha256("not-a-sha")
 
 
 def test_classify_small_unknown_gage_index():
@@ -285,15 +265,10 @@ def test_classify_small_unknown_gage_index():
         "01646500": 1122645,
     }
 
-    result = classify_gage_index_version(
-        index
-    )
+    result = classify_gage_index_version(index)
 
     assert result == {
-        "crosswalk_sha256":
-            canonical_gage_index_sha256(
-                index
-            ),
+        "crosswalk_sha256": canonical_gage_index_sha256(index),
         "network_version": None,
         "gage_count": 2,
     }
@@ -310,44 +285,39 @@ def test_load_gage_index_with_provenance(
         load_gage_index_with_provenance,
     )
 
-    path = (
-        tmp_path
-        / "RouteLink_CONUS.nc"
-    )
+    path = tmp_path / "RouteLink_CONUS.nc"
 
     path.touch()
 
-    ds = xr.Dataset({
-        "link": (
-            "feature_id",
-            [3586192, 1122645],
-        ),
-        "gages": (
-            "feature_id",
-            [
-                b"08165500",
-                b"01646500",
-            ],
-        ),
-    })
+    ds = xr.Dataset(
+        {
+            "link": (
+                "feature_id",
+                [3586192, 1122645],
+            ),
+            "gages": (
+                "feature_id",
+                [
+                    b"08165500",
+                    b"01646500",
+                ],
+            ),
+        }
+    )
 
     context = MagicMock()
     context.__enter__.return_value = ds
 
-    mocked_open = MagicMock(
-        return_value=context
-    )
+    mocked_open = MagicMock(return_value=context)
 
     monkeypatch.setattr(
         "streamflow_getter.reach_resolution.xr.open_dataset",
         mocked_open,
     )
 
-    index, provenance = (
-        load_gage_index_with_provenance(
-            path,
-            engine="h5netcdf",
-        )
+    index, provenance = load_gage_index_with_provenance(
+        path,
+        engine="h5netcdf",
     )
 
     assert index == {
@@ -356,10 +326,7 @@ def test_load_gage_index_with_provenance(
     }
 
     assert provenance == {
-        "crosswalk_sha256":
-            canonical_gage_index_sha256(
-                index
-            ),
+        "crosswalk_sha256": canonical_gage_index_sha256(index),
         "network_version": None,
         "gage_count": 2,
     }
@@ -377,10 +344,13 @@ def test_routelink_compatibility_matching_version():
         validate_routelink_compatibility,
     )
 
-    assert validate_routelink_compatibility(
-        ["3.1", "3.1"],
-        "3.1",
-    ) == "compatible"
+    assert (
+        validate_routelink_compatibility(
+            ["3.1", "3.1"],
+            "3.1",
+        )
+        == "compatible"
+    )
 
 
 def test_routelink_compatibility_rejects_known_mismatch():
@@ -412,10 +382,13 @@ def test_routelink_compatibility_allows_unknown_asset():
         validate_routelink_compatibility,
     )
 
-    assert validate_routelink_compatibility(
-        ["3.1"],
-        None,
-    ) == "unknown_routelink_version"
+    assert (
+        validate_routelink_compatibility(
+            ["3.1"],
+            None,
+        )
+        == "unknown_routelink_version"
+    )
 
 
 def test_routelink_compatibility_tracks_unresolved_request():
@@ -423,10 +396,14 @@ def test_routelink_compatibility_tracks_unresolved_request():
         validate_routelink_compatibility,
     )
 
-    assert validate_routelink_compatibility(
-        ["3.1", None],
-        "3.1",
-    ) == "unresolved_request_version"
+    assert (
+        validate_routelink_compatibility(
+            ["3.1", None],
+            "3.1",
+        )
+        == "unresolved_request_version"
+    )
+
 
 def test_build_nwm_to_usgs_index():
     gage_index = {
@@ -434,9 +411,7 @@ def test_build_nwm_to_usgs_index():
         "01646500": 1234567,
     }
 
-    result = build_nwm_to_usgs_index(
-        gage_index
-    )
+    result = build_nwm_to_usgs_index(gage_index)
 
     assert result == {
         3586192: "08165500",
@@ -445,9 +420,11 @@ def test_build_nwm_to_usgs_index():
 
 
 def test_build_nwm_to_usgs_preserves_leading_zero():
-    result = build_nwm_to_usgs_index({
-        "08165500": 3586192,
-    })
+    result = build_nwm_to_usgs_index(
+        {
+            "08165500": 3586192,
+        }
+    )
 
     assert result[3586192] == "08165500"
 
@@ -457,10 +434,12 @@ def test_build_nwm_to_usgs_rejects_ambiguous_reach():
         ValueError,
         match="Multiple USGS gages map",
     ):
-        build_nwm_to_usgs_index({
-            "08165500": 3586192,
-            "08165501": 3586192,
-        })
+        build_nwm_to_usgs_index(
+            {
+                "08165500": 3586192,
+                "08165501": 3586192,
+            }
+        )
 
 
 def test_build_nwm_to_usgs_requires_dictionary():
@@ -468,9 +447,7 @@ def test_build_nwm_to_usgs_requires_dictionary():
         TypeError,
         match="gage_index must be a dictionary",
     ):
-        build_nwm_to_usgs_index(
-            [("08165500", 3586192)]
-        )
+        build_nwm_to_usgs_index([("08165500", 3586192)])
 
 
 def test_resolve_nwm_reach_to_usgs():

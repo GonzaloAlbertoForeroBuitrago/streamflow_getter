@@ -1,4 +1,3 @@
-
 """Offline tests for operational NWM native NetCDF retrieval."""
 
 from unittest.mock import MagicMock
@@ -25,9 +24,7 @@ def sample_dataset():
         coords={
             "feature_id": [1122645, 3586192, 7144704],
             "time": [np.datetime64("2026-04-19T01:00:00")],
-            "reference_time": [
-                np.datetime64("2026-04-19T00:00:00")
-            ],
+            "reference_time": [np.datetime64("2026-04-19T00:00:00")],
         },
     )
 
@@ -93,9 +90,7 @@ def test_native_missing_reach(mock_native):
 
 
 def test_native_wrong_timestamp(mock_native, sample_dataset):
-    sample_dataset.coords["time"] = [
-        np.datetime64("2026-04-19T02:00:00")
-    ]
+    sample_dataset.coords["time"] = [np.datetime64("2026-04-19T02:00:00")]
 
     with pytest.raises(ValueError, match="valid time"):
         read_native_forecast(
@@ -122,7 +117,6 @@ def test_native_nonfinite_streamflow(mock_native, sample_dataset):
     mock_native["remote_context"].__exit__.assert_called_once()
 
 
-
 @pytest.mark.parametrize("hour", [-1, 1.5, True])
 def test_native_invalid_hour(monkeypatch, hour):
     """Reject invalid lead hours before remote access."""
@@ -146,17 +140,12 @@ def test_native_invalid_hour(monkeypatch, hour):
     remote_open.assert_not_called()
 
 
-
 def test_native_analysis_t0(mock_native, sample_dataset):
     """Retrieve analysis t0 while preserving source timestamps."""
     config = ForecastConfig()
 
-    sample_dataset.coords["time"] = [
-        np.datetime64("2026-04-19T00:00:00")
-    ]
-    sample_dataset.coords["reference_time"] = [
-        np.datetime64("2026-04-18T21:00:00")
-    ]
+    sample_dataset.coords["time"] = [np.datetime64("2026-04-19T00:00:00")]
+    sample_dataset.coords["reference_time"] = [np.datetime64("2026-04-18T21:00:00")]
 
     result = read_native_forecast(
         config,
@@ -177,9 +166,7 @@ def test_native_analysis_t0_rejects_wrong_valid_time(
     sample_dataset,
 ):
     """Reject analysis data with an incorrect valid time."""
-    sample_dataset.coords["reference_time"] = [
-        np.datetime64("2026-04-18T21:00:00")
-    ]
+    sample_dataset.coords["reference_time"] = [np.datetime64("2026-04-18T21:00:00")]
 
     with pytest.raises(ValueError, match="analysis t0 valid time"):
         read_native_forecast(

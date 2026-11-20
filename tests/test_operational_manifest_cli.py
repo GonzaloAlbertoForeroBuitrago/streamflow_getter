@@ -63,23 +63,21 @@ def _period_frame(configs):
     rows = []
 
     for config in configs:
-        rows.append({
-            "forecast_date": config.date,
-            "forecast_cycle": config.cycle,
-            "requested_product": config.product,
-            "product": config.product,
-            "domain": config.domain,
-            "lead_hour": 1,
-            "feature_id": 3586192,
-            "valid_time": (
-                f"{config.date}T01:00:00"
-            ),
-            "reference_time": (
-                f"{config.date}T00:00:00"
-            ),
-            "streamflow_m3s": 0.41,
-            "method": "kerchunk",
-        })
+        rows.append(
+            {
+                "forecast_date": config.date,
+                "forecast_cycle": config.cycle,
+                "requested_product": config.product,
+                "product": config.product,
+                "domain": config.domain,
+                "lead_hour": 1,
+                "feature_id": 3586192,
+                "valid_time": (f"{config.date}T01:00:00"),
+                "reference_time": (f"{config.date}T00:00:00"),
+                "streamflow_m3s": 0.41,
+                "method": "kerchunk",
+            }
+        )
 
     return pd.DataFrame(
         rows,
@@ -88,15 +86,11 @@ def _period_frame(configs):
 
 
 def _load_manifest(data_path):
-    manifest_path = Path(
-        str(data_path) + ".manifest.json"
-    )
+    manifest_path = Path(str(data_path) + ".manifest.json")
 
     assert manifest_path.exists()
 
-    with manifest_path.open(
-        encoding="utf-8"
-    ) as file:
+    with manifest_path.open(encoding="utf-8") as file:
         return manifest_path, json.load(file)
 
 
@@ -109,46 +103,45 @@ def test_single_date_cli_publishes_manifest_without_schema_drift(
     monkeypatch.setattr(
         operational_nwm,
         "fetch_operational_series",
-        Mock(
-            return_value=_single_frame()
-        ),
+        Mock(return_value=_single_frame()),
     )
 
     output = tmp_path / "single.csv"
 
-    assert main([
-        "nwm-operational",
-        "--date", "2026-04-19",
-        "--cycle", "0",
-        "--product", "short_range",
-        "--reach", "3586192",
-        "--start-hour", "1",
-        "--end-hour", "1",
-        "--no-t0",
-        "--no-cache",
-        "--out", str(output),
-    ]) == 0
-
-    exported = pd.read_csv(
-        output
-    )
-
-    assert list(
-        exported.columns
-    ) == SERIES_COLUMNS
-
     assert (
-        "requested_product"
-        not in exported.columns
+        main(
+            [
+                "nwm-operational",
+                "--date",
+                "2026-04-19",
+                "--cycle",
+                "0",
+                "--product",
+                "short_range",
+                "--reach",
+                "3586192",
+                "--start-hour",
+                "1",
+                "--end-hour",
+                "1",
+                "--no-t0",
+                "--no-cache",
+                "--out",
+                str(output),
+            ]
+        )
+        == 0
     )
 
-    manifest_path, manifest = (
-        _load_manifest(output)
-    )
+    exported = pd.read_csv(output)
 
-    assert manifest_path.name == (
-        "single.csv.manifest.json"
-    )
+    assert list(exported.columns) == SERIES_COLUMNS
+
+    assert "requested_product" not in exported.columns
+
+    manifest_path, manifest = _load_manifest(output)
+
+    assert manifest_path.name == ("single.csv.manifest.json")
 
     assert manifest["status"] == "complete"
 
@@ -193,9 +186,7 @@ def test_explicit_period_cli_manifest_retains_resolved_request(
         include_t0=True,
         cache_dir=None,
     ):
-        return _period_frame(
-            list(configs)
-        )
+        return _period_frame(list(configs))
 
     monkeypatch.setattr(
         operational_requests,
@@ -205,34 +196,40 @@ def test_explicit_period_cli_manifest_retains_resolved_request(
 
     output = tmp_path / "period.csv"
 
-    assert main([
-        "nwm-operational",
-        "--start-date", "2026-04-19",
-        "--end-date", "2026-04-21",
-        "--cycle", "0",
-        "--product", "short_range",
-        "--reach", "3586192",
-        "--start-hour", "1",
-        "--end-hour", "1",
-        "--no-t0",
-        "--no-cache",
-        "--out", str(output),
-    ]) == 0
-
-    exported = pd.read_csv(
-        output
+    assert (
+        main(
+            [
+                "nwm-operational",
+                "--start-date",
+                "2026-04-19",
+                "--end-date",
+                "2026-04-21",
+                "--cycle",
+                "0",
+                "--product",
+                "short_range",
+                "--reach",
+                "3586192",
+                "--start-hour",
+                "1",
+                "--end-hour",
+                "1",
+                "--no-t0",
+                "--no-cache",
+                "--out",
+                str(output),
+            ]
+        )
+        == 0
     )
+
+    exported = pd.read_csv(output)
 
     assert len(exported) == 3
 
-    assert (
-        "requested_product"
-        not in exported.columns
-    )
+    assert "requested_product" not in exported.columns
 
-    _, manifest = _load_manifest(
-        output
-    )
+    _, manifest = _load_manifest(output)
 
     assert manifest["selection"]["temporal"] == {
         "mode": "explicit_period",
@@ -242,10 +239,7 @@ def test_explicit_period_cli_manifest_retains_resolved_request(
         "resolved_end_date": "2026-04-21",
     }
 
-    assert [
-        config["forecast_date"]
-        for config in manifest["request"]["configs"]
-    ] == [
+    assert [config["forecast_date"] for config in manifest["request"]["configs"]] == [
         "2026-04-19",
         "2026-04-20",
         "2026-04-21",
@@ -282,29 +276,39 @@ def test_recent_days_manifest_records_relative_and_resolved_window(
     monkeypatch.setattr(
         operational_requests,
         "fetch_operational_configs",
-        lambda configs, reach_ids, start_hour, end_hour,
-        include_t0=True, cache_dir=None:
-            _period_frame(list(configs)),
+        lambda configs, reach_ids, start_hour, end_hour, include_t0=True, cache_dir=None: (
+            _period_frame(list(configs))
+        ),
     )
 
     output = tmp_path / "recent.csv"
 
-    assert main([
-        "nwm-operational",
-        "--recent-days", "3",
-        "--cycle", "0",
-        "--product", "short_range",
-        "--reach", "3586192",
-        "--start-hour", "1",
-        "--end-hour", "1",
-        "--no-t0",
-        "--no-cache",
-        "--out", str(output),
-    ]) == 0
-
-    _, manifest = _load_manifest(
-        output
+    assert (
+        main(
+            [
+                "nwm-operational",
+                "--recent-days",
+                "3",
+                "--cycle",
+                "0",
+                "--product",
+                "short_range",
+                "--reach",
+                "3586192",
+                "--start-hour",
+                "1",
+                "--end-hour",
+                "1",
+                "--no-t0",
+                "--no-cache",
+                "--out",
+                str(output),
+            ]
+        )
+        == 0
     )
+
+    _, manifest = _load_manifest(output)
 
     assert manifest["selection"]["temporal"] == {
         "mode": "recent_days",
@@ -323,27 +327,34 @@ def test_persistent_cache_policy_is_recorded(
     monkeypatch.setattr(
         operational_nwm,
         "fetch_operational_series",
-        Mock(
-            return_value=_single_frame()
-        ),
+        Mock(return_value=_single_frame()),
     )
 
     output = tmp_path / "cached.csv"
 
-    assert main([
-        "nwm-operational",
-        "--date", "2026-04-19",
-        "--reach", "3586192",
-        "--start-hour", "1",
-        "--end-hour", "1",
-        "--no-t0",
-        "--cache-dir", "/tmp/example-nwm-cache",
-        "--out", str(output),
-    ]) == 0
-
-    _, manifest = _load_manifest(
-        output
+    assert (
+        main(
+            [
+                "nwm-operational",
+                "--date",
+                "2026-04-19",
+                "--reach",
+                "3586192",
+                "--start-hour",
+                "1",
+                "--end-hour",
+                "1",
+                "--no-t0",
+                "--cache-dir",
+                "/tmp/example-nwm-cache",
+                "--out",
+                str(output),
+            ]
+        )
+        == 0
     )
+
+    _, manifest = _load_manifest(output)
 
     assert manifest["cache_policy"] == {
         "mode": "persistent",
@@ -358,9 +369,7 @@ def test_existing_manifest_stops_before_retrieval(
     from streamflow_getter import operational_nwm
 
     fetch = Mock(
-        side_effect=AssertionError(
-            "retrieval started despite existing manifest"
-        )
+        side_effect=AssertionError("retrieval started despite existing manifest")
     )
 
     monkeypatch.setattr(
@@ -371,9 +380,7 @@ def test_existing_manifest_stops_before_retrieval(
 
     output = tmp_path / "existing.csv"
 
-    manifest_path = Path(
-        str(output) + ".manifest.json"
-    )
+    manifest_path = Path(str(output) + ".manifest.json")
 
     manifest_path.write_text(
         "preserve-me",
@@ -384,23 +391,28 @@ def test_existing_manifest_stops_before_retrieval(
         FileExistsError,
         match="Manifest already exists",
     ):
-        main([
-            "nwm-operational",
-            "--date", "2026-04-19",
-            "--reach", "3586192",
-            "--start-hour", "1",
-            "--end-hour", "1",
-            "--no-t0",
-            "--out", str(output),
-        ])
+        main(
+            [
+                "nwm-operational",
+                "--date",
+                "2026-04-19",
+                "--reach",
+                "3586192",
+                "--start-hour",
+                "1",
+                "--end-hour",
+                "1",
+                "--no-t0",
+                "--out",
+                str(output),
+            ]
+        )
 
     fetch.assert_not_called()
 
     assert not output.exists()
 
-    assert manifest_path.read_text(
-        encoding="utf-8"
-    ) == "preserve-me"
+    assert manifest_path.read_text(encoding="utf-8") == "preserve-me"
 
 
 def test_single_date_manifest_uses_literal_analysis_source_metadata(
@@ -442,38 +454,43 @@ def test_single_date_manifest_uses_literal_analysis_source_metadata(
     monkeypatch.setattr(
         operational_nwm,
         "fetch_operational_series",
-        Mock(
-            return_value=frame
-        ),
+        Mock(return_value=frame),
     )
 
     output = tmp_path / "with-t0.csv"
 
-    assert main([
-        "nwm-operational",
-        "--date", "2026-04-19",
-        "--reach", "3586192",
-        "--start-hour", "1",
-        "--end-hour", "1",
-        "--no-cache",
-        "--out", str(output),
-    ]) == 0
-
-    exported = pd.read_csv(
-        output
+    assert (
+        main(
+            [
+                "nwm-operational",
+                "--date",
+                "2026-04-19",
+                "--reach",
+                "3586192",
+                "--start-hour",
+                "1",
+                "--end-hour",
+                "1",
+                "--no-cache",
+                "--out",
+                str(output),
+            ]
+        )
+        == 0
     )
 
-    assert exported.loc[
-        exported["lead_hour"].eq(0),
-        "reference_time",
-    ].iloc[0] == "2026-04-18T21:00:00"
+    exported = pd.read_csv(output)
 
-    _, manifest = _load_manifest(
-        output
+    assert (
+        exported.loc[
+            exported["lead_hour"].eq(0),
+            "reference_time",
+        ].iloc[0]
+        == "2026-04-18T21:00:00"
     )
 
-    assert manifest[
-        "output_contract"
-    ]["reference_time"] == (
+    _, manifest = _load_manifest(output)
+
+    assert manifest["output_contract"]["reference_time"] == (
         "literal source reference-time metadata"
     )

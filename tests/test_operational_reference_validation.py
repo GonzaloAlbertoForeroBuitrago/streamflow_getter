@@ -25,9 +25,7 @@ def reference():
 
 def test_valid_reference(reference):
     assert validate_reference(reference)
-    assert valid_source_identity(
-        reference, "https://example.com/nwm.nc"
-    )
+    assert valid_source_identity(reference, "https://example.com/nwm.nc")
 
 
 @pytest.mark.parametrize(
@@ -77,18 +75,12 @@ def test_invalid_reference_type():
 
 
 def test_wrong_source(reference):
-    assert not valid_source_identity(
-        reference, "https://example.com/other.nc"
-    )
+    assert not valid_source_identity(reference, "https://example.com/other.nc")
 
 
 def test_mixed_sources(reference):
-    reference["refs"]["streamflow/0"][0] = (
-        "https://example.com/other.nc"
-    )
-    assert not valid_source_identity(
-        reference, "https://example.com/nwm.nc"
-    )
+    reference["refs"]["streamflow/0"][0] = "https://example.com/other.nc"
+    assert not valid_source_identity(reference, "https://example.com/nwm.nc")
 
 
 def test_invalid_expected_url(reference):
@@ -96,36 +88,23 @@ def test_invalid_expected_url(reference):
 
 
 def test_valid_additional_chunk(reference):
-    reference["refs"]["velocity/0"] = [
-        "https://example.com/nwm.nc", 200, 100
-    ]
+    reference["refs"]["velocity/0"] = ["https://example.com/nwm.nc", 200, 100]
     assert validate_reference(reference)
-    assert valid_source_identity(
-        reference, "https://example.com/nwm.nc"
-    )
+    assert valid_source_identity(reference, "https://example.com/nwm.nc")
 
 
 def test_invalid_additional_chunk(reference):
-    reference["refs"]["velocity/0"] = [
-        "https://example.com/nwm.nc", -10, 100
-    ]
+    reference["refs"]["velocity/0"] = ["https://example.com/nwm.nc", -10, 100]
     assert not validate_reference(reference)
 
 
 def test_wrong_source_in_additional_chunk(reference):
-    reference["refs"]["velocity/0"] = [
-        "https://example.com/other.nc", 200, 100
-    ]
-    assert not valid_source_identity(
-        reference, "https://example.com/nwm.nc"
-    )
+    reference["refs"]["velocity/0"] = ["https://example.com/other.nc", 200, 100]
+    assert not valid_source_identity(reference, "https://example.com/nwm.nc")
 
 
 def test_valid_historical_template(reference):
-    expected_url = (
-        "https://storage.googleapis.com/"
-        "national-water-model/nwm.nc"
-    )
+    expected_url = "https://storage.googleapis.com/national-water-model/nwm.nc"
     reference["templates"] = {"u": expected_url}
     reference["refs"]["feature_id/0"][0] = "{{u}}"
     reference["refs"]["streamflow/0"][0] = "{{u}}"
@@ -151,24 +130,16 @@ def test_undefined_historical_template(reference):
 
 
 def test_historical_template_wrong_source(reference):
-    reference["templates"] = {
-        "u": "https://example.com/another-file.nc"
-    }
+    reference["templates"] = {"u": "https://example.com/another-file.nc"}
     reference["refs"]["feature_id/0"][0] = "{{u}}"
     reference["refs"]["streamflow/0"][0] = "{{u}}"
 
     assert validate_reference(reference)
-    assert not valid_source_identity(
-        reference, "https://example.com/nwm.nc"
-    )
+    assert not valid_source_identity(reference, "https://example.com/nwm.nc")
 
 
 @pytest.mark.parametrize("offset,length", [(-1, 100), (0, 0)])
 def test_invalid_historical_byte_range(reference, offset, length):
-    reference["templates"] = {
-        "u": "https://example.com/nwm.nc"
-    }
-    reference["refs"]["feature_id/0"] = [
-        "{{u}}", offset, length
-    ]
+    reference["templates"] = {"u": "https://example.com/nwm.nc"}
+    reference["refs"]["feature_id/0"] = ["{{u}}", offset, length]
     assert not validate_reference(reference)

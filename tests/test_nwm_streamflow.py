@@ -17,15 +17,10 @@ def operational_frame(
     streamflow=1.25,
 ):
     if valid_time is None:
-        valid_time = (
-            pd.Timestamp(
-                date,
-                tz="UTC",
-            )
-            + pd.Timedelta(
-                hours=cycle
-            )
-        )
+        valid_time = pd.Timestamp(
+            date,
+            tz="UTC",
+        ) + pd.Timedelta(hours=cycle)
 
     if reference_time is None:
         reference_time = valid_time
@@ -39,13 +34,9 @@ def operational_frame(
                 "domain": "conus",
                 "lead_hour": lead_hour,
                 "feature_id": feature_id,
-                "valid_time": np.datetime64(
-                    pd.Timestamp(valid_time)
-                    .tz_convert(None)
-                ),
+                "valid_time": np.datetime64(pd.Timestamp(valid_time).tz_convert(None)),
                 "reference_time": np.datetime64(
-                    pd.Timestamp(reference_time)
-                    .tz_convert(None)
+                    pd.Timestamp(reference_time).tz_convert(None)
                 ),
                 "streamflow_m3s": streamflow,
                 "method": "kerchunk",
@@ -78,28 +69,18 @@ def test_analysis_window_matches_notebook_pattern(
             )
         )
 
-        valid = (
-            pd.Timestamp(
-                config.date,
-                tz="UTC",
-            )
-            + pd.Timedelta(
-                hours=config.cycle
-            )
-        )
+        valid = pd.Timestamp(
+            config.date,
+            tz="UTC",
+        ) + pd.Timedelta(hours=config.cycle)
 
         return operational_frame(
             date=config.date,
             cycle=config.cycle,
             product=config.product,
             valid_time=valid,
-            reference_time=(
-                valid
-                - pd.Timedelta(hours=3)
-            ),
-            streamflow=float(
-                config.cycle
-            ),
+            reference_time=(valid - pd.Timedelta(hours=3)),
+            streamflow=float(config.cycle),
         )
 
     monkeypatch.setattr(
@@ -108,20 +89,14 @@ def test_analysis_window_matches_notebook_pattern(
         fake_fetch,
     )
 
-    frame = (
-        nwm_streamflow
-        .fetch_nwm_analysis_streamflow(
-            3586192,
-            "2025-07-04T07:00:00Z",
-            "2025-07-04T10:00:00Z",
-            product="analysis_assim",
-        )
+    frame = nwm_streamflow.fetch_nwm_analysis_streamflow(
+        3586192,
+        "2025-07-04T07:00:00Z",
+        "2025-07-04T10:00:00Z",
+        product="analysis_assim",
     )
 
-    assert [
-        (date, cycle)
-        for date, cycle, *_ in calls
-    ] == [
+    assert [(date, cycle) for date, cycle, *_ in calls] == [
         ("2025-07-04", 7),
         ("2025-07-04", 8),
         ("2025-07-04", 9),
@@ -129,26 +104,15 @@ def test_analysis_window_matches_notebook_pattern(
     ]
 
     assert all(
-        product == "analysis_assim"
-        and reaches == [3586192]
-        and include_t0 is True
-        for _, _, product, reaches, include_t0
-        in calls
+        product == "analysis_assim" and reaches == [3586192] and include_t0 is True
+        for _, _, product, reaches, include_t0 in calls
     )
 
-    assert frame["source"].eq(
-        "nwm"
-    ).all()
+    assert frame["source"].eq("nwm").all()
 
-    assert frame["unit"].eq(
-        "m3/s"
-    ).all()
+    assert frame["unit"].eq("m3/s").all()
 
-    assert frame[
-        "time_support"
-    ].eq(
-        "model_valid_time"
-    ).all()
+    assert frame["time_support"].eq("model_valid_time").all()
 
 
 def test_analysis_window_crosses_midnight(
@@ -172,15 +136,10 @@ def test_analysis_window_crosses_midnight(
             )
         )
 
-        valid = (
-            pd.Timestamp(
-                config.date,
-                tz="UTC",
-            )
-            + pd.Timedelta(
-                hours=config.cycle
-            )
-        )
+        valid = pd.Timestamp(
+            config.date,
+            tz="UTC",
+        ) + pd.Timedelta(hours=config.cycle)
 
         return operational_frame(
             date=config.date,
@@ -196,8 +155,7 @@ def test_analysis_window_crosses_midnight(
     )
 
     (
-        nwm_streamflow
-        .fetch_nwm_analysis_streamflow(
+        nwm_streamflow.fetch_nwm_analysis_streamflow(
             3586192,
             "2025-07-04T23:00:00Z",
             "2025-07-05T01:00:00Z",
@@ -225,9 +183,7 @@ def test_analysis_no_da_is_supported(
         include_t0,
         cache_dir,
     ):
-        observed.append(
-            config.product
-        )
+        observed.append(config.product)
 
         return operational_frame(
             date=config.date,
@@ -241,25 +197,16 @@ def test_analysis_no_da_is_supported(
         fake_fetch,
     )
 
-    frame = (
-        nwm_streamflow
-        .fetch_nwm_analysis_streamflow(
-            3586192,
-            "2025-07-04T09:00:00Z",
-            "2025-07-04T09:00:00Z",
-            product="analysis_assim_no_da",
-        )
+    frame = nwm_streamflow.fetch_nwm_analysis_streamflow(
+        3586192,
+        "2025-07-04T09:00:00Z",
+        "2025-07-04T09:00:00Z",
+        product="analysis_assim_no_da",
     )
 
-    assert observed == [
-        "analysis_assim_no_da"
-    ]
+    assert observed == ["analysis_assim_no_da"]
 
-    assert frame[
-        "series"
-    ].tolist() == [
-        "analysis_assim_no_da"
-    ]
+    assert frame["series"].tolist() == ["analysis_assim_no_da"]
 
 
 def test_analysis_rejects_forecast_product():
@@ -305,17 +252,12 @@ def test_latest_forecast_initialization(
     product,
     expected,
 ):
-    actual = (
-        nwm_streamflow
-        ._latest_forecast_initialization(
-            pd.Timestamp(reference),
-            product,
-        )
+    actual = nwm_streamflow._latest_forecast_initialization(
+        pd.Timestamp(reference),
+        product,
     )
 
-    assert actual == pd.Timestamp(
-        expected
-    )
+    assert actual == pd.Timestamp(expected)
 
 
 def test_short_range_returns_values_after_reference(
@@ -343,9 +285,7 @@ def test_short_range_returns_values_after_reference(
             }
         )
 
-        initialization = pd.Timestamp(
-            f"{config.date}T{config.cycle:02d}:00:00Z"
-        )
+        initialization = pd.Timestamp(f"{config.date}T{config.cycle:02d}:00:00Z")
 
         return pd.concat(
             [
@@ -354,12 +294,7 @@ def test_short_range_returns_values_after_reference(
                     cycle=config.cycle,
                     product=config.product,
                     lead_hour=hour,
-                    valid_time=(
-                        initialization
-                        + pd.Timedelta(
-                            hours=hour
-                        )
-                    ),
+                    valid_time=(initialization + pd.Timedelta(hours=hour)),
                     reference_time=initialization,
                     streamflow=hour / 10,
                 )
@@ -377,14 +312,11 @@ def test_short_range_returns_values_after_reference(
         fake_fetch,
     )
 
-    frame = (
-        nwm_streamflow
-        .fetch_nwm_forecast_streamflow(
-            3586192,
-            "2025-07-04T10:00:00Z",
-            "2025-07-04T12:00:00Z",
-            product="short_range",
-        )
+    frame = nwm_streamflow.fetch_nwm_forecast_streamflow(
+        3586192,
+        "2025-07-04T10:00:00Z",
+        "2025-07-04T12:00:00Z",
+        product="short_range",
     )
 
     assert observed == {
@@ -396,15 +328,9 @@ def test_short_range_returns_values_after_reference(
         "include_t0": False,
     }
 
-    assert frame[
-        "valid_time"
-    ].tolist() == [
-        pd.Timestamp(
-            "2025-07-04T11:00:00Z"
-        ),
-        pd.Timestamp(
-            "2025-07-04T12:00:00Z"
-        ),
+    assert frame["valid_time"].tolist() == [
+        pd.Timestamp("2025-07-04T11:00:00Z"),
+        pd.Timestamp("2025-07-04T12:00:00Z"),
     ]
 
 
@@ -431,9 +357,7 @@ def test_medium_range_uses_prior_cycle_and_window(
             }
         )
 
-        initialization = pd.Timestamp(
-            f"{config.date}T{config.cycle:02d}:00:00Z"
-        )
+        initialization = pd.Timestamp(f"{config.date}T{config.cycle:02d}:00:00Z")
 
         return pd.concat(
             [
@@ -442,12 +366,7 @@ def test_medium_range_uses_prior_cycle_and_window(
                     cycle=config.cycle,
                     product=config.product,
                     lead_hour=hour,
-                    valid_time=(
-                        initialization
-                        + pd.Timedelta(
-                            hours=hour
-                        )
-                    ),
+                    valid_time=(initialization + pd.Timedelta(hours=hour)),
                     reference_time=initialization,
                 )
                 for hour in range(
@@ -464,14 +383,11 @@ def test_medium_range_uses_prior_cycle_and_window(
         fake_fetch,
     )
 
-    frame = (
-        nwm_streamflow
-        .fetch_nwm_forecast_streamflow(
-            3586192,
-            "2025-07-04T10:00:00Z",
-            "2025-07-04T12:00:00Z",
-            product="medium_range_blend",
-        )
+    frame = nwm_streamflow.fetch_nwm_forecast_streamflow(
+        3586192,
+        "2025-07-04T10:00:00Z",
+        "2025-07-04T12:00:00Z",
+        product="medium_range_blend",
     )
 
     assert observed == {
@@ -481,15 +397,9 @@ def test_medium_range_uses_prior_cycle_and_window(
         "end": 6,
     }
 
-    assert frame[
-        "valid_time"
-    ].tolist() == [
-        pd.Timestamp(
-            "2025-07-04T11:00:00Z"
-        ),
-        pd.Timestamp(
-            "2025-07-04T12:00:00Z"
-        ),
+    assert frame["valid_time"].tolist() == [
+        pd.Timestamp("2025-07-04T11:00:00Z"),
+        pd.Timestamp("2025-07-04T12:00:00Z"),
     ]
 
 
@@ -515,9 +425,7 @@ def test_no_da_schedule_filters_to_available_leads(
             }
         )
 
-        initialization = pd.Timestamp(
-            f"{config.date}T{config.cycle:02d}:00:00Z"
-        )
+        initialization = pd.Timestamp(f"{config.date}T{config.cycle:02d}:00:00Z")
 
         return pd.concat(
             [
@@ -526,17 +434,10 @@ def test_no_da_schedule_filters_to_available_leads(
                     cycle=config.cycle,
                     product=config.product,
                     lead_hour=hour,
-                    valid_time=(
-                        initialization
-                        + pd.Timedelta(
-                            hours=hour
-                        )
-                    ),
+                    valid_time=(initialization + pd.Timedelta(hours=hour)),
                     reference_time=initialization,
                 )
-                for hour in (
-                    6,
-                )
+                for hour in (6,)
             ],
             ignore_index=True,
         )
@@ -547,14 +448,11 @@ def test_no_da_schedule_filters_to_available_leads(
         fake_fetch,
     )
 
-    frame = (
-        nwm_streamflow
-        .fetch_nwm_forecast_streamflow(
-            3586192,
-            "2025-07-04T10:00:00Z",
-            "2025-07-04T12:00:00Z",
-            product="medium_range_no_da",
-        )
+    frame = nwm_streamflow.fetch_nwm_forecast_streamflow(
+        3586192,
+        "2025-07-04T10:00:00Z",
+        "2025-07-04T12:00:00Z",
+        product="medium_range_no_da",
     )
 
     assert observed == {
@@ -563,13 +461,7 @@ def test_no_da_schedule_filters_to_available_leads(
         "end": 6,
     }
 
-    assert frame[
-        "valid_time"
-    ].tolist() == [
-        pd.Timestamp(
-            "2025-07-04T12:00:00Z"
-        )
-    ]
+    assert frame["valid_time"].tolist() == [pd.Timestamp("2025-07-04T12:00:00Z")]
 
 
 def test_forecast_rejects_analysis_product():
@@ -657,15 +549,7 @@ def test_normalization_rejects_missing_columns():
         ValueError,
         match="missing columns",
     ):
-        nwm_streamflow._normalize_nwm_frame(
-            pd.DataFrame(
-                {
-                    "feature_id": [
-                        3586192
-                    ]
-                }
-            )
-        )
+        nwm_streamflow._normalize_nwm_frame(pd.DataFrame({"feature_id": [3586192]}))
 
 
 def test_low_level_errors_propagate(
@@ -675,9 +559,7 @@ def test_low_level_errors_propagate(
         pass
 
     def fail(*args, **kwargs):
-        raise RetrievalFailure(
-            "source identity failure"
-        )
+        raise RetrievalFailure("source identity failure")
 
     monkeypatch.setattr(
         nwm_streamflow,

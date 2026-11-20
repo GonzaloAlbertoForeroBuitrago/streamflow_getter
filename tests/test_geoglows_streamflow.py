@@ -65,9 +65,7 @@ def fake_dataset(
     dataset["Q"].attrs.update(
         {
             "aggregation_method": aggregation,
-            "long_name": (
-                "Discharge at catchment outlet"
-            ),
+            "long_name": ("Discharge at catchment outlet"),
             "units": units,
         }
     )
@@ -77,17 +75,11 @@ def fake_dataset(
 
 @pytest.fixture(autouse=True)
 def clear_cache():
-    (
-        geoglows_streamflow
-        .clear_geoglows_dataset_cache()
-    )
+    (geoglows_streamflow.clear_geoglows_dataset_cache())
 
     yield
 
-    (
-        geoglows_streamflow
-        .clear_geoglows_dataset_cache()
-    )
+    (geoglows_streamflow.clear_geoglows_dataset_cache())
 
 
 def test_dataset_open_is_cached(
@@ -116,23 +108,15 @@ def test_dataset_open_is_cached(
         fake_open_dataset,
     )
 
-    first = (
-        geoglows_streamflow
-        .open_geoglows_retrospective_dataset()
-    )
+    first = geoglows_streamflow.open_geoglows_retrospective_dataset()
 
-    second = (
-        geoglows_streamflow
-        .open_geoglows_retrospective_dataset()
-    )
+    second = geoglows_streamflow.open_geoglows_retrospective_dataset()
 
     assert first is second
     assert len(calls) == 1
 
     assert calls[0][1] == "zarr"
-    assert calls[0][2] == {
-        "anon": True
-    }
+    assert calls[0][2] == {"anon": True}
 
 
 def test_retrospective_hourly_contract(
@@ -144,20 +128,15 @@ def test_retrospective_hourly_contract(
         lambda *args, **kwargs: fake_dataset(),
     )
 
-    frame = (
-        geoglows_streamflow
-        .fetch_geoglows_retrospective(
-            RIVER_ID,
-            "2025-07-04T07:00:00Z",
-            "2025-07-04T12:00:00Z",
-        )
+    frame = geoglows_streamflow.fetch_geoglows_retrospective(
+        RIVER_ID,
+        "2025-07-04T07:00:00Z",
+        "2025-07-04T12:00:00Z",
     )
 
     assert len(frame) == 5
 
-    assert frame[
-        "streamflow_m3s"
-    ].tolist() == pytest.approx(
+    assert frame["streamflow_m3s"].tolist() == pytest.approx(
         [
             1.85,
             1.77,
@@ -167,47 +146,21 @@ def test_retrospective_hourly_contract(
         ]
     )
 
-    assert frame["source"].eq(
-        "geoglows"
-    ).all()
+    assert frame["source"].eq("geoglows").all()
 
-    assert frame["series"].eq(
-        "retrospective_hourly"
-    ).all()
+    assert frame["series"].eq("retrospective_hourly").all()
 
-    assert frame[
-        "geoglows_river_id"
-    ].eq(
-        RIVER_ID
-    ).all()
+    assert frame["geoglows_river_id"].eq(RIVER_ID).all()
 
-    assert frame["unit"].eq(
-        "m3/s"
-    ).all()
+    assert frame["unit"].eq("m3/s").all()
 
-    assert frame[
-        "time_support"
-    ].eq(
-        "hourly_mean"
-    ).all()
+    assert frame["time_support"].eq("hourly_mean").all()
 
-    assert frame[
-        "aggregation"
-    ].eq(
-        "mean"
-    ).all()
+    assert frame["aggregation"].eq("mean").all()
 
-    assert frame[
-        "method"
-    ].eq(
-        "geoglows_zarr"
-    ).all()
+    assert frame["method"].eq("geoglows_zarr").all()
 
-    assert frame[
-        "model_version"
-    ].eq(
-        "rfs-v2"
-    ).all()
+    assert frame["model_version"].eq("rfs-v2").all()
 
 
 def test_retrospective_uses_half_open_window(
@@ -219,27 +172,16 @@ def test_retrospective_uses_half_open_window(
         lambda *args, **kwargs: fake_dataset(),
     )
 
-    frame = (
-        geoglows_streamflow
-        .fetch_geoglows_retrospective(
-            RIVER_ID,
-            "2025-07-04T07:00:00Z",
-            "2025-07-04T10:00:00Z",
-        )
+    frame = geoglows_streamflow.fetch_geoglows_retrospective(
+        RIVER_ID,
+        "2025-07-04T07:00:00Z",
+        "2025-07-04T10:00:00Z",
     )
 
-    assert frame[
-        "valid_time"
-    ].tolist() == [
-        pd.Timestamp(
-            "2025-07-04T07:00:00Z"
-        ),
-        pd.Timestamp(
-            "2025-07-04T08:00:00Z"
-        ),
-        pd.Timestamp(
-            "2025-07-04T09:00:00Z"
-        ),
+    assert frame["valid_time"].tolist() == [
+        pd.Timestamp("2025-07-04T07:00:00Z"),
+        pd.Timestamp("2025-07-04T08:00:00Z"),
+        pd.Timestamp("2025-07-04T09:00:00Z"),
     ]
 
 
@@ -252,21 +194,17 @@ def test_interval_end_is_one_hour_later(
         lambda *args, **kwargs: fake_dataset(),
     )
 
-    frame = (
-        geoglows_streamflow
-        .fetch_geoglows_retrospective(
-            RIVER_ID,
-            "2025-07-04T07:00:00Z",
-            "2025-07-04T09:00:00Z",
-        )
+    frame = geoglows_streamflow.fetch_geoglows_retrospective(
+        RIVER_ID,
+        "2025-07-04T07:00:00Z",
+        "2025-07-04T09:00:00Z",
     )
 
     assert (
-        frame["interval_end"]
-        - frame["interval_start"]
-    ).eq(
-        pd.Timedelta(hours=1)
-    ).all()
+        (frame["interval_end"] - frame["interval_start"])
+        .eq(pd.Timedelta(hours=1))
+        .all()
+    )
 
 
 def test_retrospective_timestamps_are_utc(
@@ -278,22 +216,15 @@ def test_retrospective_timestamps_are_utc(
         lambda *args, **kwargs: fake_dataset(),
     )
 
-    frame = (
-        geoglows_streamflow
-        .fetch_geoglows_retrospective(
-            RIVER_ID,
-            "2025-07-04T07:00:00-05:00",
-            "2025-07-04T14:00:00-05:00",
-        )
+    frame = geoglows_streamflow.fetch_geoglows_retrospective(
+        RIVER_ID,
+        "2025-07-04T07:00:00-05:00",
+        "2025-07-04T14:00:00-05:00",
     )
 
-    assert frame[
-        "valid_time"
-    ].dt.tz is not None
+    assert frame["valid_time"].dt.tz is not None
 
-    assert str(
-        frame["valid_time"].dt.tz
-    ) == "UTC"
+    assert str(frame["valid_time"].dt.tz) == "UTC"
 
 
 @pytest.mark.parametrize(
@@ -321,8 +252,7 @@ def test_invalid_river_id(
         match="positive integer",
     ):
         (
-            geoglows_streamflow
-            .fetch_geoglows_retrospective(
+            geoglows_streamflow.fetch_geoglows_retrospective(
                 river_id,
                 "2025-07-04T07:00:00Z",
                 "2025-07-04T12:00:00Z",
@@ -349,8 +279,7 @@ def test_invalid_time(
 
     with pytest.raises(ValueError):
         (
-            geoglows_streamflow
-            .fetch_geoglows_retrospective(
+            geoglows_streamflow.fetch_geoglows_retrospective(
                 RIVER_ID,
                 timestamp,
                 "2025-07-04T12:00:00Z",
@@ -372,8 +301,7 @@ def test_end_must_follow_start(
         match="after start_time",
     ):
         (
-            geoglows_streamflow
-            .fetch_geoglows_retrospective(
+            geoglows_streamflow.fetch_geoglows_retrospective(
                 RIVER_ID,
                 "2025-07-04T07:00:00Z",
                 "2025-07-04T07:00:00Z",
@@ -391,9 +319,7 @@ def test_dataset_requires_q(
                 periods=2,
                 freq="h",
             ),
-            "river_id": [
-                RIVER_ID
-            ],
+            "river_id": [RIVER_ID],
         }
     )
 
@@ -407,10 +333,7 @@ def test_dataset_requires_q(
         ValueError,
         match="does not contain Q",
     ):
-        (
-            geoglows_streamflow
-            .open_geoglows_retrospective_dataset()
-        )
+        (geoglows_streamflow.open_geoglows_retrospective_dataset())
 
 
 def test_dataset_requires_expected_units(
@@ -419,19 +342,14 @@ def test_dataset_requires_expected_units(
     monkeypatch.setattr(
         geoglows_streamflow.xr,
         "open_dataset",
-        lambda *args, **kwargs: fake_dataset(
-            units="ft3/s"
-        ),
+        lambda *args, **kwargs: fake_dataset(units="ft3/s"),
     )
 
     with pytest.raises(
         ValueError,
         match="Unexpected GEOGLOWS discharge units",
     ):
-        (
-            geoglows_streamflow
-            .open_geoglows_retrospective_dataset()
-        )
+        (geoglows_streamflow.open_geoglows_retrospective_dataset())
 
 
 def test_dataset_requires_mean_aggregation(
@@ -440,19 +358,14 @@ def test_dataset_requires_mean_aggregation(
     monkeypatch.setattr(
         geoglows_streamflow.xr,
         "open_dataset",
-        lambda *args, **kwargs: fake_dataset(
-            aggregation="instantaneous"
-        ),
+        lambda *args, **kwargs: fake_dataset(aggregation="instantaneous"),
     )
 
     with pytest.raises(
         ValueError,
         match="Unexpected GEOGLOWS aggregation",
     ):
-        (
-            geoglows_streamflow
-            .open_geoglows_retrospective_dataset()
-        )
+        (geoglows_streamflow.open_geoglows_retrospective_dataset())
 
 
 def test_missing_river_is_rejected(
@@ -469,8 +382,7 @@ def test_missing_river_is_rejected(
         match="river ID not found",
     ):
         (
-            geoglows_streamflow
-            .fetch_geoglows_retrospective(
+            geoglows_streamflow.fetch_geoglows_retrospective(
                 999999999,
                 "2025-07-04T07:00:00Z",
                 "2025-07-04T12:00:00Z",
@@ -498,9 +410,7 @@ def test_nonfinite_streamflow_is_rejected(
     monkeypatch.setattr(
         geoglows_streamflow.xr,
         "open_dataset",
-        lambda *args, **kwargs: fake_dataset(
-            values=values
-        ),
+        lambda *args, **kwargs: fake_dataset(values=values),
     )
 
     with pytest.raises(
@@ -508,8 +418,7 @@ def test_nonfinite_streamflow_is_rejected(
         match="non-finite",
     ):
         (
-            geoglows_streamflow
-            .fetch_geoglows_retrospective(
+            geoglows_streamflow.fetch_geoglows_retrospective(
                 RIVER_ID,
                 "2025-07-04T07:00:00Z",
                 "2025-07-04T12:00:00Z",
@@ -573,10 +482,7 @@ def test_geoglows_cleanup_preserves_validation_error(monkeypatch):
         ) as error:
             adapter.open_geoglows_retrospective_dataset()
 
-        assert any(
-            "simulated close failure" in note
-            for note in error.value.__notes__
-        )
+        assert any("simulated close failure" in note for note in error.value.__notes__)
     finally:
         adapter.clear_geoglows_dataset_cache()
 
@@ -617,10 +523,6 @@ def test_concurrent_geoglows_open_reuses_one_dataset(monkeypatch):
 
         assert len(opens) == 1
         assert len({id(dataset) for dataset in datasets}) == 1
-        assert (
-            adapter.open_geoglows_retrospective_dataset
-            .cache_info()
-            .currsize == 1
-        )
+        assert adapter.open_geoglows_retrospective_dataset.cache_info().currsize == 1
     finally:
         adapter.clear_geoglows_dataset_cache()

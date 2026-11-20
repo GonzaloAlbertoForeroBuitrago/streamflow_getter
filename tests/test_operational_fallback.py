@@ -1,4 +1,3 @@
-
 """Offline tests for Kerchunk-first operational NWM fallback."""
 
 import json
@@ -29,9 +28,7 @@ def expected_result():
     }
 
 
-def test_kerchunk_success_no_fallback(
-    monkeypatch, config, expected_result
-):
+def test_kerchunk_success_no_fallback(monkeypatch, config, expected_result):
     def native_should_not_run(*args):
         raise AssertionError("Native fallback was not expected")
 
@@ -47,16 +44,12 @@ def test_kerchunk_success_no_fallback(
         native_should_not_run,
     )
 
-    result = fetch_operational_forecast(
-        config, 1, [3586192]
-    )
+    result = fetch_operational_forecast(config, 1, [3586192])
 
     assert result["method"] == "kerchunk"
 
 
-def test_access_failure_uses_native(
-    monkeypatch, config, expected_result
-):
+def test_access_failure_uses_native(monkeypatch, config, expected_result):
     def fail_kerchunk(*args):
         raise OSError("Reference unavailable")
 
@@ -75,9 +68,7 @@ def test_access_failure_uses_native(
         },
     )
 
-    result = fetch_operational_forecast(
-        config, 1, [3586192]
-    )
+    result = fetch_operational_forecast(config, 1, [3586192])
 
     assert result["method"] == "native_remote"
     assert "OSError" in result["fallback_reason"]
@@ -92,9 +83,7 @@ def test_access_failure_uses_native(
         "Incorrect Kerchunk source identity",
     ],
 )
-def test_integrity_error_never_falls_back(
-    monkeypatch, config, message
-):
+def test_integrity_error_never_falls_back(monkeypatch, config, message):
     def fail_kerchunk(*args):
         raise ValueError(message)
 
@@ -114,16 +103,15 @@ def test_integrity_error_never_falls_back(
     )
 
     with pytest.raises(ValueError, match=message):
-        fetch_operational_forecast(
-            config, 1, [3586192]
-        )
+        fetch_operational_forecast(config, 1, [3586192])
 
 
 @pytest.mark.parametrize("cached", [False, True])
 def test_both_access_methods_fail(monkeypatch, config, tmp_path, cached):
     kerchunk_error = (
         RemoteReferenceNotFoundError("Reference metadata missing")
-        if cached else OSError("Kerchunk unavailable")
+        if cached
+        else OSError("Kerchunk unavailable")
     )
     native_error = OSError("Native unavailable")
     native_reader = Mock(side_effect=native_error)
@@ -142,7 +130,9 @@ def test_both_access_methods_fail(monkeypatch, config, tmp_path, cached):
 
     with pytest.raises(RuntimeError, match="Both Kerchunk") as caught:
         fetch_operational_forecast(
-            config, 1, [3586192],
+            config,
+            1,
+            [3586192],
             cache_dir=tmp_path if cached else None,
         )
 
@@ -162,10 +152,9 @@ def test_both_access_methods_fail(monkeypatch, config, tmp_path, cached):
         RemoteReferenceNotFoundError("Kerchunk reference metadata missing"),
     ],
 )
-def test_recoverable_access_errors_use_native(
-    monkeypatch, config, error
-):
+def test_recoverable_access_errors_use_native(monkeypatch, config, error):
     """Known access failures should trigger native retrieval."""
+
     def fail_kerchunk(*args):
         raise error
 
@@ -187,9 +176,7 @@ def test_recoverable_access_errors_use_native(
         native_success,
     )
 
-    result = fetch_operational_forecast(
-        config, 1, [3586192]
-    )
+    result = fetch_operational_forecast(config, 1, [3586192])
 
     assert result["method"] == "native_remote"
     assert type(error).__name__ in result["fallback_reason"]
@@ -197,6 +184,7 @@ def test_recoverable_access_errors_use_native(
 
 def test_permission_error_does_not_fallback(monkeypatch, config):
     """Authorization errors must not silently switch sources."""
+
     def fail_kerchunk(*args):
         raise PermissionError("Access denied")
 
@@ -216,15 +204,10 @@ def test_permission_error_does_not_fallback(monkeypatch, config):
     )
 
     with pytest.raises(PermissionError, match="Access denied"):
-        fetch_operational_forecast(
-            config, 1, [3586192]
-        )
+        fetch_operational_forecast(config, 1, [3586192])
 
 
-
-def test_coordinator_passes_cache_directory(
-    monkeypatch, config, tmp_path
-):
+def test_coordinator_passes_cache_directory(monkeypatch, config, tmp_path):
     """The coordinator forwards the selected cache directory."""
     captured = {}
 
@@ -264,10 +247,9 @@ def test_coordinator_passes_cache_directory(
         ConnectionError("Reference connection interrupted"),
     ],
 )
-def test_cached_access_failure_does_not_fallback(
-    monkeypatch, config, tmp_path, error
-):
+def test_cached_access_failure_does_not_fallback(monkeypatch, config, tmp_path, error):
     """Unclassified cached access errors must not trigger native retrieval."""
+
     def fail_kerchunk(*args, **kwargs):
         raise error
 
@@ -317,13 +299,16 @@ def cached_transport(monkeypatch, config, tmp_path):
         },
     }
     cache_file = (
-        tmp_path / config.date_folder / source["source_product"]
-        / f'{source["filename"]}.cache.json'
+        tmp_path
+        / config.date_folder
+        / source["source_product"]
+        / f"{source['filename']}.cache.json"
     )
     reference_cache.save_cache_record(
         cache_file,
         reference_cache.create_cache_record(
-            reference, source["native_url"],
+            reference,
+            source["native_url"],
             {"reference_etag": "etag-old", "source_generation": "generation-1"},
         ),
         source["native_url"],
@@ -339,14 +324,24 @@ def cached_transport(monkeypatch, config, tmp_path):
     monkeypatch.setattr(urllib.request, "urlopen", head)
     arrays = Mock(side_effect=AssertionError("Unexpected model array access"))
     monkeypatch.setattr(fsspec, "filesystem", arrays)
-    native = Mock(return_value={
-        "method": "native_remote", "streamflow_m3s": {3586192: 0.41},
-        "reference_json_bytes": 0,
-    })
+    native = Mock(
+        return_value={
+            "method": "native_remote",
+            "streamflow_m3s": {3586192: 0.41},
+            "reference_json_bytes": 0,
+        }
+    )
     monkeypatch.setattr(operational_nwm, "read_native_forecast", native)
     return SimpleNamespace(
-        source=source, cache_file=cache_file, original=cache_file.read_bytes(),
-        s3=s3, body=body, head=head, headers=headers, arrays=arrays, native=native,
+        source=source,
+        cache_file=cache_file,
+        original=cache_file.read_bytes(),
+        s3=s3,
+        body=body,
+        head=head,
+        headers=headers,
+        arrays=arrays,
+        native=native,
     )
 
 
@@ -386,7 +381,7 @@ def test_missing_remote_reference_uses_cached_native_fallback(
     origin = "metadata" if stage.startswith("metadata") else "body"
     assert result["fallback_reason"] == (
         f"RemoteReferenceNotFoundError: Kerchunk reference {origin} not found: "
-        f'{transport.source["reference_path"]}'
+        f"{transport.source['reference_path']}"
     )
     assert transport.s3.info.call_count == (2 if stage == "metadata-after" else 1)
     assert transport.head.call_count == (0 if stage == "metadata" else 1)
@@ -431,7 +426,7 @@ def test_other_cached_preparation_failures_propagate(
     elif stage == "invalid-json":
         transport.body.read.return_value = b"{"
     else:
-        transport.body.read.return_value = b'{}'
+        transport.body.read.return_value = b"{}"
 
     with pytest.raises(error_type, match=message) as caught:
         fetch_operational_forecast(config, 1, [3586192], cache_dir=tmp_path)

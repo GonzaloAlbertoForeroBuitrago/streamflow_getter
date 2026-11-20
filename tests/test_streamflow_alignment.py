@@ -22,23 +22,16 @@ def source_frame(
 
     if intervals:
         interval_start = valid_time
-        interval_end = (
-            valid_time
-            + pd.Timedelta(hours=1)
-        )
+        interval_end = valid_time + pd.Timedelta(hours=1)
     else:
         interval_start = pd.Series(
             pd.NaT,
-            index=range(
-                len(valid_time)
-            ),
+            index=range(len(valid_time)),
             dtype="datetime64[ns, UTC]",
         )
         interval_end = pd.Series(
             pd.NaT,
-            index=range(
-                len(valid_time)
-            ),
+            index=range(len(valid_time)),
             dtype="datetime64[ns, UTC]",
         )
 
@@ -47,16 +40,10 @@ def source_frame(
             "valid_time": valid_time,
             "streamflow_m3s": values,
             "unit": "m3/s",
-            "time_support": (
-                time_support
-            ),
+            "time_support": (time_support),
             "aggregation": aggregation,
-            "interval_start": (
-                interval_start
-            ),
-            "interval_end": (
-                interval_end
-            ),
+            "interval_start": (interval_start),
+            "interval_end": (interval_end),
         }
     )
 
@@ -76,11 +63,9 @@ def test_temporal_support_summary():
         intervals=True,
     )
 
-    summary = (
-        summarize_temporal_support(
-            frame,
-            label="geoglows",
-        )
+    summary = summarize_temporal_support(
+        frame,
+        label="geoglows",
     )
 
     assert summary == {
@@ -89,12 +74,8 @@ def test_temporal_support_summary():
         "time_support": "hourly_mean",
         "aggregation": "mean",
         "interval_metadata_available": True,
-        "first_valid_time": pd.Timestamp(
-            "2025-07-04T07:00:00Z"
-        ),
-        "last_valid_time": pd.Timestamp(
-            "2025-07-04T08:00:00Z"
-        ),
+        "first_valid_time": pd.Timestamp("2025-07-04T07:00:00Z"),
+        "last_valid_time": pd.Timestamp("2025-07-04T08:00:00Z"),
     }
 
 
@@ -152,73 +133,34 @@ def test_exact_time_alignment_preserves_values():
 
     row = result.iloc[0]
 
-    assert row[
-        "valid_time"
-    ] == pd.Timestamp(
-        "2025-07-04T09:00:00Z"
-    )
+    assert row["valid_time"] == pd.Timestamp("2025-07-04T09:00:00Z")
 
-    assert row[
-        "nwm_streamflow_m3s"
-    ] == pytest.approx(
-        1271.43
-    )
+    assert row["nwm_streamflow_m3s"] == pytest.approx(1271.43)
 
-    assert row[
-        "usgs_streamflow_m3s"
-    ] == pytest.approx(
-        1274.26
-    )
+    assert row["usgs_streamflow_m3s"] == pytest.approx(1274.26)
 
-    assert row[
-        "geoglows_streamflow_m3s"
-    ] == pytest.approx(
-        1.83
-    )
+    assert row["geoglows_streamflow_m3s"] == pytest.approx(1.83)
+
+    assert row["all_sources_present"] is True or row["all_sources_present"] == True
 
     assert (
-        row[
-            "all_sources_present"
-        ]
-        is True
-        or row[
-            "all_sources_present"
-        ]
-        == True
-    )
-
-    assert (
-        row[
-            "temporal_support_compatible"
-        ]
-        is False
-        or row[
-            "temporal_support_compatible"
-        ]
-        == False
+        row["temporal_support_compatible"] is False
+        or row["temporal_support_compatible"] == False
     )
 
 
 def test_compatible_hourly_sources_are_flagged():
     left = source_frame(
-        times=[
-            "2025-07-04T09:00:00Z"
-        ],
-        values=[
-            10.0
-        ],
+        times=["2025-07-04T09:00:00Z"],
+        values=[10.0],
         time_support="hourly_mean",
         aggregation="mean",
         intervals=True,
     )
 
     right = source_frame(
-        times=[
-            "2025-07-04T09:00:00Z"
-        ],
-        values=[
-            11.0
-        ],
+        times=["2025-07-04T09:00:00Z"],
+        values=[11.0],
         time_support="hourly_mean",
         aggregation="mean",
         intervals=True,
@@ -254,9 +196,7 @@ def test_outer_alignment_preserves_missing_sources():
     )
 
     usgs = source_frame(
-        times=[
-            "2025-07-04T09:00:00Z"
-        ],
+        times=["2025-07-04T09:00:00Z"],
         values=[
             3,
         ],
@@ -275,40 +215,23 @@ def test_outer_alignment_preserves_missing_sources():
     assert len(result) == 2
 
     at_ten = result.loc[
-        result["valid_time"]
-        == pd.Timestamp(
-            "2025-07-04T10:00:00Z"
-        )
+        result["valid_time"] == pd.Timestamp("2025-07-04T10:00:00Z")
     ].iloc[0]
 
-    assert pd.isna(
-        at_ten[
-            "usgs_streamflow_m3s"
-        ]
-    )
+    assert pd.isna(at_ten["usgs_streamflow_m3s"])
 
-    assert not bool(
-        at_ten[
-            "all_sources_present"
-        ]
-    )
+    assert not bool(at_ten["all_sources_present"])
 
 
 def test_alignment_does_not_mutate_inputs():
     frame = source_frame(
-        times=[
-            "2025-07-04T09:00:00Z"
-        ],
-        values=[
-            1.0
-        ],
+        times=["2025-07-04T09:00:00Z"],
+        values=[1.0],
         time_support="instantaneous",
         aggregation="native",
     )
 
-    original = frame.copy(
-        deep=True
-    )
+    original = frame.copy(deep=True)
 
     build_exact_time_comparison(
         {
@@ -349,9 +272,7 @@ def test_duplicate_valid_time_is_rejected():
 
 def test_non_m3s_unit_is_rejected():
     frame = source_frame(
-        times=[
-            "2025-07-04T09:00:00Z"
-        ],
+        times=["2025-07-04T09:00:00Z"],
         values=[
             1,
         ],
@@ -386,10 +307,7 @@ def test_mixed_support_summary_is_rejected():
         aggregation="native",
     )
 
-    frame.loc[
-        1,
-        "time_support"
-    ] = "hourly_mean"
+    frame.loc[1, "time_support"] = "hourly_mean"
 
     with pytest.raises(
         ValueError,
@@ -413,9 +331,7 @@ def test_invalid_join_mode(
     how,
 ):
     frame = source_frame(
-        times=[
-            "2025-07-04T09:00:00Z"
-        ],
+        times=["2025-07-04T09:00:00Z"],
         values=[
             1,
         ],
@@ -440,19 +356,13 @@ def test_empty_series_mapping_is_rejected():
         ValueError,
         match="at least one source",
     ):
-        build_exact_time_comparison(
-            {}
-        )
+        build_exact_time_comparison({})
 
 
 def test_summary_returns_python_bool():
     frame = source_frame(
-        times=[
-            "2025-07-04T09:00:00Z"
-        ],
-        values=[
-            1.0
-        ],
+        times=["2025-07-04T09:00:00Z"],
+        values=[1.0],
         time_support="model_valid_time",
         aggregation="native",
     )
@@ -462,34 +372,21 @@ def test_summary_returns_python_bool():
         label="nwm",
     )
 
-    assert type(
-        summary[
-            "interval_metadata_available"
-        ]
-    ) is bool
+    assert type(summary["interval_metadata_available"]) is bool
 
 
 def test_partial_interval_metadata_is_incompatible():
     left = source_frame(
-        times=[
-            "2025-07-04T09:00:00Z"
-        ],
-        values=[
-            1.0
-        ],
+        times=["2025-07-04T09:00:00Z"],
+        values=[1.0],
         time_support="hourly_mean",
         aggregation="mean",
         intervals=True,
     )
 
-    right = left.copy(
-        deep=True
-    )
+    right = left.copy(deep=True)
 
-    right.loc[
-        0,
-        "interval_end"
-    ] = pd.NaT
+    right.loc[0, "interval_end"] = pd.NaT
 
     result = build_exact_time_comparison(
         {
@@ -508,12 +405,8 @@ def test_partial_interval_metadata_is_incompatible():
 
 def test_invalid_interval_timestamp_is_rejected():
     frame = source_frame(
-        times=[
-            "2025-07-04T09:00:00Z"
-        ],
-        values=[
-            1.0
-        ],
+        times=["2025-07-04T09:00:00Z"],
+        values=[1.0],
         time_support="hourly_mean",
         aggregation="mean",
         intervals=True,
@@ -521,15 +414,9 @@ def test_invalid_interval_timestamp_is_rejected():
 
     # Cast to object so malformed external input can reach the
     # package validator instead of being rejected by pandas assignment.
-    frame["interval_end"] = (
-        frame["interval_end"]
-        .astype(object)
-    )
+    frame["interval_end"] = frame["interval_end"].astype(object)
 
-    frame.loc[
-        0,
-        "interval_end"
-    ] = "not-a-time"
+    frame.loc[0, "interval_end"] = "not-a-time"
 
     with pytest.raises(
         ValueError,
@@ -543,20 +430,13 @@ def test_invalid_interval_timestamp_is_rejected():
 
 def test_missing_temporal_metadata_is_rejected():
     frame = source_frame(
-        times=[
-            "2025-07-04T09:00:00Z"
-        ],
-        values=[
-            1.0
-        ],
+        times=["2025-07-04T09:00:00Z"],
+        values=[1.0],
         time_support="instantaneous",
         aggregation="native",
     )
 
-    frame.loc[
-        0,
-        "time_support"
-    ] = None
+    frame.loc[0, "time_support"] = None
 
     with pytest.raises(
         ValueError,
@@ -570,12 +450,8 @@ def test_missing_temporal_metadata_is_rejected():
 
 def test_nonfinite_streamflow_is_rejected():
     frame = source_frame(
-        times=[
-            "2025-07-04T09:00:00Z"
-        ],
-        values=[
-            float("inf")
-        ],
+        times=["2025-07-04T09:00:00Z"],
+        values=[float("inf")],
         time_support="instantaneous",
         aggregation="native",
     )
@@ -593,12 +469,8 @@ def test_nonfinite_streamflow_is_rejected():
 
 def test_trimmed_label_collision_is_rejected():
     frame = source_frame(
-        times=[
-            "2025-07-04T09:00:00Z"
-        ],
-        values=[
-            1.0
-        ],
+        times=["2025-07-04T09:00:00Z"],
+        values=[1.0],
         time_support="instantaneous",
         aggregation="native",
     )
@@ -613,4 +485,3 @@ def test_trimmed_label_collision_is_rejected():
                 "nwm ": frame,
             }
         )
-

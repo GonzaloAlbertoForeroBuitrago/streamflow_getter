@@ -1,4 +1,3 @@
-
 """Tests for validated operational NWM product specifications."""
 
 import pytest
@@ -10,6 +9,7 @@ from streamflow_getter.operational_nwm import (
     resolve_operational_source,
 )
 
+
 def test_medium_range_member1_source_identity():
     config = ForecastConfig(
         date="2026-04-19",
@@ -18,9 +18,7 @@ def test_medium_range_member1_source_identity():
         domain="conus",
     )
 
-    assert config.filename(1) == (
-        "nwm.t00z.medium_range.channel_rt_1.f001.conus.nc"
-    )
+    assert config.filename(1) == ("nwm.t00z.medium_range.channel_rt_1.f001.conus.nc")
 
     assert config.native_url(1).endswith(
         "/nwm.20260419/medium_range_mem1/"
@@ -85,8 +83,7 @@ def test_medium_range_member1_analysis_t0():
     )
 
     assert config.analysis_native_url().endswith(
-        "/nwm.20260419/analysis_assim/"
-        "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
+        "/nwm.20260419/analysis_assim/nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
     )
 
 
@@ -97,9 +94,7 @@ def test_short_range_configuration_unchanged():
     )
 
     assert config.product == "short_range"
-    assert config.filename(1) == (
-        "nwm.t00z.short_range.channel_rt.f001.conus.nc"
-    )
+    assert config.filename(1) == ("nwm.t00z.short_range.channel_rt.f001.conus.nc")
 
 
 def test_medium_range_member1_forecast_source():
@@ -118,9 +113,7 @@ def test_medium_range_member1_forecast_source():
 
     assert source["source_product"] == "medium_range_mem1"
     assert source["lead_hour"] == 1
-    assert source["filename"] == (
-        "nwm.t00z.medium_range.channel_rt_1.f001.conus.nc"
-    )
+    assert source["filename"] == ("nwm.t00z.medium_range.channel_rt_1.f001.conus.nc")
     assert source["native_url"] == config.native_url(1)
     assert source["reference_path"] == config.reference_path(1)
 
@@ -141,9 +134,7 @@ def test_medium_range_member1_analysis_source():
 
     assert source["source_product"] == "analysis_assim"
     assert source["lead_hour"] == 0
-    assert source["filename"] == (
-        "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
-    )
+    assert source["filename"] == ("nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc")
     assert source["native_url"] == config.analysis_native_url()
     assert source["reference_path"] == config.analysis_reference_path()
 
@@ -165,26 +156,18 @@ def test_medium_range_member1_series_with_t0(monkeypatch):
     def fake_fetch(config, hour, reach_ids, **kwargs):
         calls.append(hour)
 
-        valid_time = pd.Timestamp(
-            "2026-04-19T00:00:00"
-        ) + pd.Timedelta(hours=hour)
+        valid_time = pd.Timestamp("2026-04-19T00:00:00") + pd.Timedelta(hours=hour)
 
         return {
             "forecast_date": config.date,
             "forecast_cycle": config.cycle,
-            "product": (
-                "analysis_assim"
-                if hour == 0
-                else config.product
-            ),
+            "product": ("analysis_assim" if hour == 0 else config.product),
             "domain": config.domain,
             "lead_hour": hour,
             "method": "kerchunk",
             "valid_time": str(valid_time),
             "reference_time": (
-                "2026-04-18T21:00:00"
-                if hour == 0
-                else "2026-04-19T00:00:00"
+                "2026-04-18T21:00:00" if hour == 0 else "2026-04-19T00:00:00"
             ),
             "streamflow_m3s": {3586192: 0.41},
             "reference_json_bytes": 100,
@@ -282,9 +265,7 @@ def test_medium_range_invalid_series_range_before_fetch(
     )
 
     def unexpected_fetch(*args, **kwargs):
-        raise AssertionError(
-            "Remote retrieval must not run for invalid lead hours"
-        )
+        raise AssertionError("Remote retrieval must not run for invalid lead hours")
 
     monkeypatch.setattr(
         operational_nwm,
@@ -302,9 +283,7 @@ def test_medium_range_invalid_series_range_before_fetch(
         )
 
 
-def test_medium_range_member1_cache_isolation(
-    tmp_path, monkeypatch
-):
+def test_medium_range_member1_cache_isolation(tmp_path, monkeypatch):
     """Cache medium-range forecast and analysis t0 separately."""
     import json
     from unittest.mock import MagicMock
@@ -347,16 +326,14 @@ def test_medium_range_member1_cache_isolation(
             url = config.native_url(1)
 
         context = MagicMock()
-        context.__enter__.return_value.read.return_value = (
-            json.dumps(make_reference(url)).encode()
-        )
+        context.__enter__.return_value.read.return_value = json.dumps(
+            make_reference(url)
+        ).encode()
         return context
 
     s3.open.side_effect = open_reference
 
-    monkeypatch.setattr(
-        s3fs, "S3FileSystem", lambda **kwargs: s3
-    )
+    monkeypatch.setattr(s3fs, "S3FileSystem", lambda **kwargs: s3)
 
     monkeypatch.setattr(
         reference_cache,
@@ -382,14 +359,10 @@ def test_medium_range_member1_cache_isolation(
         hour = open_dataset.calls % 2
         open_dataset.calls += 1
 
-        valid_time = np.datetime64(
-            "2026-04-19T00:00:00"
-        ) + np.timedelta64(hour, "h")
+        valid_time = np.datetime64("2026-04-19T00:00:00") + np.timedelta64(hour, "h")
 
         reference_time = np.datetime64(
-            "2026-04-18T21:00:00"
-            if hour == 0
-            else "2026-04-19T00:00:00"
+            "2026-04-18T21:00:00" if hour == 0 else "2026-04-19T00:00:00"
         )
 
         ds = xr.Dataset(
@@ -412,17 +385,11 @@ def test_medium_range_member1_cache_isolation(
 
     open_dataset.calls = 0
 
-    monkeypatch.setattr(
-        xr, "open_zarr", open_dataset
-    )
+    monkeypatch.setattr(xr, "open_zarr", open_dataset)
 
-    read_kerchunk_forecast(
-        config, 0, [3586192], cache_dir=tmp_path
-    )
+    read_kerchunk_forecast(config, 0, [3586192], cache_dir=tmp_path)
 
-    read_kerchunk_forecast(
-        config, 1, [3586192], cache_dir=tmp_path
-    )
+    read_kerchunk_forecast(config, 1, [3586192], cache_dir=tmp_path)
 
     analysis_cache = (
         tmp_path
@@ -625,13 +592,9 @@ def test_medium_range_blend_source_paths():
         product="medium_range_blend",
     )
 
-    filename = (
-        "nwm.t00z.medium_range_blend.channel_rt.f001.conus.nc"
-    )
+    filename = "nwm.t00z.medium_range_blend.channel_rt.f001.conus.nc"
 
-    assert config.native_url(1).endswith(
-        f"/nwm.20260419/medium_range_blend/{filename}"
-    )
+    assert config.native_url(1).endswith(f"/nwm.20260419/medium_range_blend/{filename}")
 
     assert config.reference_path(1).endswith(
         f"/nwm.20260419/medium_range_blend/{filename}.json"
@@ -741,12 +704,8 @@ def test_long_range_mem1_configuration():
     assert config.forecast_hours(1, 24) == [6, 12, 18, 24]
     assert config.forecast_hours(7, 24) == [12, 18, 24]
 
-    assert config.filename(6) == (
-        "nwm.t00z.long_range.channel_rt_1.f006.conus.nc"
-    )
-    assert config.filename(720) == (
-        "nwm.t00z.long_range.channel_rt_1.f720.conus.nc"
-    )
+    assert config.filename(6) == ("nwm.t00z.long_range.channel_rt_1.f006.conus.nc")
+    assert config.filename(720) == ("nwm.t00z.long_range.channel_rt_1.f720.conus.nc")
 
 
 @pytest.mark.parametrize("cycle", [0, 6, 12, 18])
@@ -792,9 +751,7 @@ def test_long_range_mem1_source_paths():
     source = resolve_operational_source(config, 6)
 
     assert source["source_product"] == "long_range_mem1"
-    assert source["filename"] == (
-        "nwm.t00z.long_range.channel_rt_1.f006.conus.nc"
-    )
+    assert source["filename"] == ("nwm.t00z.long_range.channel_rt_1.f006.conus.nc")
     assert "/long_range_mem1/" in source["native_url"]
     assert "/long_range_mem1/" in source["reference_path"]
 
@@ -809,9 +766,7 @@ def test_long_range_mem1_analysis_source():
     source = resolve_operational_source(config, 0)
 
     assert source["source_product"] == "analysis_assim"
-    assert source["filename"] == (
-        "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
-    )
+    assert source["filename"] == ("nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc")
 
 
 @pytest.mark.parametrize("member", [2, 3, 4])
@@ -910,9 +865,8 @@ def test_long_range_ensemble_analysis_source(member):
     source = resolve_operational_source(config, 0)
 
     assert source["source_product"] == "analysis_assim"
-    assert source["filename"] == (
-        "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
-    )
+    assert source["filename"] == ("nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc")
+
 
 @pytest.mark.parametrize("member", range(1, 7))
 @pytest.mark.parametrize(
@@ -926,9 +880,7 @@ def test_long_range_ensemble_analysis_source(member):
         ("2026-04-19", 0, 1),
     ],
 )
-def test_historical_medium_range_lead_step(
-    member, date, cycle, expected_step
-):
+def test_historical_medium_range_lead_step(member, date, cycle, expected_step):
     config = ForecastConfig(
         date=date,
         cycle=cycle,
@@ -943,9 +895,7 @@ def test_historical_medium_range_lead_step(
 
 @pytest.mark.parametrize("member", range(1, 7))
 @pytest.mark.parametrize("cycle", [0, 6])
-def test_historical_medium_range_rejects_unavailable_lead(
-    member, cycle
-):
+def test_historical_medium_range_rejects_unavailable_lead(member, cycle):
     config = ForecastConfig(
         date="2021-04-20",
         cycle=cycle,

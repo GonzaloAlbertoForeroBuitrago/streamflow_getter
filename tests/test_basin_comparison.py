@@ -15,28 +15,13 @@ def test_area_comparison_available():
 
     assert result["available"] is True
 
-    assert result[
-        "difference_km2"
-    ] == pytest.approx(
-        42.372512223232
-    )
+    assert result["difference_km2"] == pytest.approx(42.372512223232)
 
-    assert result[
-        "relative_difference_pct"
-    ] == pytest.approx(
-        5.6805966779
-    )
+    assert result["relative_difference_pct"] == pytest.approx(5.6805966779)
 
-    assert result[
-        "area_ratio"
-    ] == pytest.approx(
-        1.0568059668
-    )
+    assert result["area_ratio"] == pytest.approx(1.0568059668)
 
-    assert (
-        "supporting evidence only"
-        in result["message"]
-    )
+    assert "supporting evidence only" in result["message"]
 
 
 def test_nwm_usgs_area_comparison():
@@ -49,11 +34,7 @@ def test_nwm_usgs_area_comparison():
 
     assert result["available"] is True
 
-    assert result[
-        "relative_difference_pct"
-    ] == pytest.approx(
-        0.2239628172
-    )
+    assert result["relative_difference_pct"] == pytest.approx(0.2239628172)
 
 
 @pytest.mark.parametrize(
@@ -75,21 +56,11 @@ def test_missing_area_is_normal(
         candidate_label="GEOGLOWS",
     )
 
-    assert result[
-        "available"
-    ] is False
+    assert result["available"] is False
 
-    assert (
-        result[
-            "relative_difference_pct"
-        ]
-        is None
-    )
+    assert result["relative_difference_pct"] is None
 
-    assert (
-        "unavailable"
-        in result["message"]
-    )
+    assert "unavailable" in result["message"]
 
 
 @pytest.mark.parametrize(

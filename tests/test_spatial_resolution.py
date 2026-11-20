@@ -162,12 +162,14 @@ def test_load_nearby_reaches_geographic_filter(tmp_path, monkeypatch):
     calls = []
 
     def fake_read_dataframe(path_arg, *, layer, bbox, columns):
-        calls.append({
-            "path": path_arg,
-            "layer": layer,
-            "bbox": bbox,
-            "columns": columns,
-        })
+        calls.append(
+            {
+                "path": path_arg,
+                "layer": layer,
+                "bbox": bbox,
+                "columns": columns,
+            }
+        )
         return gpd.GeoDataFrame(
             {"ID": [3586192]},
             geometry=[LineString([(-99.32, 30.06), (-99.32, 30.08)])],
@@ -197,11 +199,8 @@ def test_load_nearby_reaches_geographic_filter(tmp_path, monkeypatch):
     assert calls[0]["columns"] == ["ID"]
 
 
-
 @pytest.mark.usefixtures("mock_hydrofabric_crs")
-def test_geographic_envelope_covers_projected_radius(
-    tmp_path, monkeypatch
-):
+def test_geographic_envelope_covers_projected_radius(tmp_path, monkeypatch):
     """The geographic filter must cover the projected search circle."""
     import pyogrio
     from shapely.geometry import Point
@@ -238,16 +237,24 @@ def test_geographic_envelope_covers_projected_radius(
         max_distance_m=radius,
     )
 
-    center = gpd.GeoSeries(
-        [Point(longitude, latitude)],
-        crs="EPSG:4326",
-    ).to_crs("EPSG:5070").iloc[0]
+    center = (
+        gpd.GeoSeries(
+            [Point(longitude, latitude)],
+            crs="EPSG:4326",
+        )
+        .to_crs("EPSG:5070")
+        .iloc[0]
+    )
 
     # Sample the projected search-circle boundary densely.
-    boundary = gpd.GeoSeries(
-        [center.buffer(radius, quad_segs=256).boundary],
-        crs="EPSG:5070",
-    ).to_crs("EPSG:4269").iloc[0]
+    boundary = (
+        gpd.GeoSeries(
+            [center.buffer(radius, quad_segs=256).boundary],
+            crs="EPSG:5070",
+        )
+        .to_crs("EPSG:4269")
+        .iloc[0]
+    )
 
     west, south, east, north = captured["bbox"]
 
@@ -257,7 +264,6 @@ def test_geographic_envelope_covers_projected_radius(
     assert south <= miny
     assert east >= maxx
     assert north >= maxy
-
 
 
 @pytest.mark.usefixtures("mock_hydrofabric_crs")
@@ -319,7 +325,6 @@ def test_reaches_in_bbox_invalid(tmp_path):
         )
 
 
-
 @pytest.mark.usefixtures("mock_hydrofabric_crs")
 def test_reaches_in_polygon(tmp_path, monkeypatch, reaches):
     import pyogrio
@@ -369,22 +374,22 @@ def test_reaches_in_polygon_invalid(tmp_path):
 
     from streamflow_getter.spatial_resolution import reaches_in_polygon
 
-    invalid = Polygon([
-        (0, 0),
-        (1, 1),
-        (1, 0),
-        (0, 1),
-        (0, 0),
-    ])
+    invalid = Polygon(
+        [
+            (0, 0),
+            (1, 1),
+            (1, 0),
+            (0, 1),
+            (0, 0),
+        ]
+    )
 
     with pytest.raises(ValueError, match="valid"):
         reaches_in_polygon(tmp_path, invalid)
 
 
 @pytest.mark.usefixtures("mock_hydrofabric_crs")
-def test_reaches_in_polygon_multipolygon(
-    tmp_path, monkeypatch, reaches
-):
+def test_reaches_in_polygon_multipolygon(tmp_path, monkeypatch, reaches):
     import pyogrio
     from shapely.geometry import MultiPolygon, box
 
@@ -399,10 +404,12 @@ def test_reaches_in_polygon_multipolygon(
         lambda *args, **kwargs: reaches.to_crs("EPSG:4269"),
     )
 
-    polygon = MultiPolygon([
-        box(-99.325, 30.065, -99.315, 30.075),
-        box(-99.405, 30.065, -99.395, 30.075),
-    ])
+    polygon = MultiPolygon(
+        [
+            box(-99.325, 30.065, -99.315, 30.075),
+            box(-99.405, 30.065, -99.395, 30.075),
+        ]
+    )
 
     result = reaches_in_polygon(path, polygon)
 
@@ -420,7 +427,6 @@ def test_nearest_reaches_rejects_fractional_feature_id(reaches):
             30.07,
             max_distance_m=2000,
         )
-
 
 
 def test_hydrofabric_crs_valid(monkeypatch):
@@ -500,16 +506,22 @@ def test_load_geojson_polygon_geometry(tmp_path):
     from streamflow_getter.spatial_resolution import load_geojson_polygon
 
     path = tmp_path / "polygon.geojson"
-    path.write_text(json.dumps({
-        "type": "Polygon",
-        "coordinates": [[
-            [-99.35, 30.05],
-            [-99.30, 30.05],
-            [-99.30, 30.09],
-            [-99.35, 30.09],
-            [-99.35, 30.05],
-        ]],
-    }))
+    path.write_text(
+        json.dumps(
+            {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [-99.35, 30.05],
+                        [-99.30, 30.05],
+                        [-99.30, 30.09],
+                        [-99.35, 30.09],
+                        [-99.35, 30.05],
+                    ]
+                ],
+            }
+        )
+    )
 
     polygon = load_geojson_polygon(path)
 
@@ -523,20 +535,26 @@ def test_load_geojson_polygon_feature(tmp_path):
     from streamflow_getter.spatial_resolution import load_geojson_polygon
 
     path = tmp_path / "feature.geojson"
-    path.write_text(json.dumps({
-        "type": "Feature",
-        "properties": {},
-        "geometry": {
-            "type": "Polygon",
-            "coordinates": [[
-                [-99.35, 30.05],
-                [-99.30, 30.05],
-                [-99.30, 30.09],
-                [-99.35, 30.09],
-                [-99.35, 30.05],
-            ]],
-        },
-    }))
+    path.write_text(
+        json.dumps(
+            {
+                "type": "Feature",
+                "properties": {},
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [-99.35, 30.05],
+                            [-99.30, 30.05],
+                            [-99.30, 30.09],
+                            [-99.35, 30.09],
+                            [-99.35, 30.05],
+                        ]
+                    ],
+                },
+            }
+        )
+    )
 
     polygon = load_geojson_polygon(path)
 
@@ -556,10 +574,14 @@ def test_load_geojson_polygon_rejects_point(tmp_path):
     from streamflow_getter.spatial_resolution import load_geojson_polygon
 
     path = tmp_path / "point.geojson"
-    path.write_text(json.dumps({
-        "type": "Point",
-        "coordinates": [-99.32, 30.07],
-    }))
+    path.write_text(
+        json.dumps(
+            {
+                "type": "Point",
+                "coordinates": [-99.32, 30.07],
+            }
+        )
+    )
 
     with pytest.raises(ValueError, match="Polygon"):
         load_geojson_polygon(path)
@@ -572,23 +594,31 @@ def test_load_geojson_polygon_feature_collection(tmp_path):
     from streamflow_getter.spatial_resolution import load_geojson_polygon
 
     path = tmp_path / "collection.geojson"
-    path.write_text(json.dumps({
-        "type": "FeatureCollection",
-        "features": [{
-            "type": "Feature",
-            "properties": {},
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [[
-                    [-99.35, 30.05],
-                    [-99.30, 30.05],
-                    [-99.30, 30.09],
-                    [-99.35, 30.09],
-                    [-99.35, 30.05],
-                ]],
-            },
-        }],
-    }))
+    path.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "properties": {},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [
+                                [
+                                    [-99.35, 30.05],
+                                    [-99.30, 30.05],
+                                    [-99.30, 30.09],
+                                    [-99.35, 30.09],
+                                    [-99.35, 30.05],
+                                ]
+                            ],
+                        },
+                    }
+                ],
+            }
+        )
+    )
 
     polygon = load_geojson_polygon(path)
 
@@ -619,13 +649,17 @@ def test_load_geojson_polygon_multipolygon(tmp_path):
     ]
 
     path = tmp_path / "multipolygon.geojson"
-    path.write_text(json.dumps({
-        "type": "MultiPolygon",
-        "coordinates": [
-            [ring_a],
-            [ring_b],
-        ],
-    }))
+    path.write_text(
+        json.dumps(
+            {
+                "type": "MultiPolygon",
+                "coordinates": [
+                    [ring_a],
+                    [ring_b],
+                ],
+            }
+        )
+    )
 
     polygon = load_geojson_polygon(path)
 
@@ -641,13 +675,17 @@ def test_load_geojson_polygon_rejects_multiple_features(tmp_path):
     from streamflow_getter.spatial_resolution import load_geojson_polygon
 
     path = tmp_path / "multiple.geojson"
-    path.write_text(json.dumps({
-        "type": "FeatureCollection",
-        "features": [
-            {"type": "Feature", "properties": {}, "geometry": None},
-            {"type": "Feature", "properties": {}, "geometry": None},
-        ],
-    }))
+    path.write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "features": [
+                    {"type": "Feature", "properties": {}, "geometry": None},
+                    {"type": "Feature", "properties": {}, "geometry": None},
+                ],
+            }
+        )
+    )
 
     with pytest.raises(ValueError, match="exactly one"):
         load_geojson_polygon(path)
@@ -660,16 +698,22 @@ def test_load_geojson_polygon_rejects_invalid_geometry(tmp_path):
     from streamflow_getter.spatial_resolution import load_geojson_polygon
 
     path = tmp_path / "invalid.geojson"
-    path.write_text(json.dumps({
-        "type": "Polygon",
-        "coordinates": [[
-            [0, 0],
-            [1, 1],
-            [1, 0],
-            [0, 1],
-            [0, 0],
-        ]],
-    }))
+    path.write_text(
+        json.dumps(
+            {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [0, 0],
+                        [1, 1],
+                        [1, 0],
+                        [0, 1],
+                        [0, 0],
+                    ]
+                ],
+            }
+        )
+    )
 
     with pytest.raises(ValueError, match="valid"):
         load_geojson_polygon(path)
@@ -679,18 +723,22 @@ def test_load_geojson_polygon_rejects_invalid_geometry(tmp_path):
     "ring",
     [
         [
-            [200, 30], [201, 30],
-            [201, 31], [200, 31], [200, 30],
+            [200, 30],
+            [201, 30],
+            [201, 31],
+            [200, 31],
+            [200, 30],
         ],
         [
-            [-99, 95], [-98, 95],
-            [-98, 96], [-99, 96], [-99, 95],
+            [-99, 95],
+            [-98, 95],
+            [-98, 96],
+            [-99, 96],
+            [-99, 95],
         ],
     ],
 )
-def test_load_geojson_polygon_invalid_geographic_bounds(
-    tmp_path, ring
-):
+def test_load_geojson_polygon_invalid_geographic_bounds(tmp_path, ring):
     """Reject polygons outside valid geographic coordinate bounds."""
     import json
 
@@ -698,10 +746,12 @@ def test_load_geojson_polygon_invalid_geographic_bounds(
 
     path = tmp_path / "invalid_bounds.geojson"
     path.write_text(
-        json.dumps({
-            "type": "Polygon",
-            "coordinates": [ring],
-        }),
+        json.dumps(
+            {
+                "type": "Polygon",
+                "coordinates": [ring],
+            }
+        ),
         encoding="utf-8",
     )
 

@@ -1,4 +1,3 @@
-
 """Tests for production NWM reference caching."""
 
 import errno
@@ -85,9 +84,7 @@ def test_wrong_source_rejected(valid_reference, metadata):
     )
 
 
-def test_fresh_cache_reused(
-    tmp_path, valid_reference, metadata
-):
+def test_fresh_cache_reused(tmp_path, valid_reference, metadata):
     path = tmp_path / "record.json"
 
     save_cache_record(
@@ -109,9 +106,7 @@ def test_fresh_cache_reused(
     assert result == valid_reference
 
 
-def test_reference_change_refreshes(
-    tmp_path, valid_reference, metadata
-):
+def test_reference_change_refreshes(tmp_path, valid_reference, metadata):
     path = tmp_path / "record.json"
 
     old_metadata = {
@@ -138,9 +133,7 @@ def test_reference_change_refreshes(
     assert updated["manifest"]["reference_etag"] == "etag-1"
 
 
-def test_source_generation_change_rejected(
-    tmp_path, valid_reference, metadata
-):
+def test_source_generation_change_rejected(tmp_path, valid_reference, metadata):
     path = tmp_path / "record.json"
 
     save_cache_record(
@@ -163,9 +156,7 @@ def test_source_generation_change_rejected(
         )
 
 
-def test_failed_refresh_preserves_record(
-    tmp_path, valid_reference, metadata
-):
+def test_failed_refresh_preserves_record(tmp_path, valid_reference, metadata):
     path = tmp_path / "record.json"
 
     save_cache_record(
@@ -205,8 +196,12 @@ def test_failed_refresh_preserves_record(
     ids=["permission", "directory", "io"],
 )
 def test_cache_read_io_error_stops_refresh_and_preserves_record(
-    tmp_path, monkeypatch, valid_reference, metadata,
-    error_type, error_number,
+    tmp_path,
+    monkeypatch,
+    valid_reference,
+    metadata,
+    error_type,
+    error_number,
 ):
     path = tmp_path / "record.json"
     save_cache_record(
@@ -246,7 +241,6 @@ def test_invalid_download_rejected(tmp_path, metadata):
         )
 
     assert not path.exists()
-
 
 
 def test_fetch_remote_metadata(monkeypatch):
@@ -310,9 +304,16 @@ def test_stale_s3_listing_cannot_hide_reference_refresh(
 
     s3 = s3fs.S3FileSystem(anon=True, skip_instance_cache=True)
     s3.dircache["bucket/references"] = (
-        [{"name": reference_path, "type": "file", "size": 1,
-          "ETag": metadata["reference_etag"]}]
-        if listing_state == "stale-etag" else []
+        [
+            {
+                "name": reference_path,
+                "type": "file",
+                "size": 1,
+                "ETag": metadata["reference_etag"],
+            }
+        ]
+        if listing_state == "stale-etag"
+        else []
     )
 
     async def current_reference_metadata(operation, *args, **kwargs):
@@ -338,7 +339,8 @@ def test_stale_s3_listing_cannot_hide_reference_refresh(
     downloader = Mock(side_effect=download_reference)
 
     result = load_fresh_reference(
-        cache_file, URL,
+        cache_file,
+        URL,
         lambda: fetch_remote_metadata(reference_path, URL, s3=s3),
         downloader,
     )
@@ -484,6 +486,7 @@ def test_fetch_remote_metadata_missing_etag(monkeypatch):
             s3=s3,
         )
 
+
 def test_metadata_missing_returns_unknown(metadata):
     current = metadata.copy()
     del current["source_generation"]
@@ -500,9 +503,8 @@ def test_source_change_takes_priority_over_reference_change(metadata):
 
     assert compare_metadata(metadata, current) == "source_changed"
 
-def test_metadata_change_during_download_rejected(
-    tmp_path, valid_reference, metadata
-):
+
+def test_metadata_change_during_download_rejected(tmp_path, valid_reference, metadata):
     """Reject a reference if remote metadata changes during download."""
     path = tmp_path / "record.json"
 
@@ -530,9 +532,8 @@ def test_metadata_change_during_download_rejected(
 
     assert not path.exists()
 
-def test_corrupted_cache_is_refreshed(
-    tmp_path, valid_reference, metadata
-):
+
+def test_corrupted_cache_is_refreshed(tmp_path, valid_reference, metadata):
     """Replace a corrupted cache with a validated reference."""
     path = tmp_path / "record.json"
     path.write_text("{invalid json", encoding="utf-8")
@@ -551,22 +552,21 @@ def test_corrupted_cache_is_refreshed(
     assert cached is not None
     assert cached["reference"] == valid_reference
 
-def test_wrong_source_cache_is_refreshed(
-    tmp_path, valid_reference, metadata
-):
+
+def test_wrong_source_cache_is_refreshed(tmp_path, valid_reference, metadata):
     """Replace cached references pointing to an incorrect source."""
     path = tmp_path / "record.json"
 
     wrong_reference = json.loads(json.dumps(valid_reference))
-    wrong_reference["refs"]["streamflow/0"][0] = (
-        "https://example.org/wrong.nc"
-    )
+    wrong_reference["refs"]["streamflow/0"][0] = "https://example.org/wrong.nc"
 
     path.write_text(
-        json.dumps({
-            "reference": wrong_reference,
-            "manifest": {},
-        }),
+        json.dumps(
+            {
+                "reference": wrong_reference,
+                "manifest": {},
+            }
+        ),
         encoding="utf-8",
     )
 

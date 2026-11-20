@@ -51,10 +51,7 @@ def test_plan_multiple_cycles_and_products_in_deterministic_order():
         ),
     )
 
-    assert [
-        (config.date, config.cycle, config.product)
-        for config in configs
-    ] == [
+    assert [(config.date, config.cycle, config.product) for config in configs] == [
         ("2026-04-19", 0, "short_range"),
         ("2026-04-19", 0, "medium_range_mem1"),
         ("2026-04-19", 6, "short_range"),
@@ -68,10 +65,7 @@ def test_plan_multiple_cycles_and_products_in_deterministic_order():
 
 def test_plan_accepts_finite_generators():
     cycles = (cycle for cycle in [0, 6])
-    products = (
-        product
-        for product in ["short_range", "medium_range_mem1"]
-    )
+    products = (product for product in ["short_range", "medium_range_mem1"])
 
     configs = plan_operational_configs(
         "2026-04-19",
@@ -133,10 +127,7 @@ def test_plan_rejects_invalid_selection_collections(
 def test_plan_rejects_incompatible_cycle_product_combination():
     with pytest.raises(
         ValueError,
-        match=(
-            "date=2026-04-19, cycle=1, "
-            "product='medium_range_mem1'"
-        ),
+        match=("date=2026-04-19, cycle=1, product='medium_range_mem1'"),
     ) as caught:
         plan_operational_configs(
             "2026-04-19",
@@ -180,6 +171,7 @@ def test_plan_performs_no_remote_access(monkeypatch):
 
     assert len(configs) == 3
 
+
 def test_recent_date_range_includes_as_of_date():
     assert resolve_recent_date_range(
         1,
@@ -222,6 +214,7 @@ def test_recent_date_range_rejects_invalid_as_of_date():
             3,
             as_of="2026-02-30",
         )
+
 
 def test_operational_event_preserves_name_and_absolute_dates():
     event = OperationalEvent(

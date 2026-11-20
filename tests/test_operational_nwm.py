@@ -1,4 +1,5 @@
 """Tests for operational NWM forecast configuration and extraction."""
+
 import numpy as np
 import pytest
 import xarray as xr
@@ -9,6 +10,7 @@ from streamflow_getter.operational_nwm import (
     resolve_operational_source,
 )
 
+
 def test_resolve_analysis_t0_source():
     config = ForecastConfig(date="2026-04-19", cycle=0)
 
@@ -16,9 +18,7 @@ def test_resolve_analysis_t0_source():
 
     assert source["source_product"] == "analysis_assim"
     assert source["lead_hour"] == 0
-    assert source["filename"] == (
-        "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
-    )
+    assert source["filename"] == ("nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc")
     assert source["native_url"] == config.analysis_native_url()
     assert source["reference_path"] == config.analysis_reference_path()
 
@@ -74,10 +74,17 @@ def test_wrong_forecast_valid_time():
         )
 
 
-@pytest.mark.parametrize("kwargs", [
-    {"date": "2026-02-30"}, {"cycle": -1}, {"cycle": 24},
-    {"cycle": True}, {"product": "medium_range"}, {"domain": "alaska"},
-])
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"date": "2026-02-30"},
+        {"cycle": -1},
+        {"cycle": 24},
+        {"cycle": True},
+        {"product": "medium_range"},
+        {"domain": "alaska"},
+    ],
+)
 def test_invalid_configuration(kwargs):
     with pytest.raises(ValueError):
         ForecastConfig(**kwargs)
@@ -118,9 +125,7 @@ def test_invalid_forecast_hour(hour):
         ),
     ],
 )
-def test_forecast_config_source_paths(
-    forecast_date, cycle, hour, filename
-):
+def test_forecast_config_source_paths(forecast_date, cycle, hour, filename):
     config = ForecastConfig(date=forecast_date, cycle=cycle)
 
     date_folder = forecast_date.replace("-", "")
@@ -188,7 +193,6 @@ def test_extract_streamflow_invalid_shape():
         extract_streamflow(ds, [3586192])
 
 
-
 def test_extract_streamflow_preserves_values_and_order():
     """Verify exact streamflow values in the requested reach order."""
     ds = xr.Dataset(
@@ -224,13 +228,10 @@ def test_extract_streamflow_preserves_values_and_order():
     )
 
 
-
 def test_analysis_t0_source_identity():
     config = ForecastConfig(date="2026-04-19", cycle=0)
 
-    filename = (
-        "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
-    )
+    filename = "nwm.t00z.analysis_assim.channel_rt.tm00.conus.nc"
 
     assert config.analysis_filename() == filename
 
@@ -251,9 +252,7 @@ def test_analysis_t0_valid_time(cycle):
 
     config.validate_analysis_timestamps(
         f"2026-04-19T{cycle:02d}:00:00",
-        np.datetime64(
-            f"2026-04-19T{cycle:02d}:00:00"
-        ) - np.timedelta64(3, "h"),
+        np.datetime64(f"2026-04-19T{cycle:02d}:00:00") - np.timedelta64(3, "h"),
     )
 
 
@@ -286,6 +285,7 @@ def test_analysis_t0_rejects_missing_reference_time():
             "2026-04-19T00:00:00",
             np.datetime64("NaT", "s"),
         )
+
 
 @pytest.mark.parametrize("dtype", [np.int32, np.int64])
 def test_extract_streamflow_numpy_integer_feature_ids(dtype):

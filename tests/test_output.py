@@ -1,4 +1,3 @@
-
 """Tests for CSV and Parquet streamflow output."""
 
 from pathlib import Path
@@ -17,24 +16,26 @@ from streamflow_getter.output import (
 
 @pytest.fixture
 def sample_frame():
-    return pd.DataFrame({
-        "forecast_date": ["2026-04-19", "2026-04-19"],
-        "forecast_cycle": [0, 0],
-        "product": ["analysis_assim", "short_range"],
-        "domain": ["conus", "conus"],
-        "lead_hour": [0, 1],
-        "feature_id": [3586192, 3586192],
-        "valid_time": [
-            "2026-04-19T00:00:00",
-            "2026-04-19T01:00:00",
-        ],
-        "reference_time": [
-            "2026-04-18T21:00:00",
-            "2026-04-19T00:00:00",
-        ],
-        "streamflow_m3s": [0.41, 0.42],
-        "method": ["kerchunk", "kerchunk"],
-    })
+    return pd.DataFrame(
+        {
+            "forecast_date": ["2026-04-19", "2026-04-19"],
+            "forecast_cycle": [0, 0],
+            "product": ["analysis_assim", "short_range"],
+            "domain": ["conus", "conus"],
+            "lead_hour": [0, 1],
+            "feature_id": [3586192, 3586192],
+            "valid_time": [
+                "2026-04-19T00:00:00",
+                "2026-04-19T01:00:00",
+            ],
+            "reference_time": [
+                "2026-04-18T21:00:00",
+                "2026-04-19T00:00:00",
+            ],
+            "streamflow_m3s": [0.41, 0.42],
+            "method": ["kerchunk", "kerchunk"],
+        }
+    )
 
 
 @pytest.mark.parametrize(
@@ -51,9 +52,7 @@ def test_format_inference(filename, expected):
 
 
 def test_explicit_format():
-    assert resolve_output_format(
-        "flow.data", "parquet"
-    ) == "parquet"
+    assert resolve_output_format("flow.data", "parquet") == "parquet"
 
 
 @pytest.mark.parametrize(
@@ -71,9 +70,7 @@ def test_unsupported_extension(filename):
 )
 def test_invalid_explicit_format(output_format):
     with pytest.raises(ValueError):
-        resolve_output_format(
-            "flow.csv", output_format
-        )
+        resolve_output_format("flow.csv", output_format)
 
 
 def test_csv_roundtrip(tmp_path, sample_frame):
@@ -163,10 +160,7 @@ def test_failed_serialization_cleans_temporary_file(
     assert not list(tmp_path.glob(".streamflow-output-*.tmp"))
 
 
-
-def test_publication_failure_cleans_destination(
-    tmp_path, sample_frame, monkeypatch
-):
+def test_publication_failure_cleans_destination(tmp_path, sample_frame, monkeypatch):
     """Remove incomplete output when publication fails."""
     path = tmp_path / "flow.csv"
 
@@ -218,29 +212,21 @@ def test_conflicting_output_format(filename, output_format):
     with pytest.raises(ValueError, match="conflicts"):
         resolve_output_format(filename, output_format)
 
+
 def test_default_manifest_path_preserves_data_extension(tmp_path):
-    assert manifest_path_for(
-        tmp_path / "flow.csv"
-    ) == (
-        tmp_path
-        / "flow.csv.manifest.json"
+    assert manifest_path_for(tmp_path / "flow.csv") == (
+        tmp_path / "flow.csv.manifest.json"
     )
 
-    assert manifest_path_for(
-        tmp_path / "flow.parquet"
-    ) == (
-        tmp_path
-        / "flow.parquet.manifest.json"
+    assert manifest_path_for(tmp_path / "flow.parquet") == (
+        tmp_path / "flow.parquet.manifest.json"
     )
 
 
 def test_manifest_roundtrip(tmp_path):
     import json
 
-    path = (
-        tmp_path
-        / "flow.csv.manifest.json"
-    )
+    path = tmp_path / "flow.csv.manifest.json"
 
     manifest = {
         "schema_version": 1,
@@ -257,27 +243,18 @@ def test_manifest_roundtrip(tmp_path):
 
     assert result == path
 
-    with path.open(
-        encoding="utf-8"
-    ) as file:
-        restored = json.load(
-            file
-        )
+    with path.open(encoding="utf-8") as file:
+        restored = json.load(file)
 
     assert restored == manifest
 
-    raw = path.read_text(
-        encoding="utf-8"
-    )
+    raw = path.read_text(encoding="utf-8")
 
     assert raw.endswith("\n")
 
 
 def test_manifest_existing_file_is_preserved(tmp_path):
-    path = (
-        tmp_path
-        / "flow.csv.manifest.json"
-    )
+    path = tmp_path / "flow.csv.manifest.json"
 
     path.write_text(
         "existing-manifest",
@@ -295,9 +272,7 @@ def test_manifest_existing_file_is_preserved(tmp_path):
             path,
         )
 
-    assert path.read_text(
-        encoding="utf-8"
-    ) == "existing-manifest"
+    assert path.read_text(encoding="utf-8") == "existing-manifest"
 
 
 @pytest.mark.parametrize(
@@ -326,10 +301,7 @@ def test_manifest_rejects_invalid_content_before_publication(
     manifest,
     error_type,
 ):
-    path = (
-        tmp_path
-        / "flow.csv.manifest.json"
-    )
+    path = tmp_path / "flow.csv.manifest.json"
 
     with pytest.raises(
         error_type,
@@ -341,11 +313,7 @@ def test_manifest_rejects_invalid_content_before_publication(
 
     assert not path.exists()
 
-    assert not list(
-        tmp_path.glob(
-            ".streamflow-manifest-*.tmp"
-        )
-    )
+    assert not list(tmp_path.glob(".streamflow-manifest-*.tmp"))
 
 
 def test_manifest_publication_failure_cleans_temporary_file(
@@ -354,18 +322,13 @@ def test_manifest_publication_failure_cleans_temporary_file(
 ):
     import os
 
-    path = (
-        tmp_path
-        / "flow.csv.manifest.json"
-    )
+    path = tmp_path / "flow.csv.manifest.json"
 
     original_link = os.link
 
     def failing_link(source, destination, *args, **kwargs):
         if Path(destination) == path:
-            raise OSError(
-                "Simulated manifest publication failure"
-            )
+            raise OSError("Simulated manifest publication failure")
 
         return original_link(
             source,
@@ -394,11 +357,7 @@ def test_manifest_publication_failure_cleans_temporary_file(
 
     assert not path.exists()
 
-    assert not list(
-        tmp_path.glob(
-            ".streamflow-manifest-*.tmp"
-        )
-    )
+    assert not list(tmp_path.glob(".streamflow-manifest-*.tmp"))
 
 
 def test_timeseries_with_manifest_publishes_both(
@@ -407,53 +366,33 @@ def test_timeseries_with_manifest_publishes_both(
 ):
     import json
 
-    data_path = (
-        tmp_path
-        / "flow.csv"
-    )
+    data_path = tmp_path / "flow.csv"
 
     manifest = {
         "schema_version": 1,
         "status": "complete",
         "result": {
-            "row_count": len(
-                sample_frame
-            ),
+            "row_count": len(sample_frame),
         },
     }
 
-    data_result, manifest_result = (
-        write_timeseries_with_manifest(
-            sample_frame,
-            data_path,
-            manifest,
-        )
+    data_result, manifest_result = write_timeseries_with_manifest(
+        sample_frame,
+        data_path,
+        manifest,
     )
 
-    expected_manifest = (
-        tmp_path
-        / "flow.csv.manifest.json"
-    )
+    expected_manifest = tmp_path / "flow.csv.manifest.json"
 
     assert data_result == data_path
     assert manifest_result == expected_manifest
 
-    restored = pd.read_csv(
-        data_result
-    )
+    restored = pd.read_csv(data_result)
 
-    assert list(
-        restored.columns
-    ) == list(
-        sample_frame.columns
-    )
+    assert list(restored.columns) == list(sample_frame.columns)
 
-    with manifest_result.open(
-        encoding="utf-8"
-    ) as file:
-        restored_manifest = json.load(
-            file
-        )
+    with manifest_result.open(encoding="utf-8") as file:
+        restored_manifest = json.load(file)
 
     assert restored_manifest == manifest
 
@@ -462,15 +401,9 @@ def test_timeseries_with_manifest_accepts_custom_sidecar(
     tmp_path,
     sample_frame,
 ):
-    data_path = (
-        tmp_path
-        / "flow.csv"
-    )
+    data_path = tmp_path / "flow.csv"
 
-    manifest_path = (
-        tmp_path
-        / "run-manifest.json"
-    )
+    manifest_path = tmp_path / "run-manifest.json"
 
     results = write_timeseries_with_manifest(
         sample_frame,
@@ -495,14 +428,9 @@ def test_timeseries_with_manifest_rejects_existing_sidecar_before_data(
     tmp_path,
     sample_frame,
 ):
-    data_path = (
-        tmp_path
-        / "flow.csv"
-    )
+    data_path = tmp_path / "flow.csv"
 
-    manifest_path = manifest_path_for(
-        data_path
-    )
+    manifest_path = manifest_path_for(data_path)
 
     manifest_path.write_text(
         "preserve-me",
@@ -523,28 +451,21 @@ def test_timeseries_with_manifest_rejects_existing_sidecar_before_data(
 
     assert not data_path.exists()
 
-    assert manifest_path.read_text(
-        encoding="utf-8"
-    ) == "preserve-me"
+    assert manifest_path.read_text(encoding="utf-8") == "preserve-me"
 
 
 def test_timeseries_with_manifest_rejects_existing_data_before_sidecar(
     tmp_path,
     sample_frame,
 ):
-    data_path = (
-        tmp_path
-        / "flow.csv"
-    )
+    data_path = tmp_path / "flow.csv"
 
     data_path.write_text(
         "preserve-data",
         encoding="utf-8",
     )
 
-    manifest_path = manifest_path_for(
-        data_path
-    )
+    manifest_path = manifest_path_for(data_path)
 
     with pytest.raises(
         FileExistsError,
@@ -558,9 +479,7 @@ def test_timeseries_with_manifest_rejects_existing_data_before_sidecar(
             },
         )
 
-    assert data_path.read_text(
-        encoding="utf-8"
-    ) == "preserve-data"
+    assert data_path.read_text(encoding="utf-8") == "preserve-data"
 
     assert not manifest_path.exists()
 
@@ -569,10 +488,7 @@ def test_timeseries_with_manifest_validates_manifest_before_data(
     tmp_path,
     sample_frame,
 ):
-    data_path = (
-        tmp_path
-        / "flow.csv"
-    )
+    data_path = tmp_path / "flow.csv"
 
     with pytest.raises(
         ValueError,
@@ -587,9 +503,7 @@ def test_timeseries_with_manifest_validates_manifest_before_data(
         )
 
     assert not data_path.exists()
-    assert not manifest_path_for(
-        data_path
-    ).exists()
+    assert not manifest_path_for(data_path).exists()
 
 
 def test_timeseries_with_manifest_rolls_back_data_on_sidecar_failure(
@@ -599,25 +513,16 @@ def test_timeseries_with_manifest_rolls_back_data_on_sidecar_failure(
 ):
     from streamflow_getter import output
 
-    data_path = (
-        tmp_path
-        / "flow.csv"
-    )
+    data_path = tmp_path / "flow.csv"
 
-    manifest_path = manifest_path_for(
-        data_path
-    )
+    manifest_path = manifest_path_for(data_path)
 
     def failing_publish(payload, destination):
-        assert Path(
-            destination
-        ) == manifest_path
+        assert Path(destination) == manifest_path
 
         assert data_path.exists()
 
-        raise OSError(
-            "Controlled sidecar failure"
-        )
+        raise OSError("Controlled sidecar failure")
 
     monkeypatch.setattr(
         output,
@@ -646,10 +551,7 @@ def test_timeseries_with_manifest_requires_distinct_paths(
     tmp_path,
     sample_frame,
 ):
-    path = (
-        tmp_path
-        / "flow.csv"
-    )
+    path = tmp_path / "flow.csv"
 
     with pytest.raises(
         ValueError,

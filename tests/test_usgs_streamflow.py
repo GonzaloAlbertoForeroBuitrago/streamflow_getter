@@ -36,17 +36,11 @@ def install_payloads(
 
         if headers is not None:
             headers.append(
-                {
-                    key.casefold(): value
-                    for key, value
-                    in request.header_items()
-                }
+                {key.casefold(): value for key, value in request.header_items()}
             )
 
         if not queue:
-            raise AssertionError(
-                "Unexpected additional USGS request"
-            )
+            raise AssertionError("Unexpected additional USGS request")
 
         return FakeResponse(queue.pop(0))
 
@@ -72,16 +66,12 @@ def location_feature():
         },
         "properties": {
             "id": "USGS-08165500",
-            "monitoring_location_name": (
-                "Guadalupe Rv at Hunt, TX"
-            ),
+            "monitoring_location_name": ("Guadalupe Rv at Hunt, TX"),
             "site_type": "Stream",
             "hydrologic_unit_code": "121002010108",
             "drainage_area": 288.0,
             "contributing_drainage_area": 288.0,
-            "horizontal_positional_accuracy": (
-                "Accurate to + or - 5 sec."
-            ),
+            "horizontal_positional_accuracy": ("Accurate to + or - 5 sec."),
         },
     }
 
@@ -123,29 +113,16 @@ def test_monitoring_location_metadata(monkeypatch):
         urls=urls,
     )
 
-    metadata = (
-        usgs_streamflow.fetch_usgs_monitoring_location(
-            "08165500"
-        )
-    )
+    metadata = usgs_streamflow.fetch_usgs_monitoring_location("08165500")
 
     assert metadata["source"] == "usgs"
     assert metadata["source_id"] == "08165500"
-    assert (
-        metadata["monitoring_location_name"]
-        == "Guadalupe Rv at Hunt, TX"
-    )
+    assert metadata["monitoring_location_name"] == "Guadalupe Rv at Hunt, TX"
 
-    assert metadata["longitude"] == pytest.approx(
-        -99.3217122
-    )
-    assert metadata["latitude"] == pytest.approx(
-        30.06993074
-    )
+    assert metadata["longitude"] == pytest.approx(-99.3217122)
+    assert metadata["latitude"] == pytest.approx(30.06993074)
     assert metadata["drainage_area_sqmi"] == 288.0
-    assert metadata[
-        "contributing_drainage_area_sqmi"
-    ] == 288.0
+    assert metadata["contributing_drainage_area_sqmi"] == 288.0
 
     assert metadata["drainage_area_km2"] == pytest.approx(
         288.0 * usgs_streamflow.SQMI_TO_KM2
@@ -200,14 +177,9 @@ def test_environment_api_key(monkeypatch):
         headers=headers,
     )
 
-    usgs_streamflow.fetch_usgs_monitoring_location(
-        "08165500"
-    )
+    usgs_streamflow.fetch_usgs_monitoring_location("08165500")
 
-    assert (
-        headers[0]["x-api-key"]
-        == "environment-test-key"
-    )
+    assert headers[0]["x-api-key"] == "environment-test-key"
 
 
 def test_streamflow_converts_cfs_to_m3s(monkeypatch):
@@ -243,24 +215,18 @@ def test_streamflow_converts_cfs_to_m3s(monkeypatch):
     assert frame["source"].eq("usgs").all()
     assert frame["series"].eq("observation").all()
     assert frame["unit"].eq("m3/s").all()
-    assert frame["time_support"].eq(
-        "instantaneous"
-    ).all()
+    assert frame["time_support"].eq("instantaneous").all()
 
     assert frame.loc[
         0,
         "streamflow_m3s",
-    ] == pytest.approx(
-        84.7 * usgs_streamflow.CFS_TO_M3S
-    )
+    ] == pytest.approx(84.7 * usgs_streamflow.CFS_TO_M3S)
 
     assert frame["valid_time"].dt.tz is not None
 
     query = parse_qs(urlsplit(urls[0]).query)
 
-    assert query["monitoring_location_id"] == [
-        "USGS-08165500"
-    ]
+    assert query["monitoring_location_id"] == ["USGS-08165500"]
     assert query["parameter_code"] == ["00060"]
 
 
@@ -342,10 +308,7 @@ def test_streamflow_empty_response(monkeypatch):
     )
 
     assert frame.empty
-    assert (
-        list(frame.columns)
-        == usgs_streamflow.USGS_STREAMFLOW_COLUMNS
-    )
+    assert list(frame.columns) == usgs_streamflow.USGS_STREAMFLOW_COLUMNS
 
 
 def test_streamflow_rejects_unknown_unit(monkeypatch):
@@ -467,15 +430,8 @@ def test_pagination_follows_same_host(monkeypatch):
 
     assert len(frame) == 2
     assert len(urls) == 2
-    assert all(
-        urlsplit(url).netloc
-        == "api.waterdata.usgs.gov"
-        for url in urls
-    )
-    assert all(
-        header["x-api-key"] == "fake-test-key"
-        for header in headers
-    )
+    assert all(urlsplit(url).netloc == "api.waterdata.usgs.gov" for url in urls)
+    assert all(header["x-api-key"] == "fake-test-key" for header in headers)
 
 
 def test_pagination_rejects_foreign_host(monkeypatch):
@@ -570,21 +526,23 @@ def test_identical_usgs_observations_are_deduplicated(monkeypatch):
     """Equal observations at one UTC timestamp produce one row."""
     install_payloads(
         monkeypatch,
-        [{
-            "features": [
-                continuous_feature(
-                    "2025-07-04T07:00:00Z",
-                    10.0,
-                    time_series_id="series-2",
-                ),
-                continuous_feature(
-                    "2025-07-04T07:00:00Z",
-                    10.0,
-                    time_series_id="series-1",
-                ),
-            ],
-            "links": [],
-        }],
+        [
+            {
+                "features": [
+                    continuous_feature(
+                        "2025-07-04T07:00:00Z",
+                        10.0,
+                        time_series_id="series-2",
+                    ),
+                    continuous_feature(
+                        "2025-07-04T07:00:00Z",
+                        10.0,
+                        time_series_id="series-1",
+                    ),
+                ],
+                "links": [],
+            }
+        ],
     )
 
     frame = usgs_streamflow.fetch_usgs_streamflow(
@@ -606,15 +564,17 @@ def test_usgs_rejects_nonfinite_discharge(monkeypatch, value):
     """Non-finite discharge must never enter the output."""
     install_payloads(
         monkeypatch,
-        [{
-            "features": [
-                continuous_feature(
-                    "2025-07-04T07:00:00Z",
-                    value,
-                )
-            ],
-            "links": [],
-        }],
+        [
+            {
+                "features": [
+                    continuous_feature(
+                        "2025-07-04T07:00:00Z",
+                        value,
+                    )
+                ],
+                "links": [],
+            }
+        ],
     )
 
     with pytest.raises(

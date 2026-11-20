@@ -1,4 +1,3 @@
-
 """Offline tests for operational NWM Kerchunk retrieval."""
 
 import errno
@@ -33,9 +32,7 @@ def sample_dataset():
                 7144704,
             ],
             "time": [np.datetime64("2026-04-19T01:00:00")],
-            "reference_time": [
-                np.datetime64("2026-04-19T00:00:00")
-            ],
+            "reference_time": [np.datetime64("2026-04-19T00:00:00")],
         },
     )
 
@@ -113,9 +110,7 @@ def test_prepare_reference_without_opening_model_data(
     remote_file = mock_kerchunk["s3"].open.return_value.__enter__.return_value
     remote_file.read.return_value = raw
 
-    data_access = MagicMock(
-        side_effect=AssertionError("Unexpected model data access")
-    )
+    data_access = MagicMock(side_effect=AssertionError("Unexpected model data access"))
     monkeypatch.setattr(fsspec, "filesystem", data_access)
     monkeypatch.setattr(xr, "open_zarr", data_access)
     monkeypatch.setattr(operational_nwm, "read_native_forecast", data_access)
@@ -128,9 +123,7 @@ def test_prepare_reference_without_opening_model_data(
     assert prepared["source"]["native_url"] == config.native_url(1)
     assert prepared["source"]["reference_path"] == config.reference_path(1)
     assert prepared["source"]["lead_hour"] == 1
-    mock_kerchunk["s3"].open.assert_called_once_with(
-        config.reference_path(1), "rb"
-    )
+    mock_kerchunk["s3"].open.assert_called_once_with(config.reference_path(1), "rb")
     data_access.assert_not_called()
 
 
@@ -149,16 +142,16 @@ def test_missing_reference_body_is_classified(
     else:
         s3.open.return_value.__enter__.return_value.read.side_effect = failure
     monkeypatch.setattr(
-        reference_cache, "fetch_remote_metadata",
+        reference_cache,
+        "fetch_remote_metadata",
         lambda *args, **kwargs: {
-            "reference_etag": "etag-1", "source_generation": "generation-1",
+            "reference_etag": "etag-1",
+            "source_generation": "generation-1",
         },
     )
 
     with pytest.raises(RemoteReferenceNotFoundError, match="body") as caught:
-        prepare_operational_reference(
-            config, 1, cache_dir=tmp_path if cached else None
-        )
+        prepare_operational_reference(config, 1, cache_dir=tmp_path if cached else None)
 
     assert caught.value.__cause__ is failure
     assert config.reference_path(1) in str(caught.value)
@@ -183,9 +176,11 @@ def test_other_reference_body_errors_propagate(
 
     mock_kerchunk["s3"].open.side_effect = failure
     monkeypatch.setattr(
-        reference_cache, "fetch_remote_metadata",
+        reference_cache,
+        "fetch_remote_metadata",
         lambda *args, **kwargs: {
-            "reference_etag": "etag-1", "source_generation": "generation-1",
+            "reference_etag": "etag-1",
+            "source_generation": "generation-1",
         },
     )
 
@@ -204,21 +199,28 @@ def test_local_cache_save_missing_path_is_not_reference_missing(
 
     config = ForecastConfig()
     cache_file = (
-        tmp_path / config.date_folder / config.product
+        tmp_path
+        / config.date_folder
+        / config.product
         / f"{config.filename(1)}.cache.json"
     )
     metadata = {"reference_etag": "etag-old", "source_generation": "generation-1"}
     reference_cache.save_cache_record(
         cache_file,
-        reference_cache.create_cache_record(valid_reference, config.native_url(1), metadata),
+        reference_cache.create_cache_record(
+            valid_reference, config.native_url(1), metadata
+        ),
         config.native_url(1),
     )
     original_bytes = cache_file.read_bytes()
-    failure = FileNotFoundError(errno.ENOENT, "Local cache path unavailable", str(cache_file))
+    failure = FileNotFoundError(
+        errno.ENOENT, "Local cache path unavailable", str(cache_file)
+    )
     save_record = MagicMock(side_effect=failure)
     monkeypatch.setattr(reference_cache, "save_cache_record", save_record)
     monkeypatch.setattr(
-        reference_cache, "fetch_remote_metadata",
+        reference_cache,
+        "fetch_remote_metadata",
         lambda *args, **kwargs: {**metadata, "reference_etag": "etag-new"},
     )
 
@@ -263,9 +265,7 @@ def test_kerchunk_missing_reach(mock_kerchunk):
     mock_kerchunk["dataset_context"].__exit__.assert_called_once()
 
 
-def test_kerchunk_invalid_reference(
-    mock_kerchunk, monkeypatch
-):
+def test_kerchunk_invalid_reference(mock_kerchunk, monkeypatch):
     from streamflow_getter import reference_validation
 
     monkeypatch.setattr(
@@ -285,9 +285,7 @@ def test_kerchunk_invalid_reference(
     mock_kerchunk["dataset_context"].__enter__.assert_not_called()
 
 
-def test_kerchunk_wrong_source(
-    mock_kerchunk, monkeypatch
-):
+def test_kerchunk_wrong_source(mock_kerchunk, monkeypatch):
     from streamflow_getter import reference_validation
 
     monkeypatch.setattr(
@@ -306,12 +304,8 @@ def test_kerchunk_wrong_source(
     mock_kerchunk["dataset_context"].__enter__.assert_not_called()
 
 
-def test_kerchunk_wrong_timestamp(
-    mock_kerchunk, sample_dataset
-):
-    sample_dataset.coords["time"] = [
-        np.datetime64("2026-04-19T02:00:00")
-    ]
+def test_kerchunk_wrong_timestamp(mock_kerchunk, sample_dataset):
+    sample_dataset.coords["time"] = [np.datetime64("2026-04-19T02:00:00")]
 
     with pytest.raises(ValueError, match="valid time"):
         read_kerchunk_forecast(
@@ -323,9 +317,7 @@ def test_kerchunk_wrong_timestamp(
     mock_kerchunk["dataset_context"].__exit__.assert_called_once()
 
 
-def test_kerchunk_nonfinite_streamflow(
-    mock_kerchunk, sample_dataset
-):
+def test_kerchunk_nonfinite_streamflow(mock_kerchunk, sample_dataset):
     sample_dataset["streamflow"].values[1] = np.nan
 
     with pytest.raises(ValueError, match="Non-finite"):
@@ -338,7 +330,6 @@ def test_kerchunk_nonfinite_streamflow(
     mock_kerchunk["dataset_context"].__exit__.assert_called_once()
 
 
-
 def test_kerchunk_analysis_t0(
     mock_kerchunk,
     sample_dataset,
@@ -348,12 +339,8 @@ def test_kerchunk_analysis_t0(
 
     config = ForecastConfig()
 
-    sample_dataset.coords["time"] = [
-        np.datetime64("2026-04-19T00:00:00")
-    ]
-    sample_dataset.coords["reference_time"] = [
-        np.datetime64("2026-04-18T21:00:00")
-    ]
+    sample_dataset.coords["time"] = [np.datetime64("2026-04-19T00:00:00")]
+    sample_dataset.coords["reference_time"] = [np.datetime64("2026-04-18T21:00:00")]
 
     url = config.analysis_native_url()
 
@@ -368,9 +355,11 @@ def test_kerchunk_analysis_t0(
         },
     }
 
-    mock_kerchunk["s3"].open.return_value.__enter__.return_value.read.return_value = (
-        json.dumps(reference).encode()
-    )
+    mock_kerchunk[
+        "s3"
+    ].open.return_value.__enter__.return_value.read.return_value = json.dumps(
+        reference
+    ).encode()
 
     result = read_kerchunk_forecast(
         config,
@@ -411,13 +400,13 @@ def test_kerchunk_analysis_t0_rejects_wrong_valid_time(
         },
     }
 
-    mock_kerchunk["s3"].open.return_value.__enter__.return_value.read.return_value = (
-        json.dumps(reference).encode()
-    )
+    mock_kerchunk[
+        "s3"
+    ].open.return_value.__enter__.return_value.read.return_value = json.dumps(
+        reference
+    ).encode()
 
-    sample_dataset.coords["reference_time"] = [
-        np.datetime64("2026-04-18T21:00:00")
-    ]
+    sample_dataset.coords["reference_time"] = [np.datetime64("2026-04-18T21:00:00")]
 
     with pytest.raises(ValueError, match="analysis t0 valid time"):
         read_kerchunk_forecast(
@@ -425,6 +414,7 @@ def test_kerchunk_analysis_t0_rejects_wrong_valid_time(
             0,
             [3586192],
         )
+
 
 def test_kerchunk_preserves_integer_feature_ids(
     mock_kerchunk,
@@ -454,6 +444,4 @@ def test_kerchunk_preserves_integer_feature_ids(
     )
 
     assert result["method"] == "kerchunk"
-    assert captured["mask_and_scale"] == {
-        "feature_id": False
-    }
+    assert captured["mask_and_scale"] == {"feature_id": False}

@@ -1,4 +1,3 @@
-
 """Tests for operational NWM forecast lead schedules."""
 
 import pytest
@@ -68,9 +67,7 @@ def test_forecast_hours_selects_available_leads(
         (6, 1, 5),
     ],
 )
-def test_forecast_hours_rejects_empty_windows(
-    schedule_config, step, start, end
-):
+def test_forecast_hours_rejects_empty_windows(schedule_config, step, start, end):
     config = schedule_config(step)
 
     with pytest.raises(ValueError, match="No available forecast leads"):
@@ -88,9 +85,7 @@ def test_forecast_hours_rejects_empty_windows(
         (6, 11),
     ],
 )
-def test_filename_rejects_unavailable_leads(
-    schedule_config, step, hour
-):
+def test_filename_rejects_unavailable_leads(schedule_config, step, hour):
     config = schedule_config(step)
 
     with pytest.raises(ValueError, match="multiple"):
@@ -108,9 +103,7 @@ def test_filename_rejects_unavailable_leads(
         (6, 240),
     ],
 )
-def test_filename_accepts_available_leads(
-    schedule_config, step, hour
-):
+def test_filename_accepts_available_leads(schedule_config, step, hour):
     config = schedule_config(step)
 
     assert f".f{hour:03d}.conus.nc" in config.filename(hour)
@@ -124,9 +117,7 @@ def test_filename_accepts_available_leads(
         (-1, 12),
     ],
 )
-def test_forecast_hours_rejects_invalid_ranges(
-    schedule_config, start, end
-):
+def test_forecast_hours_rejects_invalid_ranges(schedule_config, start, end):
     config = schedule_config(3)
 
     with pytest.raises(ValueError, match="Invalid forecast hour range"):
@@ -142,9 +133,7 @@ def test_forecast_hours_rejects_invalid_ranges(
         (3, 12.0),
     ],
 )
-def test_forecast_hours_rejects_noninteger_boundaries(
-    schedule_config, start, end
-):
+def test_forecast_hours_rejects_noninteger_boundaries(schedule_config, start, end):
     config = schedule_config(3)
 
     with pytest.raises(ValueError, match="integers"):
@@ -186,9 +175,7 @@ def test_existing_medium_range_schedule_unchanged():
     assert config.forecast_hours(1, 240) == list(range(1, 241))
 
 
-def test_series_retrieves_only_available_three_hour_leads(
-    schedule_config, monkeypatch
-):
+def test_series_retrieves_only_available_three_hour_leads(schedule_config, monkeypatch):
     """Fetch only scheduled forecast hours, including analysis t0."""
     import numpy as np
     import streamflow_getter.operational_nwm as operational
@@ -205,9 +192,7 @@ def test_series_retrieves_only_available_three_hour_leads(
         return {
             "forecast_date": config.date,
             "forecast_cycle": config.cycle,
-            "product": (
-                "analysis_assim" if hour == 0 else config.product
-            ),
+            "product": ("analysis_assim" if hour == 0 else config.product),
             "domain": config.domain,
             "lead_hour": hour,
             "method": "kerchunk",

@@ -14,15 +14,22 @@ DEFAULT_CACHE_DIR = "~/.cache/streamflow_getter"
 def _arguments(tmp_path, *cache_args):
     return [
         "nwm-operational",
-        "--date", "2026-04-19",
-        "--cycle", "0",
-        "--product", "short_range",
-        "--reach", "3586192",
-        "--start-hour", "1",
-        "--end-hour", "1",
+        "--date",
+        "2026-04-19",
+        "--cycle",
+        "0",
+        "--product",
+        "short_range",
+        "--reach",
+        "3586192",
+        "--start-hour",
+        "1",
+        "--end-hour",
+        "1",
         "--no-t0",
         *cache_args,
-        "--out", str(tmp_path / "flows.csv"),
+        "--out",
+        str(tmp_path / "flows.csv"),
     ]
 
 
@@ -47,18 +54,22 @@ def _run_and_capture_cache(monkeypatch, tmp_path, *cache_args):
         captured["include_t0"] = include_t0
         captured["cache_dir"] = cache_dir
 
-        return pd.DataFrame([{
-            "forecast_date": config.date,
-            "forecast_cycle": config.cycle,
-            "product": config.product,
-            "domain": config.domain,
-            "lead_hour": start_hour,
-            "feature_id": reach_ids[0],
-            "valid_time": "2026-04-19T01:00:00",
-            "reference_time": "2026-04-19T00:00:00",
-            "streamflow_m3s": 0.41,
-            "method": "kerchunk",
-        }])
+        return pd.DataFrame(
+            [
+                {
+                    "forecast_date": config.date,
+                    "forecast_cycle": config.cycle,
+                    "product": config.product,
+                    "domain": config.domain,
+                    "lead_hour": start_hour,
+                    "feature_id": reach_ids[0],
+                    "valid_time": "2026-04-19T01:00:00",
+                    "reference_time": "2026-04-19T00:00:00",
+                    "streamflow_m3s": 0.41,
+                    "method": "kerchunk",
+                }
+            ]
+        )
 
     def fake_write(frame, destination, *, output_format=None):
         captured["output_rows"] = len(frame)

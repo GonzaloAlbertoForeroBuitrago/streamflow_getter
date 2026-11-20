@@ -71,10 +71,7 @@ def test_analysis_product_source_identity(product):
         0,
     )
 
-    expected_filename = (
-        f"nwm.t09z.{product}."
-        "channel_rt.tm00.conus.nc"
-    )
+    expected_filename = f"nwm.t09z.{product}.channel_rt.tm00.conus.nc"
 
     assert source["source_product"] == product
     assert source["lead_hour"] == 0
@@ -115,12 +112,14 @@ def test_analysis_series_fetches_only_t0(
         *,
         cache_dir=None,
     ):
-        calls.append({
-            "product": config.product,
-            "hour": hour,
-            "reaches": list(reach_ids),
-            "cache_dir": cache_dir,
-        })
+        calls.append(
+            {
+                "product": config.product,
+                "hour": hour,
+                "reaches": list(reach_ids),
+                "cache_dir": cache_dir,
+            }
+        )
 
         return {
             "forecast_date": config.date,
@@ -129,20 +128,15 @@ def test_analysis_series_fetches_only_t0(
             "domain": config.domain,
             "lead_hour": 0,
             "method": "kerchunk",
-            "valid_time": (
-                "2025-07-04T09:00:00.000000000"
-            ),
-            "reference_time": (
-                "2025-07-04T06:00:00.000000000"
-            ),
+            "valid_time": ("2025-07-04T09:00:00.000000000"),
+            "reference_time": ("2025-07-04T06:00:00.000000000"),
             "streamflow_m3s": {
                 3586192: 1.0,
             },
         }
 
     monkeypatch.setattr(
-        "streamflow_getter.operational_nwm."
-        "fetch_operational_forecast",
+        "streamflow_getter.operational_nwm.fetch_operational_forecast",
         fake_fetch,
     )
 
@@ -196,14 +190,21 @@ def test_analysis_series_requires_t0(product):
 def test_cli_parser_accepts_analysis_products(product):
     parser = build_parser()
 
-    args = parser.parse_args([
-        "nwm-operational",
-        "--date", "2025-07-04",
-        "--cycle", "9",
-        "--product", product,
-        "--reach", "3586192",
-        "--out", "analysis.csv",
-    ])
+    args = parser.parse_args(
+        [
+            "nwm-operational",
+            "--date",
+            "2025-07-04",
+            "--cycle",
+            "9",
+            "--product",
+            product,
+            "--reach",
+            "3586192",
+            "--out",
+            "analysis.csv",
+        ]
+    )
 
     assert args.product == product
     assert args.cycle == 9
@@ -220,15 +221,22 @@ def test_cli_rejects_no_t0_for_analysis_product(
         ValueError,
         match="Analysis-only products cannot be used with --no-t0",
     ):
-        main([
-            "nwm-operational",
-            "--date", "2025-07-04",
-            "--cycle", "9",
-            "--product", product,
-            "--reach", "3586192",
-            "--no-t0",
-            "--no-cache",
-            "--out", str(output),
-        ])
+        main(
+            [
+                "nwm-operational",
+                "--date",
+                "2025-07-04",
+                "--cycle",
+                "9",
+                "--product",
+                product,
+                "--reach",
+                "3586192",
+                "--no-t0",
+                "--no-cache",
+                "--out",
+                str(output),
+            ]
+        )
 
     assert not output.exists()

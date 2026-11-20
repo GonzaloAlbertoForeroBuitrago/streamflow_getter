@@ -1,4 +1,3 @@
-
 """Offline integration tests for cached operational Kerchunk retrieval."""
 
 import json
@@ -79,9 +78,7 @@ def test_cached_kerchunk_reuses_reference(tmp_path, monkeypatch):
         coords={
             "feature_id": [3586192],
             "time": [np.datetime64("2026-04-19T01:00:00")],
-            "reference_time": [
-                np.datetime64("2026-04-19T00:00:00")
-            ],
+            "reference_time": [np.datetime64("2026-04-19T00:00:00")],
         },
     )
 
@@ -102,10 +99,7 @@ def test_cached_kerchunk_reuses_reference(tmp_path, monkeypatch):
         [config], 1, 1, cache_dir=tmp_path, include_t0=False
     )
     cache_file = (
-        tmp_path
-        / "nwm.20260419"
-        / "short_range"
-        / f"{config.filename(1)}.cache.json"
+        tmp_path / "nwm.20260419" / "short_range" / f"{config.filename(1)}.cache.json"
     )
     cached = reference_cache.load_cache_record(cache_file, url)
 
@@ -140,9 +134,7 @@ def test_cached_kerchunk_reuses_reference(tmp_path, monkeypatch):
     assert s3.open.call_count == 1
 
 
-def test_cached_reader_rejects_source_generation_change(
-    tmp_path, monkeypatch
-):
+def test_cached_reader_rejects_source_generation_change(tmp_path, monkeypatch):
     """A changed source generation must stop cached retrieval."""
     from streamflow_getter import reference_cache
     from streamflow_getter.reference_cache import (
@@ -202,9 +194,7 @@ def test_cached_reader_rejects_source_generation_change(
         )
 
 
-def test_cached_reader_rejects_missing_metadata(
-    tmp_path, monkeypatch
-):
+def test_cached_reader_rejects_missing_metadata(tmp_path, monkeypatch):
     """Incomplete metadata must not be treated as fresh."""
     from streamflow_getter import reference_cache
 
@@ -225,10 +215,7 @@ def test_cached_reader_rejects_missing_metadata(
         )
 
 
-
-def test_cached_reader_refreshes_changed_reference(
-    tmp_path, monkeypatch
-):
+def test_cached_reader_refreshes_changed_reference(tmp_path, monkeypatch):
     """A changed reference ETag refreshes the cached record."""
     import json
     from unittest.mock import MagicMock
@@ -289,9 +276,9 @@ def test_cached_reader_refreshes_changed_reference(
 
     s3 = MagicMock()
     remote_context = MagicMock()
-    remote_context.__enter__.return_value.read.return_value = (
-        json.dumps(reference).encode()
-    )
+    remote_context.__enter__.return_value.read.return_value = json.dumps(
+        reference
+    ).encode()
     s3.open.return_value = remote_context
 
     monkeypatch.setattr(
@@ -319,9 +306,7 @@ def test_cached_reader_refreshes_changed_reference(
         coords={
             "feature_id": [3586192],
             "time": [np.datetime64("2026-04-19T01:00:00")],
-            "reference_time": [
-                np.datetime64("2026-04-19T00:00:00")
-            ],
+            "reference_time": [np.datetime64("2026-04-19T00:00:00")],
         },
     )
 
@@ -351,7 +336,6 @@ def test_cached_reader_refreshes_changed_reference(
     assert updated["manifest"]["source_generation"] == "gen-1"
 
     s3.open.assert_called_once()
-
 
 
 @pytest.mark.parametrize(
@@ -397,9 +381,9 @@ def test_analysis_t0_cache_separate_from_forecast(
             url = config.native_url(forecast_hour)
 
         context = MagicMock()
-        context.__enter__.return_value.read.return_value = (
-            json.dumps(make_reference(url)).encode()
-        )
+        context.__enter__.return_value.read.return_value = json.dumps(
+            make_reference(url)
+        ).encode()
         return context
 
     s3.open.side_effect = open_reference
@@ -438,11 +422,7 @@ def test_analysis_t0_cache_separate_from_forecast(
             if hour == 0
             else f"2026-04-19T{forecast_hour:02d}:00:00"
         )
-        reference = (
-            "2026-04-18T21:00:00"
-            if hour == 0
-            else "2026-04-19T00:00:00"
-        )
+        reference = "2026-04-18T21:00:00" if hour == 0 else "2026-04-19T00:00:00"
 
         ds = xr.Dataset(
             {"streamflow": ("feature_id", [0.41])},
@@ -465,9 +445,7 @@ def test_analysis_t0_cache_separate_from_forecast(
         open_dataset,
     )
 
-    analysis_prepared = prepare_operational_reference(
-        config, 0, cache_dir=tmp_path
-    )
+    analysis_prepared = prepare_operational_reference(config, 0, cache_dir=tmp_path)
     forecast_prepared = prepare_operational_reference(
         config, forecast_hour, cache_dir=tmp_path
     )
@@ -486,21 +464,23 @@ def test_analysis_t0_cache_separate_from_forecast(
         / f"{config.filename(forecast_hour)}.cache.json"
     )
 
-    assert reference_cache.load_cache_record(
-        analysis_path, config.analysis_native_url()
-    ) is not None
-    assert reference_cache.load_cache_record(
-        forecast_path, config.native_url(forecast_hour)
-    ) is not None
+    assert (
+        reference_cache.load_cache_record(analysis_path, config.analysis_native_url())
+        is not None
+    )
+    assert (
+        reference_cache.load_cache_record(
+            forecast_path, config.native_url(forecast_hour)
+        )
+        is not None
+    )
     assert analysis_path != forecast_path
     assert analysis_prepared["source"]["source_product"] == analysis_product
     assert forecast_prepared["source"]["source_product"] == product
     assert open_dataset.calls == 0
     filesystem.get_mapper.assert_not_called()
 
-    analysis = read_kerchunk_forecast(
-        config, 0, [3586192], cache_dir=tmp_path
-    )
+    analysis = read_kerchunk_forecast(config, 0, [3586192], cache_dir=tmp_path)
     forecast = read_kerchunk_forecast(
         config, forecast_hour, [3586192], cache_dir=tmp_path
     )
@@ -552,8 +532,11 @@ def test_batch_rejects_invalid_inputs_before_preparation(
     tmp_path, mock_reference_preparation, overrides, error_type, message
 ):
     arguments = {
-        "configs": [ForecastConfig()], "start_hour": 1, "end_hour": 1,
-        "cache_dir": tmp_path, "include_t0": True,
+        "configs": [ForecastConfig()],
+        "start_hour": 1,
+        "end_hour": 1,
+        "cache_dir": tmp_path,
+        "include_t0": True,
     }
     arguments.update(overrides)
 
@@ -571,9 +554,7 @@ def test_batch_deduplicates_shared_t0_in_first_seen_order(
     no_da = ForecastConfig(product="medium_range_no_da")
     configs = (config for config in [second, first, no_da, second])
 
-    summaries = prepare_operational_references(
-        configs, 6, 6, cache_dir=str(tmp_path)
-    )
+    summaries = prepare_operational_references(configs, 6, 6, cache_dir=str(tmp_path))
 
     expected = [(second, 0), (second, 6), (first, 6), (no_da, 0), (no_da, 6)]
     assert mock_reference_preparation.call_args_list == [
@@ -591,9 +572,7 @@ def test_batch_deduplicates_shared_t0_in_first_seen_order(
     ]
 
 
-def test_batch_keeps_distinct_dates_and_cycles(
-    tmp_path, mock_reference_preparation
-):
+def test_batch_keeps_distinct_dates_and_cycles(tmp_path, mock_reference_preparation):
     configs = [
         ForecastConfig(date="2026-04-19", cycle=0),
         ForecastConfig(date="2026-04-20", cycle=0),
@@ -621,15 +600,25 @@ def test_batch_uses_each_product_schedule(
     long_range = ForecastConfig(product="long_range_mem1")
 
     prepare_operational_references(
-        [short, no_da, long_range], 4, 6,
-        cache_dir=tmp_path, include_t0=include_t0,
+        [short, no_da, long_range],
+        4,
+        6,
+        cache_dir=tmp_path,
+        include_t0=include_t0,
     )
 
     expected = (
-        [(short, 0), (short, 4), (short, 5), (short, 6),
-         (no_da, 0), (no_da, 6), (long_range, 6)]
-        if include_t0 else
-        [(short, 4), (short, 5), (short, 6), (no_da, 6), (long_range, 6)]
+        [
+            (short, 0),
+            (short, 4),
+            (short, 5),
+            (short, 6),
+            (no_da, 0),
+            (no_da, 6),
+            (long_range, 6),
+        ]
+        if include_t0
+        else [(short, 4), (short, 5), (short, 6), (no_da, 6), (long_range, 6)]
     )
     assert mock_reference_preparation.call_args_list == [
         call(config, hour, cache_dir=tmp_path) for config, hour in expected
@@ -645,7 +634,8 @@ def test_batch_stops_at_original_preparation_error(
     mock_reference_preparation.side_effect = [
         {
             "source": resolve_operational_source(config, 1),
-            "reference": {}, "reference_json_bytes": 101,
+            "reference": {},
+            "reference_json_bytes": 101,
         },
         failure,
         AssertionError("Preparation continued after failure"),

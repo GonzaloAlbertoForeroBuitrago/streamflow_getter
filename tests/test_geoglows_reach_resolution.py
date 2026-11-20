@@ -23,9 +23,7 @@ class FakeResponse:
         return False
 
     def read(self):
-        return json.dumps(
-            self.payload
-        ).encode("utf-8")
+        return json.dumps(self.payload).encode("utf-8")
 
 
 def feature(
@@ -60,9 +58,7 @@ def install_payload(
     monkeypatch.setattr(
         geoglows_reach_resolution,
         "urlopen",
-        lambda request, timeout: FakeResponse(
-            payload
-        ),
+        lambda request, timeout: FakeResponse(payload),
     )
 
 
@@ -90,19 +86,13 @@ def test_candidates_are_sorted_by_distance(
         },
     )
 
-    candidates = (
-        geoglows_reach_resolution
-        .find_geoglows_reach_candidates(
-            -99.3217,
-            30.0699,
-            max_distance_m=1000,
-        )
+    candidates = geoglows_reach_resolution.find_geoglows_reach_candidates(
+        -99.3217,
+        30.0699,
+        max_distance_m=1000,
     )
 
-    assert [
-        candidate["river_id"]
-        for candidate in candidates
-    ] == [1, 2]
+    assert [candidate["river_id"] for candidate in candidates] == [1, 2]
 
 
 def test_candidate_preserves_area_and_order(
@@ -124,32 +114,19 @@ def test_candidate_preserves_area_and_order(
         },
     )
 
-    candidate = (
-        geoglows_reach_resolution
-        .nearest_geoglows_reach(
-            -99.3217,
-            30.0699,
-            max_distance_m=1000,
-        )
+    candidate = geoglows_reach_resolution.nearest_geoglows_reach(
+        -99.3217,
+        30.0699,
+        max_distance_m=1000,
     )
 
     assert candidate is not None
 
-    assert (
-        candidate["river_id"]
-        == 770578531
-    )
+    assert candidate["river_id"] == 770578531
 
-    assert candidate[
-        "upstream_area_km2"
-    ] == pytest.approx(
-        788.289088
-    )
+    assert candidate["upstream_area_km2"] == pytest.approx(788.289088)
 
-    assert (
-        candidate["stream_order"]
-        == 4
-    )
+    assert candidate["stream_order"] == 4
 
 
 def test_missing_area_is_allowed(
@@ -170,21 +147,13 @@ def test_missing_area_is_allowed(
         },
     )
 
-    candidate = (
-        geoglows_reach_resolution
-        .nearest_geoglows_reach(
-            -99.3217,
-            30.0699,
-        )
+    candidate = geoglows_reach_resolution.nearest_geoglows_reach(
+        -99.3217,
+        30.0699,
     )
 
     assert candidate is not None
-    assert (
-        candidate[
-            "upstream_area_km2"
-        ]
-        is None
-    )
+    assert candidate["upstream_area_km2"] is None
 
 
 def test_no_candidate_returns_none(
@@ -199,8 +168,7 @@ def test_no_candidate_returns_none(
     )
 
     assert (
-        geoglows_reach_resolution
-        .nearest_geoglows_reach(
+        geoglows_reach_resolution.nearest_geoglows_reach(
             -99.3217,
             30.0699,
         )
@@ -225,13 +193,10 @@ def test_candidate_outside_radius_is_removed(
         },
     )
 
-    candidates = (
-        geoglows_reach_resolution
-        .find_geoglows_reach_candidates(
-            -99.3217,
-            30.0699,
-            max_distance_m=100,
-        )
+    candidates = geoglows_reach_resolution.find_geoglows_reach_candidates(
+        -99.3217,
+        30.0699,
+        max_distance_m=100,
     )
 
     assert candidates == []
@@ -254,8 +219,7 @@ def test_invalid_coordinates(
         ValueError,
     ):
         (
-            geoglows_reach_resolution
-            .find_geoglows_reach_candidates(
+            geoglows_reach_resolution.find_geoglows_reach_candidates(
                 longitude,
                 latitude,
             )
@@ -278,8 +242,7 @@ def test_invalid_radius(
         ValueError,
     ):
         (
-            geoglows_reach_resolution
-            .find_geoglows_reach_candidates(
+            geoglows_reach_resolution.find_geoglows_reach_candidates(
                 -99.3217,
                 30.0699,
                 max_distance_m=radius,
@@ -292,11 +255,7 @@ def test_service_error_is_propagated(
 ):
     install_payload(
         monkeypatch,
-        {
-            "error": {
-                "message": "service failure"
-            }
-        },
+        {"error": {"message": "service failure"}},
     )
 
     with pytest.raises(
@@ -304,8 +263,7 @@ def test_service_error_is_propagated(
         match="service error",
     ):
         (
-            geoglows_reach_resolution
-            .find_geoglows_reach_candidates(
+            geoglows_reach_resolution.find_geoglows_reach_candidates(
                 -99.3217,
                 30.0699,
             )
