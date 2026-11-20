@@ -336,6 +336,110 @@ def _resolve_operational_temporal_selection(args):
     return configs, temporal_selection
 
 
+def _extend_operational_geographic_reaches(args, reaches: list[int]) -> None:
+    """Append reaches selected by geographic CLI arguments."""
+
+    # Resolve geographic bounding-box selections locally.
+    if args.bbox:
+        from streamflow_getter.spatial_resolution import reaches_in_bbox
+
+        selected_reaches = reaches_in_bbox(
+            args.hydrofabric,
+            tuple(args.bbox),
+        )
+
+        if not selected_reaches:
+            raise ValueError(
+                "No NWM reaches found within the bounding box"
+            )
+
+        if len(selected_reaches) > args.max_reaches:
+            raise ValueError(
+                f"Bounding box selected {len(selected_reaches)} reaches; "
+                f"maximum allowed is {args.max_reaches}"
+            )
+
+        reaches.extend(selected_reaches)
+
+        print(
+            f"Selected {len(selected_reaches)} NWM reaches "
+            "from geographic bounding box"
+        )
+
+
+
+    # Resolve GeoJSON polygon selections locally.
+    if args.polygon:
+        from streamflow_getter.spatial_resolution import (
+            load_geojson_polygon,
+            reaches_in_polygon,
+        )
+
+        polygon = load_geojson_polygon(args.polygon)
+
+        selected_reaches = reaches_in_polygon(
+            args.hydrofabric,
+            polygon,
+        )
+
+        if not selected_reaches:
+            raise ValueError(
+                "No NWM reaches found within the polygon"
+            )
+
+        if len(selected_reaches) > args.max_reaches:
+            raise ValueError(
+                f"Polygon selected {len(selected_reaches)} reaches; "
+                f"maximum allowed is {args.max_reaches}"
+            )
+
+        reaches.extend(selected_reaches)
+
+        print(
+            f"Selected {len(selected_reaches)} NWM reaches "
+            "from GeoJSON polygon"
+        )
+
+
+
+    # Resolve the nearest NWM channel to a geographic point.
+    if args.point:
+        from streamflow_getter.spatial_resolution import (
+            load_nearby_reaches,
+            nearest_reaches,
+        )
+
+        longitude, latitude = args.point
+
+        nearby = load_nearby_reaches(
+            args.hydrofabric,
+            longitude,
+            latitude,
+            max_distance_m=args.max_distance_m,
+        )
+
+        candidates = nearest_reaches(
+            nearby,
+            longitude,
+            latitude,
+            max_distance_m=args.max_distance_m,
+            limit=1,
+        )
+
+        if not candidates:
+            raise ValueError(
+                "No NWM reaches found within the maximum distance"
+            )
+
+        selected = candidates[0]
+        reaches.append(selected["feature_id"])
+
+        print(
+            f"Selected NWM reach {selected['feature_id']} "
+            f"at {selected['distance_m']:.2f} m"
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -432,105 +536,7 @@ def main(argv: list[str] | None = None) -> int:
         reaches = list(args.reach)
         routelink_selection = None
 
-        # Resolve geographic bounding-box selections locally.
-        if args.bbox:
-            from streamflow_getter.spatial_resolution import reaches_in_bbox
-
-            selected_reaches = reaches_in_bbox(
-                args.hydrofabric,
-                tuple(args.bbox),
-            )
-
-            if not selected_reaches:
-                raise ValueError(
-                    "No NWM reaches found within the bounding box"
-                )
-
-            if len(selected_reaches) > args.max_reaches:
-                raise ValueError(
-                    f"Bounding box selected {len(selected_reaches)} reaches; "
-                    f"maximum allowed is {args.max_reaches}"
-                )
-
-            reaches.extend(selected_reaches)
-
-            print(
-                f"Selected {len(selected_reaches)} NWM reaches "
-                "from geographic bounding box"
-            )
-
-
-
-        # Resolve GeoJSON polygon selections locally.
-        if args.polygon:
-            from streamflow_getter.spatial_resolution import (
-                load_geojson_polygon,
-                reaches_in_polygon,
-            )
-
-            polygon = load_geojson_polygon(args.polygon)
-
-            selected_reaches = reaches_in_polygon(
-                args.hydrofabric,
-                polygon,
-            )
-
-            if not selected_reaches:
-                raise ValueError(
-                    "No NWM reaches found within the polygon"
-                )
-
-            if len(selected_reaches) > args.max_reaches:
-                raise ValueError(
-                    f"Polygon selected {len(selected_reaches)} reaches; "
-                    f"maximum allowed is {args.max_reaches}"
-                )
-
-            reaches.extend(selected_reaches)
-
-            print(
-                f"Selected {len(selected_reaches)} NWM reaches "
-                "from GeoJSON polygon"
-            )
-
-
-
-        # Resolve the nearest NWM channel to a geographic point.
-        if args.point:
-            from streamflow_getter.spatial_resolution import (
-                load_nearby_reaches,
-                nearest_reaches,
-            )
-
-            longitude, latitude = args.point
-
-            nearby = load_nearby_reaches(
-                args.hydrofabric,
-                longitude,
-                latitude,
-                max_distance_m=args.max_distance_m,
-            )
-
-            candidates = nearest_reaches(
-                nearby,
-                longitude,
-                latitude,
-                max_distance_m=args.max_distance_m,
-                limit=1,
-            )
-
-            if not candidates:
-                raise ValueError(
-                    "No NWM reaches found within the maximum distance"
-                )
-
-            selected = candidates[0]
-            reaches.append(selected["feature_id"])
-
-            print(
-                f"Selected NWM reach {selected['feature_id']} "
-                f"at {selected['distance_m']:.2f} m"
-            )
+        _extend_operational_geographic_reaches(args, reaches)
 
         # Resolve USGS gages through the local RouteLink index.
         if args.gage:
