@@ -247,41 +247,8 @@ def expected_combined_row_identities(
     return identities
 
 
-def validate_combined_operational_frame(frame) -> None:
-    """Validate the stable successful combined-output row contract."""
-    import pandas as pd
-
-    if not isinstance(
-        frame,
-        pd.DataFrame,
-    ):
-        raise TypeError(
-            "Operational output must be a pandas DataFrame"
-        )
-
-    if frame.empty:
-        raise ValueError(
-            "Operational output must not be empty"
-        )
-
-    if tuple(frame.columns) != COMBINED_OPERATIONAL_COLUMNS:
-        raise ValueError(
-            "Combined operational output columns do not match "
-            "the stable contract"
-        )
-
-    if frame[list(COMBINED_ROW_IDENTITY)].isnull().any().any():
-        raise ValueError(
-            "Combined row identity contains null values"
-        )
-
-    if frame.duplicated(
-        subset=list(COMBINED_ROW_IDENTITY)
-    ).any():
-        raise ValueError(
-            "Duplicate combined operational row identity"
-        )
-
+def _validate_combined_text_columns(frame) -> None:
+    """Validate required combined-output text fields."""
     if not frame["requested_product"].map(
         lambda value:
             isinstance(value, str)
@@ -317,6 +284,44 @@ def validate_combined_operational_frame(frame) -> None:
         raise ValueError(
             "method must contain nonempty strings"
         )
+
+
+def validate_combined_operational_frame(frame) -> None:
+    """Validate the stable successful combined-output row contract."""
+    import pandas as pd
+
+    if not isinstance(
+        frame,
+        pd.DataFrame,
+    ):
+        raise TypeError(
+            "Operational output must be a pandas DataFrame"
+        )
+
+    if frame.empty:
+        raise ValueError(
+            "Operational output must not be empty"
+        )
+
+    if tuple(frame.columns) != COMBINED_OPERATIONAL_COLUMNS:
+        raise ValueError(
+            "Combined operational output columns do not match "
+            "the stable contract"
+        )
+
+    if frame[list(COMBINED_ROW_IDENTITY)].isnull().any().any():
+        raise ValueError(
+            "Combined row identity contains null values"
+        )
+
+    if frame.duplicated(
+        subset=list(COMBINED_ROW_IDENTITY)
+    ).any():
+        raise ValueError(
+            "Duplicate combined operational row identity"
+        )
+
+    _validate_combined_text_columns(frame)
 
     lead_hours = pd.to_numeric(
         frame["lead_hour"],
