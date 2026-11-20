@@ -369,6 +369,44 @@ def resolve_operational_source(
     }
 
 
+def _try_vectorized_nwm_feature_indices(ids, requested):
+    """Resolve signed integer NWM IDs using a validated NumPy path.
+
+    Return None when the original Python validation path is required.
+    """
+    if ids.dtype.kind != "i":
+        return None
+
+    bounds = np.iinfo(ids.dtype)
+
+    if any(
+        isinstance(reach, (bool, np.bool_))
+        or not isinstance(reach, numbers.Integral)
+        or int(reach) < bounds.min
+        or int(reach) > bounds.max
+        for reach in requested
+    ):
+        return None
+
+    matches = np.flatnonzero(np.isin(ids, requested))
+    mapping = {}
+
+    for position in matches:
+        feature_id = int(ids[position])
+
+        if feature_id in mapping:
+            raise ValueError(f"Duplicate feature ID {feature_id}")
+
+        mapping[feature_id] = int(position)
+
+    missing = set(requested) - mapping.keys()
+
+    if missing:
+        raise ValueError(f"Missing reaches: {sorted(missing)}")
+
+    return [mapping[reach] for reach in requested]
+
+
 def _resolve_nwm_feature_indices(ds, requested: list[int]) -> list[int]:
     """Resolve requested NWM feature IDs to dataset positions."""
     if "feature_id" not in ds or "streamflow" not in ds:
@@ -376,6 +414,10 @@ def _resolve_nwm_feature_indices(ds, requested: list[int]) -> list[int]:
     ids = np.asarray(ds["feature_id"].values)
     if ids.ndim != 1:
         raise ValueError("feature_id must be one-dimensional")
+
+    fast_indices = _try_vectorized_nwm_feature_indices(ids, requested)
+    if fast_indices is not None:
+        return fast_indices
 
     mapping = {}
     wanted = set(requested)

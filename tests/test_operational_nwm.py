@@ -308,3 +308,116 @@ def test_extract_streamflow_numpy_integer_feature_ids(dtype):
     result = extract_streamflow(ds, [3586192])
 
     assert result == {3586192: 0.41}
+
+
+def test_vectorized_nwm_indices_preserve_order_and_unrelated_duplicates():
+    import numpy as np
+    import xarray as xr
+
+    from streamflow_getter.operational_nwm import (
+        _resolve_nwm_feature_indices,
+    )
+
+    cases = [
+        ([30, 10, 20], [20, 30], [2, 0]),
+        ([30, 10, 20], [10, 20, 30], [1, 2, 0]),
+        ([30, 10, 30], [10], [1]),
+        ([-5, 10, 20], [-5, 20], [0, 2]),
+    ]
+
+    for ids, requested, expected in cases:
+        ds = xr.Dataset(
+            {
+                "streamflow": (
+                    "feature_id",
+                    np.zeros(len(ids), dtype=np.float32),
+                )
+            },
+            coords={
+                "feature_id": np.asarray(ids, dtype=np.int64),
+            },
+        )
+
+        assert _resolve_nwm_feature_indices(ds, requested) == expected
+
+
+def test_vectorized_nwm_indices_reject_matching_duplicates_and_missing():
+    import numpy as np
+    import pytest
+    import xarray as xr
+
+    from streamflow_getter.operational_nwm import (
+        _resolve_nwm_feature_indices,
+    )
+
+    ds = xr.Dataset(
+        {
+            "streamflow": (
+                "feature_id",
+                np.zeros(4, dtype=np.float32),
+            )
+        },
+        coords={
+            "feature_id": np.array([30, 10, 30, 20], dtype=np.int64),
+        },
+    )
+
+    with pytest.raises(ValueError, match="Duplicate feature ID 30"):
+        _resolve_nwm_feature_indices(ds, [30])
+
+    with pytest.raises(ValueError, match="Missing reaches"):
+        _resolve_nwm_feature_indices(ds, [99])
+
+
+def test_vectorized_nwm_indices_preserve_fallback_for_other_types():
+    import numpy as np
+    import pytest
+    import xarray as xr
+
+    from streamflow_getter.operational_nwm import (
+        _resolve_nwm_feature_indices,
+    )
+
+    cases = [
+        (np.array([30, 10, 20], dtype=np.uint64), [20], [2]),
+        (np.array([30, 10, 20], dtype=np.int8), [10], [1]),
+    ]
+
+    for ids, requested, expected in cases:
+        ds = xr.Dataset(
+            {
+                "streamflow": (
+                    "feature_id",
+                    np.zeros(len(ids), dtype=np.float32),
+                )
+            },
+            coords={"feature_id": ids},
+        )
+        assert _resolve_nwm_feature_indices(ds, requested) == expected
+
+    signed_ds = xr.Dataset(
+        {
+            "streamflow": (
+                "feature_id",
+                np.zeros(3, dtype=np.float32),
+            )
+        },
+        coords={"feature_id": np.array([30, 10, 20], dtype=np.int8)},
+    )
+
+    with pytest.raises(ValueError, match="Missing reaches"):
+        _resolve_nwm_feature_indices(signed_ds, [200])
+
+    with pytest.raises(ValueError, match="NWM feature IDs must be integers"):
+        _resolve_nwm_feature_indices(
+            xr.Dataset(
+                {
+                    "streamflow": (
+                        "feature_id",
+                        np.zeros(3, dtype=np.float32),
+                    )
+                },
+                coords={"feature_id": np.array([30.0, 10.0, 20.0])},
+            ),
+            [20],
+        )
