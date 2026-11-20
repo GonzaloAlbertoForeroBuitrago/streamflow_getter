@@ -286,42 +286,9 @@ def _validate_combined_text_columns(frame) -> None:
         )
 
 
-def validate_combined_operational_frame(frame) -> None:
-    """Validate the stable successful combined-output row contract."""
+def _validate_combined_numeric_columns(frame):
+    """Validate numerical fields in combined NWM output."""
     import pandas as pd
-
-    if not isinstance(
-        frame,
-        pd.DataFrame,
-    ):
-        raise TypeError(
-            "Operational output must be a pandas DataFrame"
-        )
-
-    if frame.empty:
-        raise ValueError(
-            "Operational output must not be empty"
-        )
-
-    if tuple(frame.columns) != COMBINED_OPERATIONAL_COLUMNS:
-        raise ValueError(
-            "Combined operational output columns do not match "
-            "the stable contract"
-        )
-
-    if frame[list(COMBINED_ROW_IDENTITY)].isnull().any().any():
-        raise ValueError(
-            "Combined row identity contains null values"
-        )
-
-    if frame.duplicated(
-        subset=list(COMBINED_ROW_IDENTITY)
-    ).any():
-        raise ValueError(
-            "Duplicate combined operational row identity"
-        )
-
-    _validate_combined_text_columns(frame)
 
     lead_hours = pd.to_numeric(
         frame["lead_hour"],
@@ -369,6 +336,48 @@ def validate_combined_operational_frame(frame) -> None:
         raise ValueError(
             "streamflow_m3s must contain finite numeric values"
         )
+
+    return lead_hours
+
+
+def validate_combined_operational_frame(frame) -> None:
+    """Validate the stable successful combined-output row contract."""
+    import pandas as pd
+
+    if not isinstance(
+        frame,
+        pd.DataFrame,
+    ):
+        raise TypeError(
+            "Operational output must be a pandas DataFrame"
+        )
+
+    if frame.empty:
+        raise ValueError(
+            "Operational output must not be empty"
+        )
+
+    if tuple(frame.columns) != COMBINED_OPERATIONAL_COLUMNS:
+        raise ValueError(
+            "Combined operational output columns do not match "
+            "the stable contract"
+        )
+
+    if frame[list(COMBINED_ROW_IDENTITY)].isnull().any().any():
+        raise ValueError(
+            "Combined row identity contains null values"
+        )
+
+    if frame.duplicated(
+        subset=list(COMBINED_ROW_IDENTITY)
+    ).any():
+        raise ValueError(
+            "Duplicate combined operational row identity"
+        )
+
+    _validate_combined_text_columns(frame)
+
+    lead_hours = _validate_combined_numeric_columns(frame)
 
     for column in (
         "valid_time",
