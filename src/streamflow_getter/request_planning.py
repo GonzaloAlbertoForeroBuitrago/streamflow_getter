@@ -16,13 +16,8 @@ class OperationalEvent:
     end_date: str
 
     def __post_init__(self):
-        if (
-            not isinstance(self.name, str)
-            or not self.name.strip()
-        ):
-            raise ValueError(
-                "event name must be a nonempty string"
-            )
+        if not isinstance(self.name, str) or not self.name.strip():
+            raise ValueError("event name must be a nonempty string")
 
         first = _parse_iso_date(
             self.start_date,
@@ -35,23 +30,16 @@ class OperationalEvent:
         )
 
         if last < first:
-            raise ValueError(
-                "event end_date must not precede start_date"
-            )
+            raise ValueError("event end_date must not precede start_date")
 
 
 def _parse_iso_date(value: str, field_name: str) -> date:
     """Return a strict YYYY-MM-DD calendar date."""
     try:
-        if (
-            not isinstance(value, str)
-            or date.fromisoformat(value).isoformat() != value
-        ):
+        if not isinstance(value, str) or date.fromisoformat(value).isoformat() != value:
             raise ValueError
     except (TypeError, ValueError) as exc:
-        raise ValueError(
-            f"{field_name} must use YYYY-MM-DD format"
-        ) from exc
+        raise ValueError(f"{field_name} must use YYYY-MM-DD format") from exc
 
     return date.fromisoformat(value)
 
@@ -66,14 +54,8 @@ def resolve_recent_date_range(
     The ending date is included. With as_of=None, it is the current UTC
     calendar date. Supplying as_of makes the resolution reproducible.
     """
-    if (
-        isinstance(days, bool)
-        or not isinstance(days, int)
-        or days < 1
-    ):
-        raise ValueError(
-            "recent days must be a positive integer"
-        )
+    if isinstance(days, bool) or not isinstance(days, int) or days < 1:
+        raise ValueError("recent days must be a positive integer")
 
     if as_of is None:
         last = datetime.now(UTC).date()
@@ -93,8 +75,7 @@ def _requested_cycles(cycles: Iterable[int]) -> tuple[int, ...]:
         raise ValueError("At least one forecast cycle is required")
 
     if any(
-        isinstance(cycle, bool) or not isinstance(cycle, int)
-        for cycle in requested
+        isinstance(cycle, bool) or not isinstance(cycle, int) for cycle in requested
     ):
         raise ValueError("Forecast cycles must be integers")
 
@@ -111,10 +92,7 @@ def _requested_products(products: Iterable[str]) -> tuple[str, ...]:
     if not requested:
         raise ValueError("At least one forecast product is required")
 
-    if any(
-        not isinstance(product, str) or not product
-        for product in requested
-    ):
+    if any(not isinstance(product, str) or not product for product in requested):
         raise ValueError("Forecast products must be nonempty strings")
 
     if len(set(requested)) != len(requested):
@@ -191,9 +169,7 @@ def plan_operational_event(
     bounding boxes, polygons, or a future external event catalogue.
     """
     if not isinstance(event, OperationalEvent):
-        raise TypeError(
-            "event must be an OperationalEvent"
-        )
+        raise TypeError("event must be an OperationalEvent")
 
     return plan_operational_configs(
         event.start_date,

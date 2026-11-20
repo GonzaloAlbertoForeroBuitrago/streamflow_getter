@@ -20,24 +20,15 @@ def _optional_area(
         return None
 
     if isinstance(value, bool):
-        raise ValueError(
-            f"{name} must be a positive area"
-        )
+        raise ValueError(f"{name} must be a positive area")
 
     try:
         area = float(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(
-            f"{name} must be a positive area"
-        ) from exc
+        raise ValueError(f"{name} must be a positive area") from exc
 
-    if (
-        not math.isfinite(area)
-        or area <= 0
-    ):
-        raise ValueError(
-            f"{name} must be a positive area"
-        )
+    if not math.isfinite(area) or area <= 0:
+        raise ValueError(f"{name} must be a positive area")
 
     return area
 
@@ -60,9 +51,7 @@ def compare_drainage_areas(
         or not isinstance(candidate_label, str)
         or not candidate_label.strip()
     ):
-        raise ValueError(
-            "Area-comparison labels must be nonempty strings"
-        )
+        raise ValueError("Area-comparison labels must be nonempty strings")
 
     reference = _optional_area(
         reference_area_km2,
@@ -74,18 +63,11 @@ def compare_drainage_areas(
         name="candidate_area_km2",
     )
 
-    if (
-        reference is None
-        or candidate is None
-    ):
+    if reference is None or candidate is None:
         return {
             "available": False,
-            "reference_label": (
-                reference_label.strip()
-            ),
-            "candidate_label": (
-                candidate_label.strip()
-            ),
+            "reference_label": (reference_label.strip()),
+            "candidate_label": (candidate_label.strip()),
             "reference_area_km2": reference,
             "candidate_area_km2": candidate,
             "difference_km2": None,
@@ -100,46 +82,24 @@ def compare_drainage_areas(
             ),
         }
 
-    difference = (
-        candidate
-        - reference
-    )
+    difference = candidate - reference
 
-    absolute_difference = abs(
-        difference
-    )
+    absolute_difference = abs(difference)
 
-    relative_difference = (
-        absolute_difference
-        / reference
-    )
+    relative_difference = absolute_difference / reference
 
-    ratio = (
-        candidate
-        / reference
-    )
+    ratio = candidate / reference
 
     return {
         "available": True,
-        "reference_label": (
-            reference_label.strip()
-        ),
-        "candidate_label": (
-            candidate_label.strip()
-        ),
+        "reference_label": (reference_label.strip()),
+        "candidate_label": (candidate_label.strip()),
         "reference_area_km2": reference,
         "candidate_area_km2": candidate,
         "difference_km2": difference,
-        "absolute_difference_km2": (
-            absolute_difference
-        ),
-        "relative_difference": (
-            relative_difference
-        ),
-        "relative_difference_pct": (
-            relative_difference
-            * 100.0
-        ),
+        "absolute_difference_km2": (absolute_difference),
+        "relative_difference": (relative_difference),
+        "relative_difference_pct": (relative_difference * 100.0),
         "area_ratio": ratio,
         "message": (
             f"{reference_label.strip()} area: "

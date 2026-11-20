@@ -1,4 +1,3 @@
-
 """Validation of operational NWM Kerchunk references."""
 
 REQUIRED_KEYS = {

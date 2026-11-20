@@ -1,4 +1,3 @@
-
 """CSV and Parquet output for streamflow time series."""
 
 from contextlib import suppress
@@ -28,9 +27,7 @@ def resolve_output_format(path, output_format=None):
         suffix = path.suffix.lower().lstrip(".")
 
         if suffix in SUPPORTED_FORMATS and suffix != selected:
-            raise ValueError(
-                "Output format conflicts with file extension"
-            )
+            raise ValueError("Output format conflicts with file extension")
 
         return selected
 
@@ -38,8 +35,7 @@ def resolve_output_format(path, output_format=None):
 
     if suffix not in SUPPORTED_FORMATS:
         raise ValueError(
-            "Cannot infer output format; use .csv, .parquet, "
-            "or specify output_format"
+            "Cannot infer output format; use .csv, .parquet, or specify output_format"
         )
 
     return suffix
@@ -66,9 +62,7 @@ def write_timeseries(
     selected = resolve_output_format(destination, output_format)
 
     if destination.exists():
-        raise FileExistsError(
-            f"Output already exists: {destination}"
-        )
+        raise FileExistsError(f"Output already exists: {destination}")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
 
@@ -112,15 +106,14 @@ def write_timeseries(
 
     return destination
 
+
 def manifest_path_for(output_path):
     """Return the default JSON sidecar path for a data output."""
     from pathlib import Path
 
     path = Path(output_path).expanduser()
 
-    return path.with_name(
-        path.name + ".manifest.json"
-    )
+    return path.with_name(path.name + ".manifest.json")
 
 
 def _serialize_manifest(manifest) -> bytes:
@@ -129,9 +122,7 @@ def _serialize_manifest(manifest) -> bytes:
     import json
 
     if not isinstance(manifest, Mapping):
-        raise TypeError(
-            "manifest must be a mapping"
-        )
+        raise TypeError("manifest must be a mapping")
 
     try:
         text = json.dumps(
@@ -141,13 +132,9 @@ def _serialize_manifest(manifest) -> bytes:
             allow_nan=False,
         )
     except (TypeError, ValueError) as exc:
-        raise ValueError(
-            "manifest must contain strict JSON-compatible values"
-        ) from exc
+        raise ValueError("manifest must contain strict JSON-compatible values") from exc
 
-    return (
-        text + "\n"
-    ).encode("utf-8")
+    return (text + "\n").encode("utf-8")
 
 
 def _publish_manifest_payload(
@@ -161,9 +148,7 @@ def _publish_manifest_payload(
     path = Path(destination).expanduser()
 
     if path.exists():
-        raise FileExistsError(
-            f"Manifest already exists: {path}"
-        )
+        raise FileExistsError(f"Manifest already exists: {path}")
 
     temporary_path = None
 
@@ -177,13 +162,9 @@ def _publish_manifest_payload(
         ) as temporary:
             temporary.write(payload)
             temporary.flush()
-            os.fsync(
-                temporary.fileno()
-            )
+            os.fsync(temporary.fileno())
 
-            temporary_path = Path(
-                temporary.name
-            )
+            temporary_path = Path(temporary.name)
 
         # The temporary file lives in the destination directory.
         # Creating a hard link publishes the complete bytes in one
@@ -194,9 +175,7 @@ def _publish_manifest_payload(
                 path,
             )
         except FileExistsError as exc:
-            raise FileExistsError(
-                f"Manifest already exists: {path}"
-            ) from exc
+            raise FileExistsError(f"Manifest already exists: {path}") from exc
 
         return path
 
@@ -213,9 +192,7 @@ def write_manifest(
     path,
 ):
     """Publish a JSON run manifest without overwriting existing output."""
-    payload = _serialize_manifest(
-        manifest
-    )
+    payload = _serialize_manifest(manifest)
 
     return _publish_manifest_payload(
         payload,
@@ -243,28 +220,15 @@ def write_timeseries_with_manifest(
     """
     from pathlib import Path
 
-    data_destination = Path(
-        path
-    ).expanduser()
+    data_destination = Path(path).expanduser()
 
     if manifest_path is None:
-        manifest_destination = (
-            manifest_path_for(
-                data_destination
-            )
-        )
+        manifest_destination = manifest_path_for(data_destination)
     else:
-        manifest_destination = Path(
-            manifest_path
-        ).expanduser()
+        manifest_destination = Path(manifest_path).expanduser()
 
-    if (
-        data_destination
-        == manifest_destination
-    ):
-        raise ValueError(
-            "Data and manifest destinations must differ"
-        )
+    if data_destination == manifest_destination:
+        raise ValueError("Data and manifest destinations must differ")
 
     # Validate the requested data format before creating anything.
     resolve_output_format(
@@ -273,19 +237,13 @@ def write_timeseries_with_manifest(
     )
 
     # Prove the complete manifest is serializable before creating data.
-    manifest_payload = _serialize_manifest(
-        manifest
-    )
+    manifest_payload = _serialize_manifest(manifest)
 
     if data_destination.exists():
-        raise FileExistsError(
-            f"Output already exists: {data_destination}"
-        )
+        raise FileExistsError(f"Output already exists: {data_destination}")
 
     if manifest_destination.exists():
-        raise FileExistsError(
-            f"Manifest already exists: {manifest_destination}"
-        )
+        raise FileExistsError(f"Manifest already exists: {manifest_destination}")
 
     data_written = write_timeseries(
         frame,
@@ -294,20 +252,14 @@ def write_timeseries_with_manifest(
     )
 
     try:
-        manifest_written = (
-            _publish_manifest_payload(
-                manifest_payload,
-                manifest_destination,
-            )
+        manifest_written = _publish_manifest_payload(
+            manifest_payload,
+            manifest_destination,
         )
 
     except Exception as exc:
         try:
-            Path(
-                data_written
-            ).unlink(
-                missing_ok=True
-            )
+            Path(data_written).unlink(missing_ok=True)
         except OSError as cleanup_error:
             with suppress(AttributeError):
                 exc.add_note(

@@ -40,25 +40,15 @@ def _coordinate(
 ) -> float:
     """Return a validated finite geographic coordinate."""
     if isinstance(value, bool):
-        raise ValueError(
-            f"{name} must be numeric"
-        )
+        raise ValueError(f"{name} must be numeric")
 
     try:
         result = float(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(
-            f"{name} must be numeric"
-        ) from exc
+        raise ValueError(f"{name} must be numeric") from exc
 
-    if (
-        not math.isfinite(result)
-        or not minimum <= result <= maximum
-    ):
-        raise ValueError(
-            f"{name} must be between "
-            f"{minimum} and {maximum}"
-        )
+    if not math.isfinite(result) or not minimum <= result <= maximum:
+        raise ValueError(f"{name} must be between {minimum} and {maximum}")
 
     return result
 
@@ -66,24 +56,15 @@ def _coordinate(
 def _radius_m(value) -> float:
     """Return a validated positive local-search radius."""
     if isinstance(value, bool):
-        raise ValueError(
-            "max_distance_m must be positive"
-        )
+        raise ValueError("max_distance_m must be positive")
 
     try:
         radius = float(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(
-            "max_distance_m must be positive"
-        ) from exc
+        raise ValueError("max_distance_m must be positive") from exc
 
-    if (
-        not math.isfinite(radius)
-        or not 0 < radius <= _MAX_SEARCH_RADIUS_M
-    ):
-        raise ValueError(
-            "max_distance_m must be in (0, 25000]"
-        )
+    if not math.isfinite(radius) or not 0 < radius <= _MAX_SEARCH_RADIUS_M:
+        raise ValueError("max_distance_m must be in (0, 25000]")
 
     return radius
 
@@ -95,9 +76,7 @@ def _request_json(
 ) -> dict:
     """Retrieve one JSON document from the GEOGLOWS ArcGIS service."""
     if timeout <= 0:
-        raise ValueError(
-            "timeout must be positive"
-        )
+        raise ValueError("timeout must be positive")
 
     request = Request(
         url,
@@ -114,15 +93,10 @@ def _request_json(
         payload = json.load(response)
 
     if not isinstance(payload, dict):
-        raise ValueError(
-            "GEOGLOWS geometry service returned invalid JSON"
-        )
+        raise ValueError("GEOGLOWS geometry service returned invalid JSON")
 
     if "error" in payload:
-        raise ValueError(
-            "GEOGLOWS geometry service error: "
-            f"{payload['error']}"
-        )
+        raise ValueError(f"GEOGLOWS geometry service error: {payload['error']}")
 
     return payload
 
@@ -133,24 +107,13 @@ def _search_envelope(
     radius_m: float,
 ) -> tuple[float, float, float, float]:
     """Return a conservative lon/lat envelope around a point."""
-    delta_lat = math.degrees(
-        radius_m / _EARTH_RADIUS_M
-    )
+    delta_lat = math.degrees(radius_m / _EARTH_RADIUS_M)
 
     if abs(latitude) + delta_lat >= 90:
-        raise ValueError(
-            "Search area crosses a pole"
-        )
+        raise ValueError("Search area crosses a pole")
 
     delta_lon = math.degrees(
-        math.asin(
-            math.sin(
-                math.radians(delta_lat)
-            )
-            / math.cos(
-                math.radians(latitude)
-            )
-        )
+        math.asin(math.sin(math.radians(delta_lat)) / math.cos(math.radians(latitude)))
     )
 
     envelope = (
@@ -163,9 +126,7 @@ def _search_envelope(
     west, _, east, _ = envelope
 
     if west < -180 or east > 180:
-        raise ValueError(
-            "Antimeridian-crossing searches are not supported"
-        )
+        raise ValueError("Antimeridian-crossing searches are not supported")
 
     return envelope
 
@@ -176,26 +137,20 @@ def _query_parameters(
     radius_m: float,
 ) -> dict[str, object]:
     """Build the stable ArcGIS query parameters for one search."""
-    west, south, east, north = (
-        _search_envelope(
-            longitude,
-            latitude,
-            radius_m,
-        )
+    west, south, east, north = _search_envelope(
+        longitude,
+        latitude,
+        radius_m,
     )
 
     return {
         "where": "1=1",
-        "geometry": (
-            f"{west},{south},{east},{north}"
-        ),
+        "geometry": (f"{west},{south},{east},{north}"),
         "geometryType": "esriGeometryEnvelope",
         "inSR": 4326,
         "outSR": 4326,
         "spatialRel": "esriSpatialRelIntersects",
-        "outFields": (
-            "comid,upstreamarea,streamorder"
-        ),
+        "outFields": ("comid,upstreamarea,streamorder"),
         "returnGeometry": "true",
         "orderByFields": "comid",
         "resultRecordCount": _PAGE_SIZE,
@@ -236,9 +191,7 @@ def _fetch_candidate_features(
         )
 
         if not isinstance(page, list):
-            raise ValueError(
-                "GEOGLOWS geometry service returned invalid features"
-            )
+            raise ValueError("GEOGLOWS geometry service returned invalid features")
 
         previous_count = len(rows)
 
@@ -256,9 +209,7 @@ def _fetch_candidate_features(
             ):
                 continue
 
-            river_id = attributes.get(
-                "comid"
-            )
+            river_id = attributes.get("comid")
 
             if river_id is None:
                 continue
@@ -277,13 +228,9 @@ def _fetch_candidate_features(
             return rows
 
         if not page or len(rows) == previous_count:
-            raise ValueError(
-                "GEOGLOWS pagination made no progress"
-            )
+            raise ValueError("GEOGLOWS pagination made no progress")
 
-    raise ValueError(
-        "Incomplete GEOGLOWS geometry response"
-    )
+    raise ValueError("Incomplete GEOGLOWS geometry response")
 
 
 def _feature_geometry(
@@ -295,33 +242,15 @@ def _feature_geometry(
         {},
     )
 
-    paths = geometry.get(
-        "paths"
-    )
+    paths = geometry.get("paths")
 
     if not isinstance(paths, list):
-        raise ValueError(
-            "GEOGLOWS feature has invalid geometry"
-        )
+        raise ValueError("GEOGLOWS feature has invalid geometry")
 
-    coordinates = [
-        [
-            list(point[:2])
-            for point in path
-        ]
-        for path in paths
-    ]
+    coordinates = [[list(point[:2]) for point in path] for path in paths]
 
-    if (
-        not coordinates
-        or any(
-            len(path) < 2
-            for path in coordinates
-        )
-    ):
-        raise ValueError(
-            "GEOGLOWS feature has invalid geometry"
-        )
+    if not coordinates or any(len(path) < 2 for path in coordinates):
+        raise ValueError("GEOGLOWS feature has invalid geometry")
 
     return {
         "type": "MultiLineString",
@@ -334,13 +263,7 @@ def _local_projector(
     latitude: float,
 ):
     """Return a local azimuthal-equidistant projection function."""
-    crs = (
-        f"+proj=aeqd "
-        f"+lat_0={latitude} "
-        f"+lon_0={longitude} "
-        f"+datum=WGS84 "
-        f"+units=m"
-    )
+    crs = f"+proj=aeqd +lat_0={latitude} +lon_0={longitude} +datum=WGS84 +units=m"
 
     return Transformer.from_crs(
         4326,
@@ -355,17 +278,10 @@ def _distance_to_geometry_m(
     project,
 ) -> float:
     """Return point-to-line distance in the local metric CRS."""
-    line = shape(
-        geometry
-    )
+    line = shape(geometry)
 
-    if (
-        line.is_empty
-        or not line.is_valid
-    ):
-        raise ValueError(
-            "Invalid GEOGLOWS geometry"
-        )
+    if line.is_empty or not line.is_valid:
+        raise ValueError("Invalid GEOGLOWS geometry")
 
     metric = transform(
         line,
@@ -385,12 +301,8 @@ def _distance_to_geometry_m(
         )
     )
 
-    if not math.isfinite(
-        distance
-    ):
-        raise ValueError(
-            "Invalid GEOGLOWS distance"
-        )
+    if not math.isfinite(distance):
+        raise ValueError("Invalid GEOGLOWS distance")
 
     return distance
 
@@ -406,19 +318,11 @@ def _upstream_area_km2(
         return None
 
     try:
-        area = (
-            float(value)
-            / 1_000_000.0
-        )
+        area = float(value) / 1_000_000.0
     except (TypeError, ValueError) as exc:
-        raise ValueError(
-            "Invalid GEOGLOWS upstream area"
-        ) from exc
+        raise ValueError("Invalid GEOGLOWS upstream area") from exc
 
-    if (
-        not math.isfinite(area)
-        or area <= 0
-    ):
+    if not math.isfinite(area) or area <= 0:
         return None
 
     return area
@@ -437,15 +341,9 @@ def _stream_order(
     try:
         order = int(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(
-            "Invalid GEOGLOWS stream order"
-        ) from exc
+        raise ValueError("Invalid GEOGLOWS stream order") from exc
 
-    return (
-        order
-        if order > 0
-        else None
-    )
+    return order if order > 0 else None
 
 
 def _candidate_record(
@@ -465,26 +363,17 @@ def _candidate_record(
         attributes,
         dict,
     ):
-        raise ValueError(
-            "GEOGLOWS feature has invalid attributes"
-        )
+        raise ValueError("GEOGLOWS feature has invalid attributes")
 
-    geometry = _feature_geometry(
-        feature
-    )
+    geometry = _feature_geometry(feature)
 
     try:
-        distance_m = (
-            _distance_to_geometry_m(
-                geometry,
-                project=project,
-            )
+        distance_m = _distance_to_geometry_m(
+            geometry,
+            project=project,
         )
     except ValueError as exc:
-        raise ValueError(
-            "Invalid GEOGLOWS geometry "
-            f"for river {river_id}"
-        ) from exc
+        raise ValueError(f"Invalid GEOGLOWS geometry for river {river_id}") from exc
 
     if distance_m > radius_m:
         return None
@@ -493,20 +382,8 @@ def _candidate_record(
         "source": "geoglows",
         "river_id": river_id,
         "distance_m": distance_m,
-        "upstream_area_km2": (
-            _upstream_area_km2(
-                attributes.get(
-                    "upstreamarea"
-                )
-            )
-        ),
-        "stream_order": (
-            _stream_order(
-                attributes.get(
-                    "streamorder"
-                )
-            )
-        ),
+        "upstream_area_km2": (_upstream_area_km2(attributes.get("upstreamarea"))),
+        "stream_order": (_stream_order(attributes.get("streamorder"))),
         "geometry": geometry,
     }
 
@@ -538,18 +415,10 @@ def find_geoglows_reach_candidates(
         maximum=90,
     )
 
-    radius = _radius_m(
-        max_distance_m
-    )
+    radius = _radius_m(max_distance_m)
 
-    if (
-        isinstance(max_pages, bool)
-        or not isinstance(max_pages, int)
-        or max_pages <= 0
-    ):
-        raise ValueError(
-            "max_pages must be a positive integer"
-        )
+    if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages <= 0:
+        raise ValueError("max_pages must be a positive integer")
 
     features = _fetch_candidate_features(
         _query_parameters(
@@ -571,8 +440,7 @@ def find_geoglows_reach_candidates(
 
     candidates = [
         candidate
-        for river_id, feature
-        in features.items()
+        for river_id, feature in features.items()
         if (
             candidate := _candidate_record(
                 river_id,
@@ -601,17 +469,11 @@ def nearest_geoglows_reach(
     timeout: float = 60.0,
 ) -> dict | None:
     """Return the nearest candidate, or None when no reach is nearby."""
-    candidates = (
-        find_geoglows_reach_candidates(
-            longitude,
-            latitude,
-            max_distance_m=max_distance_m,
-            timeout=timeout,
-        )
+    candidates = find_geoglows_reach_candidates(
+        longitude,
+        latitude,
+        max_distance_m=max_distance_m,
+        timeout=timeout,
     )
 
-    return (
-        candidates[0]
-        if candidates
-        else None
-    )
+    return candidates[0] if candidates else None

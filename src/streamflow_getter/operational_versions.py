@@ -94,14 +94,10 @@ def forecast_initialization_utc(
         config,
         ForecastConfig,
     ):
-        raise TypeError(
-            "config must be a ForecastConfig"
-        )
+        raise TypeError("config must be a ForecastConfig")
 
     return datetime.combine(
-        date.fromisoformat(
-            config.date
-        ),
+        date.fromisoformat(config.date),
         time(
             hour=config.cycle,
             tzinfo=UTC,
@@ -122,30 +118,16 @@ def resolve_operational_nwm_version(
     beginning January 1, 2018. Earlier dates return None rather than
     receiving a guessed version.
     """
-    initialization = (
-        forecast_initialization_utc(
-            config
-        )
-    )
+    initialization = forecast_initialization_utc(config)
 
-    if (
-        initialization
-        < OPERATIONAL_VERSION_BASELINE_UTC
-    ):
+    if initialization < OPERATIONAL_VERSION_BASELINE_UTC:
         return None
 
     version = "1.1"
 
-    for transition in (
-        OPERATIONAL_VERSION_TRANSITIONS
-    ):
-        if (
-            initialization
-            >= transition.effective_utc
-        ):
-            version = (
-                transition.version
-            )
+    for transition in OPERATIONAL_VERSION_TRANSITIONS:
+        if initialization >= transition.effective_utc:
+            version = transition.version
         else:
             break
 

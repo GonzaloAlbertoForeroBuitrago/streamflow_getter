@@ -55,9 +55,7 @@ def _feature_id(value: int) -> int:
         or not isinstance(value, numbers.Integral)
         or int(value) <= 0
     ):
-        raise ValueError(
-            "NWM feature ID must be a positive integer"
-        )
+        raise ValueError("NWM feature ID must be a positive integer")
 
     return int(value)
 
@@ -67,21 +65,15 @@ def _utc_hour(value, *, name: str) -> pd.Timestamp:
     try:
         timestamp = pd.Timestamp(value)
     except (TypeError, ValueError, OverflowError) as exc:
-        raise ValueError(
-            f"{name} must be a valid datetime"
-        ) from exc
+        raise ValueError(f"{name} must be a valid datetime") from exc
 
     if timestamp.tzinfo is None:
-        raise ValueError(
-            f"{name} must include an explicit timezone"
-        )
+        raise ValueError(f"{name} must include an explicit timezone")
 
     timestamp = timestamp.tz_convert("UTC")
 
     if timestamp != timestamp.floor("h"):
-        raise ValueError(
-            f"{name} must fall on a whole UTC hour"
-        )
+        raise ValueError(f"{name} must fall on a whole UTC hour")
 
     return timestamp
 
@@ -107,8 +99,7 @@ def _normalize_nwm_frame(
 
     if missing:
         raise ValueError(
-            "Operational NWM frame is missing columns: "
-            + ", ".join(sorted(missing))
+            "Operational NWM frame is missing columns: " + ", ".join(sorted(missing))
         )
 
     result = frame.copy()
@@ -126,19 +117,13 @@ def _normalize_nwm_frame(
     )
 
     if result["valid_time"].isna().any():
-        raise ValueError(
-            "NWM valid_time contains missing values"
-        )
+        raise ValueError("NWM valid_time contains missing values")
 
     if result["reference_time"].isna().any():
-        raise ValueError(
-            "NWM reference_time contains missing values"
-        )
+        raise ValueError("NWM reference_time contains missing values")
 
     if result["streamflow_m3s"].isna().any():
-        raise ValueError(
-            "NWM streamflow contains missing values"
-        )
+        raise ValueError("NWM streamflow contains missing values")
 
     result["source"] = "nwm"
     result["series"] = result["product"]
@@ -171,37 +156,26 @@ def _latest_forecast_initialization(
 ) -> pd.Timestamp:
     """Return the latest supported product cycle at or before reference."""
     if product not in PRODUCT_SPECS:
-        raise ValueError(
-            f"Unsupported operational NWM product: {product}"
-        )
+        raise ValueError(f"Unsupported operational NWM product: {product}")
 
     spec = PRODUCT_SPECS[product]
 
     if spec.analysis_only:
-        raise ValueError(
-            f"{product} is an analysis product, not a forecast product"
-        )
+        raise ValueError(f"{product} is an analysis product, not a forecast product")
 
     candidates = [
         day + pd.Timedelta(hours=cycle)
         for day in (
-            reference_time.normalize()
-            - pd.Timedelta(days=1),
+            reference_time.normalize() - pd.Timedelta(days=1),
             reference_time.normalize(),
         )
         for cycle in spec.cycles
     ]
 
-    eligible = [
-        candidate
-        for candidate in candidates
-        if candidate <= reference_time
-    ]
+    eligible = [candidate for candidate in candidates if candidate <= reference_time]
 
     if not eligible:
-        raise ValueError(
-            f"No supported initialization found for {product}"
-        )
+        raise ValueError(f"No supported initialization found for {product}")
 
     return max(eligible)
 
@@ -217,27 +191,20 @@ def _forecast_leads_in_window(
         config.spec.max_hour,
     )
 
-    initialization = pd.Timestamp(
-        f"{config.date}T{config.cycle:02d}:00:00Z"
-    )
+    initialization = pd.Timestamp(f"{config.date}T{config.cycle:02d}:00:00Z")
 
     selected = [
         lead
         for lead in lead_hours
         if (
-            initialization
-            + pd.Timedelta(hours=lead)
-            > reference_time
-            and initialization
-            + pd.Timedelta(hours=lead)
-            <= end_time
+            initialization + pd.Timedelta(hours=lead) > reference_time
+            and initialization + pd.Timedelta(hours=lead) <= end_time
         )
     ]
 
     if not selected:
         raise ValueError(
-            "No scheduled forecast valid times "
-            "inside the requested window"
+            "No scheduled forecast valid times inside the requested window"
         )
 
     return selected
@@ -261,10 +228,7 @@ def fetch_nwm_analysis_streamflow(
 
     if product not in ANALYSIS_PRODUCTS:
         raise ValueError(
-            "Analysis product must be one of: "
-            + ", ".join(
-                sorted(ANALYSIS_PRODUCTS)
-            )
+            "Analysis product must be one of: " + ", ".join(sorted(ANALYSIS_PRODUCTS))
         )
 
     start = _utc_hour(
@@ -277,9 +241,7 @@ def fetch_nwm_analysis_streamflow(
     )
 
     if end < start:
-        raise ValueError(
-            "end_time must not be before start_time"
-        )
+        raise ValueError("end_time must not be before start_time")
 
     frames = []
 
@@ -289,9 +251,7 @@ def fetch_nwm_analysis_streamflow(
         freq="h",
     ):
         config = ForecastConfig(
-            date=valid_time.strftime(
-                "%Y-%m-%d"
-            ),
+            date=valid_time.strftime("%Y-%m-%d"),
             cycle=int(valid_time.hour),
             product=product,
             domain="conus",
@@ -342,24 +302,16 @@ def fetch_nwm_forecast_streamflow(
     )
 
     if end <= reference:
-        raise ValueError(
-            "end_time must be after reference_time"
-        )
+        raise ValueError("end_time must be after reference_time")
 
-    initialization = (
-        _latest_forecast_initialization(
-            reference,
-            product,
-        )
+    initialization = _latest_forecast_initialization(
+        reference,
+        product,
     )
 
     config = ForecastConfig(
-        date=initialization.strftime(
-            "%Y-%m-%d"
-        ),
-        cycle=int(
-            initialization.hour
-        ),
+        date=initialization.strftime("%Y-%m-%d"),
+        cycle=int(initialization.hour),
         product=product,
         domain="conus",
     )
@@ -379,23 +331,13 @@ def fetch_nwm_forecast_streamflow(
         cache_dir=cache_dir,
     )
 
-    normalized = _normalize_nwm_frame(
-        frame
-    )
+    normalized = _normalize_nwm_frame(frame)
 
-    inside_window = (
-        normalized["valid_time"]
-        .gt(reference)
-        & normalized["valid_time"]
-        .le(end)
-    )
+    inside_window = normalized["valid_time"].gt(reference) & normalized[
+        "valid_time"
+    ].le(end)
 
-    result = (
-        normalized.loc[
-            inside_window
-        ]
-        .reset_index(drop=True)
-    )
+    result = normalized.loc[inside_window].reset_index(drop=True)
 
     if result.empty:
         raise ValueError(
