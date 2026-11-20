@@ -15,12 +15,13 @@ def open_chrtout(version: str = "3.0") -> xr.Dataset:
 
 
 def gages_to_reaches(gages: list[str], ds: xr.Dataset) -> dict[str, int]:
-    """Map gage IDs (kept as strings, 8-digit USGS zero-padded) to feature_ids."""
+    """Map exact USGS gage ID strings to NWM feature IDs."""
     ids = np.char.strip(ds.gage_id.values.astype(str))
     found = {}
     for gage in gages:
-        padded = gage.zfill(8) if gage.isdigit() and len(gage) < 8 else gage
-        hits = np.flatnonzero(ids == padded)
+        if not isinstance(gage, str):
+            raise TypeError("USGS gage ID must be a string")
+        hits = np.flatnonzero(ids == gage)
         if len(hits) == 0:
             raise ValueError(f"gage_id not in NWM CONUS retrospective: {gage}")
         found[gage] = int(ds.feature_id.values[hits[0]])

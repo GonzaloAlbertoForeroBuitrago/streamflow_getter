@@ -16,7 +16,7 @@ def ds():
         coords={
             "time": time,
             "feature_id": ids,
-            "gage_id": ("feature_id", np.array([b"", b"01646500", b"01234567"])),
+            "gage_id": ("feature_id", np.array([b"", b"08165500", b"08166000"])),
         },
     )
 
@@ -33,13 +33,19 @@ def test_fetch_unknown_reach(ds):
         nwm.fetch([999], "2020-01-01", "2020-01-02", ds=ds)
 
 
-def test_gage_lookup_strips_and_pads(ds):
-    assert nwm.gages_to_reaches(["01646500", "1234567"], ds) == {
-        "01646500": 179,
-        "1234567": 181,
+def test_gage_lookup_preserves_exact_ids(ds):
+    assert nwm.gages_to_reaches(["08165500", "08166000"], ds) == {
+        "08165500": 179,
+        "08166000": 181,
     }
 
 
 def test_gage_lookup_unknown(ds):
     with pytest.raises(ValueError, match="99999999"):
         nwm.gages_to_reaches(["99999999"], ds)
+
+
+def test_gage_lookup_does_not_add_zeros(ds):
+    """Shorter IDs must not match by adding leading zeros."""
+    with pytest.raises(ValueError, match="gage_id not in"):
+        nwm.gages_to_reaches(["8165500"], ds)
