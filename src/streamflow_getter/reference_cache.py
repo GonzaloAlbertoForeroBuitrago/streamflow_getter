@@ -191,6 +191,23 @@ def load_cache_record(path, expected_url):
     return None
 
 
+def _normalize_remote_reference_metadata(
+    metadata, *, invalid_type_message: str
+) -> dict:
+    """Validate and normalize remote reference metadata."""
+    if not isinstance(metadata, dict):
+        raise ValueError(invalid_type_message)
+
+    required = ("reference_etag", "source_generation")
+    if any(not metadata.get(key) for key in required):
+        raise ValueError("Remote metadata is incomplete")
+
+    return {
+        "reference_etag": metadata["reference_etag"],
+        "source_generation": str(metadata["source_generation"]),
+    }
+
+
 def load_fresh_reference(
     cache_file,
     expected_url,
@@ -203,19 +220,10 @@ def load_fresh_reference(
     downloader returns the Kerchunk reference JSON bytes.
     """
 
-    current = metadata_provider()
-
-    if not isinstance(current, dict):
-        raise ValueError("Invalid remote metadata")
-
-    required = ("reference_etag", "source_generation")
-    if any(not current.get(key) for key in required):
-        raise ValueError("Remote metadata is incomplete")
-
-    current = {
-        "reference_etag": current["reference_etag"],
-        "source_generation": str(current["source_generation"]),
-    }
+    current = _normalize_remote_reference_metadata(
+        metadata_provider(),
+        invalid_type_message='Invalid remote metadata',
+    )
 
     record = load_cache_record(cache_file, expected_url)
 
@@ -236,26 +244,16 @@ def load_fresh_reference(
 
     raw = downloader()
 
-    if isinstance(raw, bytes) or isinstance(raw, str):
+    if isinstance(raw, (bytes, str)):
         reference = json.loads(raw)
     else:
         raise TypeError("Downloader must return JSON bytes or text")
 
     # Check whether remote metadata changed during the download.
-    after = metadata_provider()
-
-    if not isinstance(after, dict):
-        raise ValueError("Remote metadata is incomplete")
-
-    required = ("reference_etag", "source_generation")
-
-    if any(not after.get(key) for key in required):
-        raise ValueError("Remote metadata is incomplete")
-
-    after = {
-        "reference_etag": after["reference_etag"],
-        "source_generation": str(after["source_generation"]),
-    }
+    after = _normalize_remote_reference_metadata(
+        metadata_provider(),
+        invalid_type_message='Remote metadata is incomplete',
+    )
 
     if compare_metadata(current, after) != "unchanged":
         raise ValueError(
