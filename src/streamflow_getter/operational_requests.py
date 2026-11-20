@@ -105,6 +105,47 @@ def _validate_series_frame(frame, config: ForecastConfig) -> None:
         )
 
 
+def _resolve_shared_analysis_t0(
+    frame, is_t0, config, include_t0,
+    fetch_t0, t0_identity, shared_t0,
+):
+    """Validate, cache, or reuse analysis t0 rows."""
+    if include_t0 and fetch_t0:
+        t0_frame = frame.loc[is_t0].copy()
+
+        if t0_frame.empty:
+            raise ValueError(
+                "Expected analysis t0 rows were not returned"
+            )
+
+        if not t0_frame["product"].eq(
+            config.spec.analysis_product
+        ).all():
+            raise ValueError(
+                "Unexpected analysis t0 source product"
+            )
+
+        shared_t0[t0_identity] = t0_frame
+
+    elif include_t0:
+        if is_t0.any():
+            raise ValueError(
+                "Shared analysis t0 was unexpectedly fetched twice"
+            )
+
+        t0_frame = shared_t0[t0_identity].copy()
+
+    else:
+        if is_t0.any():
+            raise ValueError(
+                "Analysis t0 returned when include_t0 is False"
+            )
+
+        t0_frame = None
+
+    return t0_frame
+
+
 def fetch_operational_configs(
     configs: Iterable[ForecastConfig],
     reach_ids: Iterable[int],
@@ -184,38 +225,10 @@ def fetch_operational_configs(
 
         is_t0 = frame["lead_hour"].eq(0)
 
-        if include_t0 and fetch_t0:
-            t0_frame = frame.loc[is_t0].copy()
-
-            if t0_frame.empty:
-                raise ValueError(
-                    "Expected analysis t0 rows were not returned"
-                )
-
-            if not t0_frame["product"].eq(
-                config.spec.analysis_product
-            ).all():
-                raise ValueError(
-                    "Unexpected analysis t0 source product"
-                )
-
-            shared_t0[t0_identity] = t0_frame
-
-        elif include_t0:
-            if is_t0.any():
-                raise ValueError(
-                    "Shared analysis t0 was unexpectedly fetched twice"
-                )
-
-            t0_frame = shared_t0[t0_identity].copy()
-
-        else:
-            if is_t0.any():
-                raise ValueError(
-                    "Analysis t0 returned when include_t0 is False"
-                )
-
-            t0_frame = None
+        t0_frame = _resolve_shared_analysis_t0(
+            frame, is_t0, config, include_t0,
+            fetch_t0, t0_identity, shared_t0,
+        )
 
         forecast_frame = frame.loc[~is_t0].copy()
 
