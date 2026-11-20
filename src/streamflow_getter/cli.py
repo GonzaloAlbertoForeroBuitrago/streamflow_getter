@@ -595,6 +595,48 @@ def _fetch_operational_manifest_frame(args, configs, reaches):
     return manifest_frame
 
 
+def _validate_operational_forecast_hours(args, configs) -> None:
+    """Validate operational request constraints."""
+    if args.start_hour < 1 or args.end_hour < args.start_hour:
+        raise ValueError(
+            "Invalid forecast hour range: start_hour must be "
+            "positive and end_hour must not precede start_hour"
+        )
+
+    if args.no_t0 and any(
+        config.spec.analysis_only
+        for config in configs
+    ):
+        raise ValueError(
+            "Analysis-only products cannot be used with --no-t0"
+        )
+    # Validate product-specific forecast hours before remote access.
+    for config in configs:
+        config.forecast_hours(
+            args.start_hour,
+            args.end_hour,
+        )
+
+
+def _validate_combined_operational_reaches(args, reaches) -> None:
+    """Validate operational request constraints."""
+    if any(reach <= 0 for reach in reaches):
+        raise ValueError(
+            "Reach IDs must be positive integers"
+        )
+
+    if len(reaches) != len(set(reaches)):
+        raise ValueError(
+            "Duplicate NWM feature IDs are not allowed"
+        )
+
+    if (args.bbox or args.polygon) and len(reaches) > args.max_reaches:
+        raise ValueError(
+            f"Request contains {len(reaches)} reaches; "
+            f"maximum allowed is {args.max_reaches}"
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -635,25 +677,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
         # Reject invalid forecast-hour ranges before remote access.
-        if args.start_hour < 1 or args.end_hour < args.start_hour:
-            raise ValueError(
-                "Invalid forecast hour range: start_hour must be "
-                "positive and end_hour must not precede start_hour"
-            )
-
-        if args.no_t0 and any(
-            config.spec.analysis_only
-            for config in configs
-        ):
-            raise ValueError(
-                "Analysis-only products cannot be used with --no-t0"
-            )
-        # Validate product-specific forecast hours before remote access.
-        for config in configs:
-            config.forecast_hours(
-                args.start_hour,
-                args.end_hour,
-            )
+        _validate_operational_forecast_hours(args, configs)
 
 
         # Validate data and manifest destinations before remote retrieval.
@@ -689,21 +713,7 @@ def main(argv: list[str] | None = None) -> int:
         routelink_selection = _extend_operational_gage_reaches(args, configs, reaches)
 
         # Validate the combined reach selection.
-        if any(reach <= 0 for reach in reaches):
-            raise ValueError(
-                "Reach IDs must be positive integers"
-            )
-
-        if len(reaches) != len(set(reaches)):
-            raise ValueError(
-                "Duplicate NWM feature IDs are not allowed"
-            )
-
-        if (args.bbox or args.polygon) and len(reaches) > args.max_reaches:
-            raise ValueError(
-                f"Request contains {len(reaches)} reaches; "
-                f"maximum allowed is {args.max_reaches}"
-            )
+        _validate_combined_operational_reaches(args, reaches)
 
         # Retrieve operational NWM streamflow after local validation.
         manifest_frame = _fetch_operational_manifest_frame(args, configs, reaches)
