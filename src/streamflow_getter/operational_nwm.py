@@ -747,6 +747,49 @@ def fetch_operational_forecast(
 
 
 
+def _validate_operational_forecast_result(config, hour, requested, result) -> None:
+    """Validate operational result identity and discharge integrity."""
+    if result["lead_hour"] != hour:
+        raise ValueError("Unexpected forecast lead hour")
+
+    if result["forecast_date"] != config.date:
+        raise ValueError("Unexpected forecast date")
+
+    if result["forecast_cycle"] != config.cycle:
+        raise ValueError("Unexpected forecast cycle")
+
+    if result["domain"] != config.domain:
+        raise ValueError("Unexpected NWM domain")
+
+    if hour == 0:
+        config.validate_analysis_timestamps(
+            result["valid_time"],
+            result["reference_time"],
+        )
+    else:
+        config.validate_timestamps(
+            hour,
+            result["valid_time"],
+            result["reference_time"],
+        )
+
+    expected_product = (
+        config.spec.analysis_product if hour == 0 else config.product
+    )
+
+    if result["product"] != expected_product:
+        raise ValueError("Unexpected NWM source product")
+
+    if set(result["streamflow_m3s"]) != set(requested):
+        raise ValueError("Unexpected feature IDs in forecast result")
+
+
+    if not np.isfinite(
+        list(result["streamflow_m3s"].values())
+    ).all():
+        raise ValueError("Non-finite streamflow values found")
+
+
 def fetch_operational_series(
     config: ForecastConfig,
     reach_ids: list[int],
@@ -826,45 +869,7 @@ def fetch_operational_series(
                 cache_dir=cache_dir,
             )
 
-        if result["lead_hour"] != hour:
-            raise ValueError("Unexpected forecast lead hour")
-
-        if result["forecast_date"] != config.date:
-            raise ValueError("Unexpected forecast date")
-
-        if result["forecast_cycle"] != config.cycle:
-            raise ValueError("Unexpected forecast cycle")
-
-        if result["domain"] != config.domain:
-            raise ValueError("Unexpected NWM domain")
-
-        if hour == 0:
-            config.validate_analysis_timestamps(
-                result["valid_time"],
-                result["reference_time"],
-            )
-        else:
-            config.validate_timestamps(
-                hour,
-                result["valid_time"],
-                result["reference_time"],
-            )
-
-        expected_product = (
-            config.spec.analysis_product if hour == 0 else config.product
-        )
-
-        if result["product"] != expected_product:
-            raise ValueError("Unexpected NWM source product")
-
-        if set(result["streamflow_m3s"]) != set(requested):
-            raise ValueError("Unexpected feature IDs in forecast result")
-
-
-        if not np.isfinite(
-            list(result["streamflow_m3s"].values())
-        ).all():
-            raise ValueError("Non-finite streamflow values found")
+        _validate_operational_forecast_result(config, hour, requested, result)
 
 
         for reach in requested:
