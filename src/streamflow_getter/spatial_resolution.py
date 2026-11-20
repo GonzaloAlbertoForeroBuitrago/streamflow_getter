@@ -1,4 +1,3 @@
-
 """Geographic selection of NWM reaches using channel geometries."""
 
 import math
@@ -8,20 +7,13 @@ from pathlib import Path
 
 def validate_feature_id(value) -> int:
     """Validate an NWM feature ID without silently changing its value."""
-    if (
-        isinstance(value, (bool, str))
-        or not isinstance(value, numbers.Integral)
-    ):
-        raise ValueError(
-            f"NWM feature ID must be an integer: {value!r}"
-        )
+    if isinstance(value, (bool, str)) or not isinstance(value, numbers.Integral):
+        raise ValueError(f"NWM feature ID must be an integer: {value!r}")
 
     feature_id = int(value)
 
     if feature_id <= 0:
-        raise ValueError(
-            f"NWM feature ID must be a positive integer: {value!r}"
-        )
+        raise ValueError(f"NWM feature ID must be a positive integer: {value!r}")
 
     return feature_id
 
@@ -45,12 +37,9 @@ def validate_hydrofabric_crs(
     if not actual:
         raise ValueError("Hydrofabric CRS is missing")
 
-    if not CRS.from_user_input(actual).equals(
-        CRS.from_user_input(expected_crs)
-    ):
+    if not CRS.from_user_input(actual).equals(CRS.from_user_input(expected_crs)):
         raise ValueError(
-            f"Unexpected hydrofabric CRS: {actual}; "
-            f"expected {expected_crs}"
+            f"Unexpected hydrofabric CRS: {actual}; expected {expected_crs}"
         )
 
 
@@ -111,10 +100,14 @@ def nearest_reaches(
 
     projected = reaches.to_crs(projected_crs)
 
-    point = gpd.GeoSeries(
-        [Point(longitude, latitude)],
-        crs="EPSG:4326",
-    ).to_crs(projected_crs).iloc[0]
+    point = (
+        gpd.GeoSeries(
+            [Point(longitude, latitude)],
+            crs="EPSG:4326",
+        )
+        .to_crs(projected_crs)
+        .iloc[0]
+    )
 
     distances = projected.geometry.distance(point)
 
@@ -125,14 +118,14 @@ def nearest_reaches(
             continue
 
         if distance <= max_distance_m:
-            feature_id = validate_feature_id(
-                projected.iloc[position]["ID"]
-            )
+            feature_id = validate_feature_id(projected.iloc[position]["ID"])
 
-            candidates.append({
-                "feature_id": feature_id,
-                "distance_m": float(distance),
-            })
+            candidates.append(
+                {
+                    "feature_id": feature_id,
+                    "distance_m": float(distance),
+                }
+            )
 
     candidates.sort(
         key=lambda item: (
@@ -228,10 +221,14 @@ def _reaches_intersecting_geometry(
     validate_hydrofabric_crs(path, layer=layer)
 
     # Transform the input geometry into the hydrofabric CRS.
-    query = gpd.GeoSeries(
-        [geometry],
-        crs=geometry_crs,
-    ).to_crs("EPSG:4269").iloc[0]
+    query = (
+        gpd.GeoSeries(
+            [geometry],
+            crs=geometry_crs,
+        )
+        .to_crs("EPSG:4269")
+        .iloc[0]
+    )
 
     # Read candidate geometries using their bounding boxes.
     reaches = pyogrio.read_dataframe(
@@ -241,21 +238,15 @@ def _reaches_intersecting_geometry(
         columns=["ID"],
     )
 
-    if reaches.crs is None or not CRS.from_user_input(
-        reaches.crs
-    ).equals(CRS.from_epsg(4269)):
-        raise ValueError(
-            "Unexpected CRS in loaded reach geometries"
-        )
+    if reaches.crs is None or not CRS.from_user_input(reaches.crs).equals(
+        CRS.from_epsg(4269)
+    ):
+        raise ValueError("Unexpected CRS in loaded reach geometries")
 
     # Apply exact geometric intersection after candidate loading.
-    selected = reaches[
-        reaches.geometry.intersects(query)
-    ]
+    selected = reaches[reaches.geometry.intersects(query)]
 
-    return sorted(
-        {validate_feature_id(value) for value in selected["ID"]}
-    )
+    return sorted({validate_feature_id(value) for value in selected["ID"]})
 
 
 def reaches_in_bbox(
@@ -277,15 +268,11 @@ def reaches_in_bbox(
     west, south, east, north = bbox
 
     if not all(
-        isinstance(value, (int, float)) and math.isfinite(value)
-        for value in bbox
+        isinstance(value, (int, float)) and math.isfinite(value) for value in bbox
     ):
         raise ValueError("bbox coordinates must be finite numbers")
 
-    if not (
-        -180 <= west < east <= 180
-        and -90 <= south < north <= 90
-    ):
+    if not (-180 <= west < east <= 180 and -90 <= south < north <= 90):
         raise ValueError("Invalid geographic bounding box")
 
     return _reaches_intersecting_geometry(
@@ -320,7 +307,6 @@ def reaches_in_polygon(
     )
 
 
-
 def _extract_geojson_polygon_geometry(data):
     """Extract a Polygon or MultiPolygon definition from GeoJSON."""
     if not isinstance(data, dict):
@@ -353,9 +339,7 @@ def _extract_geojson_polygon_geometry(data):
         raise ValueError("GeoJSON geometry must be an object")
 
     if geometry_data.get("type") not in ("Polygon", "MultiPolygon"):
-        raise ValueError(
-            "GeoJSON geometry must be Polygon or MultiPolygon"
-        )
+        raise ValueError("GeoJSON geometry must be Polygon or MultiPolygon")
 
     return geometry_data
 
@@ -396,20 +380,10 @@ def load_geojson_polygon(path):
     # Validate geographic coordinate bounds for WGS84 input.
     minx, miny, maxx, maxy = polygon.bounds
 
-    if not all(
-        math.isfinite(value)
-        for value in (minx, miny, maxx, maxy)
-    ):
-        raise ValueError(
-            "GeoJSON coordinates must be finite"
-        )
+    if not all(math.isfinite(value) for value in (minx, miny, maxx, maxy)):
+        raise ValueError("GeoJSON coordinates must be finite")
 
-    if not (
-        -180 <= minx <= maxx <= 180
-        and -90 <= miny <= maxy <= 90
-    ):
-        raise ValueError(
-            "GeoJSON coordinates must be valid longitude/latitude"
-        )
+    if not (-180 <= minx <= maxx <= 180 and -90 <= miny <= maxy <= 90):
+        raise ValueError("GeoJSON coordinates must be valid longitude/latitude")
 
     return polygon

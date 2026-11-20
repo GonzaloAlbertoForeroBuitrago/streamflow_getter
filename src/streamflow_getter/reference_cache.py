@@ -93,9 +93,7 @@ def validate_manifest(manifest, reference_bytes, expected_url):
     if not manifest.get("source_generation"):
         return False
 
-    return manifest.get("reference_sha256") == sha256_bytes(
-        reference_bytes
-    )
+    return manifest.get("reference_sha256") == sha256_bytes(reference_bytes)
 
 
 def create_cache_record(reference, expected_url, metadata):
@@ -107,9 +105,7 @@ def create_cache_record(reference, expected_url, metadata):
     if not valid_source_identity(reference, expected_url):
         raise ValueError("Incorrect reference source")
 
-    raw = json.dumps(
-        reference, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
+    raw = json.dumps(reference, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
     manifest = create_manifest(raw, expected_url, metadata)
 
@@ -134,9 +130,7 @@ def validate_cache_record(record, expected_url):
     if not valid_source_identity(reference, expected_url):
         return False
 
-    raw = json.dumps(
-        reference, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
+    raw = json.dumps(reference, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
     return validate_manifest(manifest, raw, expected_url)
 
@@ -222,7 +216,7 @@ def load_fresh_reference(
 
     current = _normalize_remote_reference_metadata(
         metadata_provider(),
-        invalid_type_message='Invalid remote metadata',
+        invalid_type_message="Invalid remote metadata",
     )
 
     record = load_cache_record(cache_file, expected_url)
@@ -252,13 +246,11 @@ def load_fresh_reference(
     # Check whether remote metadata changed during the download.
     after = _normalize_remote_reference_metadata(
         metadata_provider(),
-        invalid_type_message='Remote metadata is incomplete',
+        invalid_type_message="Remote metadata is incomplete",
     )
 
     if compare_metadata(current, after) != "unchanged":
-        raise ValueError(
-            "Remote metadata changed during download"
-        )
+        raise ValueError("Remote metadata changed during download")
 
     new_record = create_cache_record(
         reference,
@@ -269,7 +261,6 @@ def load_fresh_reference(
     save_cache_record(cache_file, new_record, expected_url)
 
     return new_record["reference"]
-
 
 
 def fetch_remote_metadata(

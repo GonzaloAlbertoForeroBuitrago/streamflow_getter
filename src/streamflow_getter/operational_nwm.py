@@ -22,9 +22,8 @@ class ProductSpec:
     analysis_only: bool = False
 
 
-
 PRODUCT_SPECS = {
-        "analysis_assim": ProductSpec(
+    "analysis_assim": ProductSpec(
         directory="analysis_assim",
         filename_product="analysis_assim",
         channel_family="channel_rt",
@@ -99,7 +98,6 @@ PRODUCT_SPECS = {
         max_hour=240,
         lead_step_hours=1,
     ),
-
     "medium_range_no_da": ProductSpec(
         directory="medium_range_no_da",
         filename_product="medium_range_no_da",
@@ -109,7 +107,6 @@ PRODUCT_SPECS = {
         lead_step_hours=3,
         analysis_product="analysis_assim_no_da",
     ),
-
     "long_range_mem1": ProductSpec(
         directory="long_range_mem1",
         filename_product="long_range",
@@ -119,8 +116,6 @@ PRODUCT_SPECS = {
         lead_step_hours=6,
         analysis_product="analysis_assim",
     ),
-
-
     "long_range_mem2": ProductSpec(
         directory="long_range_mem2",
         filename_product="long_range",
@@ -148,11 +143,11 @@ PRODUCT_SPECS = {
         lead_step_hours=6,
         analysis_product="analysis_assim",
     ),
-
 }
 
 # Observed CIROH operational medium-range scheduling transition.
 MEDIUM_RANGE_HOURLY_START = datetime(2021, 4, 20, 12)
+
 
 @dataclass(frozen=True)
 class ForecastConfig:
@@ -165,7 +160,10 @@ class ForecastConfig:
 
     def __post_init__(self):
         try:
-            if not isinstance(self.date, str) or date.fromisoformat(self.date).isoformat() != self.date:
+            if (
+                not isinstance(self.date, str)
+                or date.fromisoformat(self.date).isoformat() != self.date
+            ):
                 raise ValueError
         except (TypeError, ValueError) as exc:
             raise ValueError("date must use YYYY-MM-DD format") from exc
@@ -175,17 +173,13 @@ class ForecastConfig:
         if not 0 <= self.cycle <= 23:
             raise ValueError("cycle must be between 0 and 23")
         if self.product not in PRODUCT_SPECS:
-            raise ValueError(
-                f"Unsupported operational NWM product: {self.product}"
-            )
+            raise ValueError(f"Unsupported operational NWM product: {self.product}")
 
         if self.domain != "conus":
             raise ValueError("Only the CONUS domain is currently supported")
 
         if self.cycle not in PRODUCT_SPECS[self.product].cycles:
-            raise ValueError(
-                f"Unsupported cycle {self.cycle} for {self.product}"
-            )
+            raise ValueError(f"Unsupported cycle {self.cycle} for {self.product}")
 
     @property
     def spec(self) -> ProductSpec:
@@ -194,9 +188,7 @@ class ForecastConfig:
     @property
     def lead_step_hours(self) -> int:
         """Return the forecast lead interval for this product and cycle."""
-        if self.product in {
-            f"medium_range_mem{i}" for i in range(1, 7)
-        }:
+        if self.product in {f"medium_range_mem{i}" for i in range(1, 7)}:
             initialization = datetime.combine(
                 date.fromisoformat(self.date),
                 datetime.min.time(),
@@ -214,7 +206,6 @@ class ForecastConfig:
     @property
     def cycle_name(self) -> str:
         return f"t{self.cycle:02d}z"
-
 
     def forecast_hours(self, start_hour: int, end_hour: int) -> list[int]:
         """Select available forecast leads within an inclusive hour window."""
@@ -234,8 +225,7 @@ class ForecastConfig:
 
         if end_hour > self.spec.max_hour:
             raise ValueError(
-                f"Forecast hour must not exceed {self.spec.max_hour} "
-                f"for {self.product}"
+                f"Forecast hour must not exceed {self.spec.max_hour} for {self.product}"
             )
 
         step = self.lead_step_hours
@@ -244,12 +234,9 @@ class ForecastConfig:
         first = ((start_hour + step - 1) // step) * step
 
         if first > end_hour:
-            raise ValueError(
-                "No available forecast leads in the requested hour range"
-            )
+            raise ValueError("No available forecast leads in the requested hour range")
 
         return list(range(first, end_hour + 1, step))
-
 
     def filename(self, hour: int) -> str:
         """Build a validated operational channel forecast filename."""
@@ -272,16 +259,13 @@ class ForecastConfig:
 
         if hour % step != 0:
             raise ValueError(
-                f"Forecast hour must be a multiple of "
-                f"{step} for {self.product}"
+                f"Forecast hour must be a multiple of {step} for {self.product}"
             )
 
         return (
             f"nwm.{self.cycle_name}.{self.spec.filename_product}."
             f"{self.spec.channel_family}.f{hour:03d}.{self.domain}.nc"
         )
-
-
 
     def native_url(self, hour: int) -> str:
         return (
@@ -294,8 +278,6 @@ class ForecastConfig:
             "ciroh-nwm-zarr-copy/national-water-model/"
             f"{self.date_folder}/{self.spec.directory}/{self.filename(hour)}.json"
         )
-
-
 
     def analysis_filename(self) -> str:
         """Build the configured CONUS analysis t0 filename."""
@@ -320,7 +302,6 @@ class ForecastConfig:
             f"{self.analysis_filename()}.json"
         )
 
-
     def validate_analysis_timestamps(
         self,
         valid_time,
@@ -343,7 +324,6 @@ class ForecastConfig:
 
         if np.isnat(actual_reference):
             raise ValueError("Invalid analysis t0 reference time")
-
 
     def validate_timestamps(self, hour: int, valid_time, reference_time) -> None:
         """Verify forecast timestamps against the requested cycle."""
@@ -387,6 +367,7 @@ def resolve_operational_source(
         "reference_path": config.reference_path(hour),
         "lead_hour": hour,
     }
+
 
 def _resolve_nwm_feature_indices(ds, requested: list[int]) -> list[int]:
     """Resolve requested NWM feature IDs to dataset positions."""
@@ -453,6 +434,7 @@ def extract_streamflow(ds, reach_ids: list[int]) -> dict[int, float]:
         raise ValueError("Non-finite streamflow values found")
     return {reach: float(flow) for reach, flow in zip(requested, flows, strict=True)}
 
+
 def prepare_operational_reference(
     config: ForecastConfig,
     hour: int,
@@ -506,7 +488,7 @@ def prepare_operational_reference(
             cache_root
             / config.date_folder
             / source["source_product"]
-            / f'{source["filename"]}.cache.json'
+            / f"{source['filename']}.cache.json"
         )
 
         def metadata_provider():
@@ -555,9 +537,7 @@ def prepare_operational_references(
     """
     from pathlib import Path
 
-    if cache_dir is None or (
-        isinstance(cache_dir, str) and not cache_dir.strip()
-    ):
+    if cache_dir is None or (isinstance(cache_dir, str) and not cache_dir.strip()):
         raise ValueError("cache_dir is required for batch reference preparation")
     cache_root = Path(cache_dir).expanduser()
 
@@ -590,13 +570,15 @@ def prepare_operational_references(
     summaries = []
     for config, hour in planned.values():
         prepared = prepare_operational_reference(config, hour, cache_dir=cache_root)
-        summaries.append({
-            "forecast_date": config.date,
-            "forecast_cycle": config.cycle,
-            "domain": config.domain,
-            "source": prepared["source"],
-            "reference_json_bytes": prepared["reference_json_bytes"],
-        })
+        summaries.append(
+            {
+                "forecast_date": config.date,
+                "forecast_cycle": config.cycle,
+                "domain": config.domain,
+                "source": prepared["source"],
+                "reference_json_bytes": prepared["reference_json_bytes"],
+            }
+        )
     return summaries
 
 
@@ -738,20 +720,15 @@ def fetch_operational_forecast(
     try:
         result = read_native_forecast(config, hour, reach_ids)
     except Exception as native_error:
-        failure = RuntimeError(
-            "Both Kerchunk and native NWM retrieval failed"
-        )
+        failure = RuntimeError("Both Kerchunk and native NWM retrieval failed")
         failure.add_note(
             f"Kerchunk fallback reason: "
             f"{type(kerchunk_error).__name__}: {kerchunk_error}"
         )
         raise failure from native_error
 
-    result["fallback_reason"] = (
-        f"{type(kerchunk_error).__name__}: {kerchunk_error}"
-    )
+    result["fallback_reason"] = f"{type(kerchunk_error).__name__}: {kerchunk_error}"
     return result
-
 
 
 def _validate_operational_forecast_result(config, hour, requested, result) -> None:
@@ -780,9 +757,7 @@ def _validate_operational_forecast_result(config, hour, requested, result) -> No
             result["reference_time"],
         )
 
-    expected_product = (
-        config.spec.analysis_product if hour == 0 else config.product
-    )
+    expected_product = config.spec.analysis_product if hour == 0 else config.product
 
     if result["product"] != expected_product:
         raise ValueError("Unexpected NWM source product")
@@ -790,10 +765,7 @@ def _validate_operational_forecast_result(config, hour, requested, result) -> No
     if set(result["streamflow_m3s"]) != set(requested):
         raise ValueError("Unexpected feature IDs in forecast result")
 
-
-    if not np.isfinite(
-        list(result["streamflow_m3s"].values())
-    ).all():
+    if not np.isfinite(list(result["streamflow_m3s"].values())).all():
         raise ValueError("Non-finite streamflow values found")
 
 
@@ -812,10 +784,8 @@ def _prepare_operational_series_request(
     if start_hour < 1 or end_hour < start_hour:
         raise ValueError("Invalid forecast hour range")
 
-
     # Select only available forecast leads before remote access.
     hours = config.forecast_hours(start_hour, end_hour)
-
 
     if not isinstance(include_t0, bool):
         raise ValueError("include_t0 must be a boolean")
@@ -865,7 +835,6 @@ def fetch_operational_series(
     """
     import pandas as pd
 
-
     requested, hours = _prepare_operational_series_request(
         config, reach_ids, start_hour, end_hour, include_t0
     )
@@ -889,26 +858,26 @@ def fetch_operational_series(
 
         _validate_operational_forecast_result(config, hour, requested, result)
 
-
         for reach in requested:
-            records.append({
-                "forecast_date": result["forecast_date"],
-                "forecast_cycle": result["forecast_cycle"],
-                "product": result["product"],
-                "domain": result["domain"],
-                "lead_hour": result["lead_hour"],
-                "feature_id": reach,
-                "valid_time": result["valid_time"],
-                "reference_time": result["reference_time"],
-                "streamflow_m3s": result["streamflow_m3s"][reach],
-                "method": result["method"],
-            })
+            records.append(
+                {
+                    "forecast_date": result["forecast_date"],
+                    "forecast_cycle": result["forecast_cycle"],
+                    "product": result["product"],
+                    "domain": result["domain"],
+                    "lead_hour": result["lead_hour"],
+                    "feature_id": reach,
+                    "valid_time": result["valid_time"],
+                    "reference_time": result["reference_time"],
+                    "streamflow_m3s": result["streamflow_m3s"][reach],
+                    "method": result["method"],
+                }
+            )
 
     frame = pd.DataFrame.from_records(records)
 
     if frame.duplicated(
-        subset=["forecast_date", "forecast_cycle",
-                "lead_hour", "feature_id"]
+        subset=["forecast_date", "forecast_cycle", "lead_hour", "feature_id"]
     ).any():
         raise ValueError("Duplicate forecast records")
 

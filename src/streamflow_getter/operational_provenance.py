@@ -67,9 +67,7 @@ def _json_mapping(
     elif isinstance(value, Mapping):
         result = dict(value)
     else:
-        raise TypeError(
-            f"{field_name} must be a mapping"
-        )
+        raise TypeError(f"{field_name} must be a mapping")
 
     try:
         json.dumps(
@@ -77,9 +75,7 @@ def _json_mapping(
             sort_keys=True,
         )
     except (TypeError, ValueError) as exc:
-        raise ValueError(
-            f"{field_name} must contain JSON-compatible values"
-        ) from exc
+        raise ValueError(f"{field_name} must contain JSON-compatible values") from exc
 
     return result
 
@@ -87,14 +83,10 @@ def _json_mapping(
 def _created_utc(value: str | None) -> str:
     """Return one explicit timezone-aware UTC run timestamp."""
     if value is None:
-        return datetime.now(
-            UTC
-        ).isoformat()
+        return datetime.now(UTC).isoformat()
 
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(
-            "created_utc must be a timezone-aware ISO timestamp"
-        )
+        raise ValueError("created_utc must be a timezone-aware ISO timestamp")
 
     try:
         parsed = datetime.fromisoformat(
@@ -104,21 +96,12 @@ def _created_utc(value: str | None) -> str:
             )
         )
     except ValueError as exc:
-        raise ValueError(
-            "created_utc must be a timezone-aware ISO timestamp"
-        ) from exc
+        raise ValueError("created_utc must be a timezone-aware ISO timestamp") from exc
 
-    if (
-        parsed.tzinfo is None
-        or parsed.utcoffset() is None
-    ):
-        raise ValueError(
-            "created_utc must be a timezone-aware ISO timestamp"
-        )
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("created_utc must be a timezone-aware ISO timestamp")
 
-    return parsed.astimezone(
-        UTC
-    ).isoformat()
+    return parsed.astimezone(UTC).isoformat()
 
 
 def _materialize_configs(
@@ -128,17 +111,10 @@ def _materialize_configs(
     requested = list(configs)
 
     if not requested:
-        raise ValueError(
-            "At least one forecast configuration is required"
-        )
+        raise ValueError("At least one forecast configuration is required")
 
-    if any(
-        not isinstance(config, ForecastConfig)
-        for config in requested
-    ):
-        raise TypeError(
-            "configs must contain ForecastConfig instances"
-        )
+    if any(not isinstance(config, ForecastConfig) for config in requested):
+        raise TypeError("configs must contain ForecastConfig instances")
 
     identities = [
         (
@@ -151,9 +127,7 @@ def _materialize_configs(
     ]
 
     if len(identities) != len(set(identities)):
-        raise ValueError(
-            "Duplicate forecast configurations are not allowed"
-        )
+        raise ValueError("Duplicate forecast configurations are not allowed")
 
     return requested
 
@@ -165,9 +139,7 @@ def _materialize_reaches(
     requested = list(reach_ids)
 
     if not requested:
-        raise ValueError(
-            "At least one reach is required"
-        )
+        raise ValueError("At least one reach is required")
 
     if any(
         isinstance(reach, (bool, np.bool_))
@@ -175,19 +147,12 @@ def _materialize_reaches(
         or int(reach) <= 0
         for reach in requested
     ):
-        raise ValueError(
-            "Reach IDs must be positive integers"
-        )
+        raise ValueError("Reach IDs must be positive integers")
 
-    requested = [
-        int(reach)
-        for reach in requested
-    ]
+    requested = [int(reach) for reach in requested]
 
     if len(requested) != len(set(requested)):
-        raise ValueError(
-            "Duplicate reach IDs are not allowed"
-        )
+        raise ValueError("Duplicate reach IDs are not allowed")
 
     return requested
 
@@ -202,17 +167,11 @@ def expected_combined_row_identities(
 ) -> list[tuple]:
     """Return the strict expected row identities for a planned run."""
     if not isinstance(include_t0, bool):
-        raise ValueError(
-            "include_t0 must be a boolean"
-        )
+        raise ValueError("include_t0 must be a boolean")
 
-    requested_configs = _materialize_configs(
-        configs
-    )
+    requested_configs = _materialize_configs(configs)
 
-    requested_reaches = _materialize_reaches(
-        reach_ids
-    )
+    requested_reaches = _materialize_reaches(reach_ids)
 
     identities = []
 
@@ -230,60 +189,52 @@ def expected_combined_row_identities(
 
         for hour in hours:
             for reach in requested_reaches:
-                identities.append((
-                    config.date,
-                    config.cycle,
-                    config.product,
-                    config.domain,
-                    hour,
-                    reach,
-                ))
+                identities.append(
+                    (
+                        config.date,
+                        config.cycle,
+                        config.product,
+                        config.domain,
+                        hour,
+                        reach,
+                    )
+                )
 
     if len(identities) != len(set(identities)):
-        raise ValueError(
-            "Expected combined row identities are not unique"
-        )
+        raise ValueError("Expected combined row identities are not unique")
 
     return identities
 
 
 def _validate_combined_text_columns(frame) -> None:
     """Validate required combined-output text fields."""
-    if not frame["requested_product"].map(
-        lambda value:
-            isinstance(value, str)
-            and bool(value)
-    ).all():
-        raise ValueError(
-            "requested_product must contain nonempty strings"
-        )
+    if (
+        not frame["requested_product"]
+        .map(lambda value: isinstance(value, str) and bool(value))
+        .all()
+    ):
+        raise ValueError("requested_product must contain nonempty strings")
 
-    if not frame["product"].map(
-        lambda value:
-            isinstance(value, str)
-            and bool(value)
-    ).all():
-        raise ValueError(
-            "product must contain nonempty strings"
-        )
+    if (
+        not frame["product"]
+        .map(lambda value: isinstance(value, str) and bool(value))
+        .all()
+    ):
+        raise ValueError("product must contain nonempty strings")
 
-    if not frame["domain"].map(
-        lambda value:
-            isinstance(value, str)
-            and bool(value)
-    ).all():
-        raise ValueError(
-            "domain must contain nonempty strings"
-        )
+    if (
+        not frame["domain"]
+        .map(lambda value: isinstance(value, str) and bool(value))
+        .all()
+    ):
+        raise ValueError("domain must contain nonempty strings")
 
-    if not frame["method"].map(
-        lambda value:
-            isinstance(value, str)
-            and bool(value)
-    ).all():
-        raise ValueError(
-            "method must contain nonempty strings"
-        )
+    if (
+        not frame["method"]
+        .map(lambda value: isinstance(value, str) and bool(value))
+        .all()
+    ):
+        raise ValueError("method must contain nonempty strings")
 
 
 def _validate_combined_numeric_columns(frame):
@@ -303,9 +254,7 @@ def _validate_combined_numeric_columns(frame):
             np.floor(lead_hours),
         ).all()
     ):
-        raise ValueError(
-            "lead_hour must contain nonnegative integers"
-        )
+        raise ValueError("lead_hour must contain nonnegative integers")
 
     feature_ids = pd.to_numeric(
         frame["feature_id"],
@@ -320,22 +269,15 @@ def _validate_combined_numeric_columns(frame):
             np.floor(feature_ids),
         ).all()
     ):
-        raise ValueError(
-            "feature_id must contain positive integers"
-        )
+        raise ValueError("feature_id must contain positive integers")
 
     values = pd.to_numeric(
         frame["streamflow_m3s"],
         errors="coerce",
     )
 
-    if (
-        values.isna().any()
-        or not np.isfinite(values).all()
-    ):
-        raise ValueError(
-            "streamflow_m3s must contain finite numeric values"
-        )
+    if values.isna().any() or not np.isfinite(values).all():
+        raise ValueError("streamflow_m3s must contain finite numeric values")
 
     return lead_hours
 
@@ -348,32 +290,21 @@ def validate_combined_operational_frame(frame) -> None:
         frame,
         pd.DataFrame,
     ):
-        raise TypeError(
-            "Operational output must be a pandas DataFrame"
-        )
+        raise TypeError("Operational output must be a pandas DataFrame")
 
     if frame.empty:
-        raise ValueError(
-            "Operational output must not be empty"
-        )
+        raise ValueError("Operational output must not be empty")
 
     if tuple(frame.columns) != COMBINED_OPERATIONAL_COLUMNS:
         raise ValueError(
-            "Combined operational output columns do not match "
-            "the stable contract"
+            "Combined operational output columns do not match the stable contract"
         )
 
     if frame[list(COMBINED_ROW_IDENTITY)].isnull().any().any():
-        raise ValueError(
-            "Combined row identity contains null values"
-        )
+        raise ValueError("Combined row identity contains null values")
 
-    if frame.duplicated(
-        subset=list(COMBINED_ROW_IDENTITY)
-    ).any():
-        raise ValueError(
-            "Duplicate combined operational row identity"
-        )
+    if frame.duplicated(subset=list(COMBINED_ROW_IDENTITY)).any():
+        raise ValueError("Duplicate combined operational row identity")
 
     _validate_combined_text_columns(frame)
 
@@ -390,24 +321,24 @@ def validate_combined_operational_frame(frame) -> None:
         )
 
         if parsed.isna().any():
-            raise ValueError(
-                f"{column} contains invalid timestamps"
-            )
+            raise ValueError(f"{column} contains invalid timestamps")
 
     forecast_rows = lead_hours.gt(0)
 
-    if not frame.loc[
-        forecast_rows,
-        "requested_product",
-    ].eq(
-        frame.loc[
+    if (
+        not frame.loc[
             forecast_rows,
-            "product",
+            "requested_product",
         ]
-    ).all():
-        raise ValueError(
-            "Forecast source product differs from requested product"
+        .eq(
+            frame.loc[
+                forecast_rows,
+                "product",
+            ]
         )
+        .all()
+    ):
+        raise ValueError("Forecast source product differs from requested product")
 
     # Analysis t0 intentionally permits product != requested_product.
     # reference_time is source metadata and is never normalized to the
@@ -416,15 +347,9 @@ def validate_combined_operational_frame(frame) -> None:
 
 def _ordered_counts(values) -> dict[str, int]:
     """Return deterministic string-key counts."""
-    counts = Counter(
-        str(value)
-        for value in values
-    )
+    counts = Counter(str(value) for value in values)
 
-    return {
-        key: int(counts[key])
-        for key in sorted(counts)
-    }
+    return {key: int(counts[key]) for key in sorted(counts)}
 
 
 def build_operational_run_manifest(
@@ -446,17 +371,11 @@ def build_operational_run_manifest(
     This version does not describe partial success. Missing or extra row
     identities are rejected rather than represented as a complete run.
     """
-    validate_combined_operational_frame(
-        frame
-    )
+    validate_combined_operational_frame(frame)
 
-    requested_configs = _materialize_configs(
-        configs
-    )
+    requested_configs = _materialize_configs(configs)
 
-    requested_reaches = _materialize_reaches(
-        reach_ids
-    )
+    requested_reaches = _materialize_reaches(reach_ids)
 
     expected = expected_combined_row_identities(
         requested_configs,
@@ -491,9 +410,7 @@ def build_operational_run_manifest(
 
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
-        "created_utc": _created_utc(
-            created_utc
-        ),
+        "created_utc": _created_utc(created_utc),
         "status": "complete",
         "selection": _json_mapping(
             selection,
@@ -506,9 +423,7 @@ def build_operational_run_manifest(
                     "forecast_cycle": config.cycle,
                     "requested_product": config.product,
                     "domain": config.domain,
-                    "nwm_version": resolve_operational_nwm_version(
-                        config
-                    ),
+                    "nwm_version": resolve_operational_nwm_version(config),
                 }
                 for config in requested_configs
             ],
@@ -520,14 +435,16 @@ def build_operational_run_manifest(
         "model": {
             "name": "National Water Model",
             "version_basis": "forecast_initialization_utc",
-            "operational_versions": sorted({
-                version
-                for version in (
-                    resolve_operational_nwm_version(config)
-                    for config in requested_configs
-                )
-                if version is not None
-            }),
+            "operational_versions": sorted(
+                {
+                    version
+                    for version in (
+                        resolve_operational_nwm_version(config)
+                        for config in requested_configs
+                    )
+                    if version is not None
+                }
+            ),
             "unresolved_config_count": sum(
                 resolve_operational_nwm_version(config) is None
                 for config in requested_configs
@@ -546,33 +463,17 @@ def build_operational_run_manifest(
             field_name="diagnostics",
         ),
         "output_contract": {
-            "columns": list(
-                COMBINED_OPERATIONAL_COLUMNS
-            ),
-            "row_identity": list(
-                COMBINED_ROW_IDENTITY
-            ),
-            "requested_product": (
-                "forecast product/member requested by the run"
-            ),
-            "product": (
-                "actual NWM source product for the row"
-            ),
-            "reference_time": (
-                "literal source reference-time metadata"
-            ),
+            "columns": list(COMBINED_OPERATIONAL_COLUMNS),
+            "row_identity": list(COMBINED_ROW_IDENTITY),
+            "requested_product": ("forecast product/member requested by the run"),
+            "product": ("actual NWM source product for the row"),
+            "reference_time": ("literal source reference-time metadata"),
         },
         "result": {
             "row_count": len(frame),
-            "requested_product_counts": _ordered_counts(
-                frame["requested_product"]
-            ),
-            "source_product_counts": _ordered_counts(
-                frame["product"]
-            ),
-            "method_counts": _ordered_counts(
-                frame["method"]
-            ),
+            "requested_product_counts": _ordered_counts(frame["requested_product"]),
+            "source_product_counts": _ordered_counts(frame["product"]),
+            "method_counts": _ordered_counts(frame["method"]),
         },
         "completeness": {
             "mode": "strict",

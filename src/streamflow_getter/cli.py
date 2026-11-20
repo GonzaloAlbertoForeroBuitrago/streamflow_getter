@@ -56,9 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
         "nwm-operational",
         help="Operational NWM CONUS forecasts and analyses",
     )
-    date_selection = operational.add_mutually_exclusive_group(
-        required=True
-    )
+    date_selection = operational.add_mutually_exclusive_group(required=True)
     date_selection.add_argument(
         "--date",
         help="Single forecast initialization date (YYYY-MM-DD)",
@@ -71,10 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--recent-days",
         type=int,
         metavar="N",
-        help=(
-            "Most recent N UTC calendar dates, including "
-            "the current UTC date"
-        ),
+        help=("Most recent N UTC calendar dates, including the current UTC date"),
     )
     operational.add_argument(
         "--end-date",
@@ -180,8 +175,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="~/.cache/streamflow_getter",
         metavar="PATH",
         help=(
-            "Kerchunk reference cache directory "
-            "(default: ~/.cache/streamflow_getter)"
+            "Kerchunk reference cache directory (default: ~/.cache/streamflow_getter)"
         ),
     )
     cache_policy.add_argument(
@@ -204,51 +198,30 @@ def build_parser() -> argparse.ArgumentParser:
 def _validate_operational_reach_arguments(args) -> None:
     """Validate operational reach-selection CLI arguments."""
     # Validate reach-selection arguments before remote NWM access.
-    if not (
-        args.reach or args.gage or args.point
-        or args.bbox or args.polygon
-    ):
+    if not (args.reach or args.gage or args.point or args.bbox or args.polygon):
         raise ValueError(
-            "Provide at least one --reach, --gage, "
-            "--point, --bbox, or --polygon"
+            "Provide at least one --reach, --gage, --point, --bbox, or --polygon"
         )
 
-    if (
-        args.point or args.bbox or args.polygon
-    ) and not args.hydrofabric:
-        raise ValueError(
-            "--hydrofabric is required for geographic selection"
-        )
+    if (args.point or args.bbox or args.polygon) and not args.hydrofabric:
+        raise ValueError("--hydrofabric is required for geographic selection")
 
     if args.point and (
-        not math.isfinite(args.max_distance_m)
-        or args.max_distance_m <= 0
+        not math.isfinite(args.max_distance_m) or args.max_distance_m <= 0
     ):
-        raise ValueError(
-            "max_distance_m must be positive and finite"
-        )
+        raise ValueError("max_distance_m must be positive and finite")
 
-    if args.hydrofabric and not (
-        args.point or args.bbox or args.polygon
-    ):
-        raise ValueError(
-            "--hydrofabric requires --point, --bbox, or --polygon"
-        )
+    if args.hydrofabric and not (args.point or args.bbox or args.polygon):
+        raise ValueError("--hydrofabric requires --point, --bbox, or --polygon")
 
     if args.max_reaches < 1:
-        raise ValueError(
-            "max_reaches must be a positive integer"
-        )
+        raise ValueError("max_reaches must be a positive integer")
 
     if args.gage and not args.routelink:
-        raise ValueError(
-            "--routelink is required when using --gage"
-        )
+        raise ValueError("--routelink is required when using --gage")
 
     if args.routelink and not args.gage:
-        raise ValueError(
-            "--routelink requires at least one --gage"
-        )
+        raise ValueError("--routelink requires at least one --gage")
 
 
 def _resolve_operational_temporal_selection(args):
@@ -261,9 +234,7 @@ def _resolve_operational_temporal_selection(args):
 
     if args.date is not None:
         if args.end_date is not None:
-            raise ValueError(
-                "--end-date cannot be used with --date"
-            )
+            raise ValueError("--end-date cannot be used with --date")
 
         configs = [
             ForecastConfig(
@@ -282,9 +253,7 @@ def _resolve_operational_temporal_selection(args):
 
     elif args.start_date is not None:
         if args.end_date is None:
-            raise ValueError(
-                "--end-date is required with --start-date"
-            )
+            raise ValueError("--end-date is required with --start-date")
 
         configs = plan_operational_configs(
             args.start_date,
@@ -303,15 +272,9 @@ def _resolve_operational_temporal_selection(args):
 
     else:
         if args.end_date is not None:
-            raise ValueError(
-                "--end-date requires --start-date"
-            )
+            raise ValueError("--end-date requires --start-date")
 
-        recent_start, recent_end = (
-            resolve_recent_date_range(
-                args.recent_days
-            )
-        )
+        recent_start, recent_end = resolve_recent_date_range(args.recent_days)
 
         print(
             f"Resolved --recent-days {args.recent_days} "
@@ -349,9 +312,7 @@ def _extend_operational_geographic_reaches(args, reaches: list[int]) -> None:
         )
 
         if not selected_reaches:
-            raise ValueError(
-                "No NWM reaches found within the bounding box"
-            )
+            raise ValueError("No NWM reaches found within the bounding box")
 
         if len(selected_reaches) > args.max_reaches:
             raise ValueError(
@@ -362,11 +323,8 @@ def _extend_operational_geographic_reaches(args, reaches: list[int]) -> None:
         reaches.extend(selected_reaches)
 
         print(
-            f"Selected {len(selected_reaches)} NWM reaches "
-            "from geographic bounding box"
+            f"Selected {len(selected_reaches)} NWM reaches from geographic bounding box"
         )
-
-
 
     # Resolve GeoJSON polygon selections locally.
     if args.polygon:
@@ -383,9 +341,7 @@ def _extend_operational_geographic_reaches(args, reaches: list[int]) -> None:
         )
 
         if not selected_reaches:
-            raise ValueError(
-                "No NWM reaches found within the polygon"
-            )
+            raise ValueError("No NWM reaches found within the polygon")
 
         if len(selected_reaches) > args.max_reaches:
             raise ValueError(
@@ -395,12 +351,7 @@ def _extend_operational_geographic_reaches(args, reaches: list[int]) -> None:
 
         reaches.extend(selected_reaches)
 
-        print(
-            f"Selected {len(selected_reaches)} NWM reaches "
-            "from GeoJSON polygon"
-        )
-
-
+        print(f"Selected {len(selected_reaches)} NWM reaches from GeoJSON polygon")
 
     # Resolve the nearest NWM channel to a geographic point.
     if args.point:
@@ -427,9 +378,7 @@ def _extend_operational_geographic_reaches(args, reaches: list[int]) -> None:
         )
 
         if not candidates:
-            raise ValueError(
-                "No NWM reaches found within the maximum distance"
-            )
+            raise ValueError("No NWM reaches found within the maximum distance")
 
         selected = candidates[0]
         reaches.append(selected["feature_id"])
@@ -456,30 +405,17 @@ def _extend_operational_gage_reaches(args, configs, reaches: list[int]):
             validate_routelink_compatibility,
         )
 
-        index = load_gage_index(
-            args.routelink
-        )
+        index = load_gage_index(args.routelink)
 
-        routelink_provenance = (
-            classify_gage_index_version(
-                index
-            )
-        )
+        routelink_provenance = classify_gage_index_version(index)
 
         request_versions = [
-            resolve_operational_nwm_version(
-                config
-            )
-            for config in configs
+            resolve_operational_nwm_version(config) for config in configs
         ]
 
-        compatibility = (
-            validate_routelink_compatibility(
-                request_versions,
-                routelink_provenance[
-                    "network_version"
-                ],
-            )
+        compatibility = validate_routelink_compatibility(
+            request_versions,
+            routelink_provenance["network_version"],
         )
 
         resolved = resolve_gages(
@@ -487,50 +423,26 @@ def _extend_operational_gage_reaches(args, configs, reaches: list[int]):
             index,
         )
 
-        reaches.extend(
-            resolved.values()
-        )
+        reaches.extend(resolved.values())
 
-        resolved_versions = sorted({
-            version
-            for version in request_versions
-            if version is not None
-        })
+        resolved_versions = sorted(
+            {version for version in request_versions if version is not None}
+        )
 
         routelink_selection = {
             "gage_resolution": {
-                "gage_ids": list(
-                    args.gage
-                ),
-                "resolved_gages": dict(
-                    resolved
-                ),
+                "gage_ids": list(args.gage),
+                "resolved_gages": dict(resolved),
                 "routelink": {
-                    "file_name": Path(
-                        args.routelink
-                    ).expanduser().name,
-                    "crosswalk_sha256":
-                        routelink_provenance[
-                            "crosswalk_sha256"
-                        ],
-                    "network_version":
-                        routelink_provenance[
-                            "network_version"
-                        ],
-                    "gage_count":
-                        routelink_provenance[
-                            "gage_count"
-                        ],
-                    "compatibility":
-                        compatibility,
-                    "requested_nwm_versions":
-                        resolved_versions,
-                    "unresolved_request_version_count":
-                        sum(
-                            version is None
-                            for version
-                            in request_versions
-                        ),
+                    "file_name": Path(args.routelink).expanduser().name,
+                    "crosswalk_sha256": routelink_provenance["crosswalk_sha256"],
+                    "network_version": routelink_provenance["network_version"],
+                    "gage_count": routelink_provenance["gage_count"],
+                    "compatibility": compatibility,
+                    "requested_nwm_versions": resolved_versions,
+                    "unresolved_request_version_count": sum(
+                        version is None for version in request_versions
+                    ),
                 },
             },
         }
@@ -561,8 +473,7 @@ def _fetch_operational_manifest_frame(args, configs, reaches):
 
         if "requested_product" in manifest_frame.columns:
             raise ValueError(
-                "Single-date operational result unexpectedly "
-                "contains requested_product"
+                "Single-date operational result unexpectedly contains requested_product"
             )
 
         manifest_frame.insert(
@@ -583,13 +494,10 @@ def _fetch_operational_manifest_frame(args, configs, reaches):
 
         if (
             "requested_product" not in manifest_frame.columns
-            or not manifest_frame["requested_product"].eq(
-                args.product
-            ).all()
+            or not manifest_frame["requested_product"].eq(args.product).all()
         ):
             raise ValueError(
-                "Unexpected requested product in "
-                "planned operational result"
+                "Unexpected requested product in planned operational result"
             )
 
     return manifest_frame
@@ -603,13 +511,8 @@ def _validate_operational_forecast_hours(args, configs) -> None:
             "positive and end_hour must not precede start_hour"
         )
 
-    if args.no_t0 and any(
-        config.spec.analysis_only
-        for config in configs
-    ):
-        raise ValueError(
-            "Analysis-only products cannot be used with --no-t0"
-        )
+    if args.no_t0 and any(config.spec.analysis_only for config in configs):
+        raise ValueError("Analysis-only products cannot be used with --no-t0")
     # Validate product-specific forecast hours before remote access.
     for config in configs:
         config.forecast_hours(
@@ -621,14 +524,10 @@ def _validate_operational_forecast_hours(args, configs) -> None:
 def _validate_combined_operational_reaches(args, reaches) -> None:
     """Validate operational request constraints."""
     if any(reach <= 0 for reach in reaches):
-        raise ValueError(
-            "Reach IDs must be positive integers"
-        )
+        raise ValueError("Reach IDs must be positive integers")
 
     if len(reaches) != len(set(reaches)):
-        raise ValueError(
-            "Duplicate NWM feature IDs are not allowed"
-        )
+        raise ValueError("Duplicate NWM feature IDs are not allowed")
 
     if (args.bbox or args.polygon) and len(reaches) > args.max_reaches:
         raise ValueError(
@@ -646,9 +545,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("nwm needs at least one --reach or --gage")
 
         ds = nwm.open_chrtout(args.nwm_version)
-        reaches = list(args.reach) + list(
-            nwm.gages_to_reaches(args.gage, ds).values()
-        )
+        reaches = list(args.reach) + list(nwm.gages_to_reaches(args.gage, ds).values())
 
         df = nwm.fetch(
             reaches,
@@ -672,13 +569,10 @@ def main(argv: list[str] | None = None) -> int:
             build_operational_run_manifest,
         )
 
-
         configs, temporal_selection = _resolve_operational_temporal_selection(args)
-
 
         # Reject invalid forecast-hour ranges before remote access.
         _validate_operational_forecast_hours(args, configs)
-
 
         # Validate data and manifest destinations before remote retrieval.
         resolved_output_format = resolve_output_format(
@@ -686,18 +580,12 @@ def main(argv: list[str] | None = None) -> int:
             args.output_format,
         )
 
-        destination_path = Path(
-            args.out
-        ).expanduser()
+        destination_path = Path(args.out).expanduser()
 
-        manifest_destination_path = manifest_path_for(
-            destination_path
-        )
+        manifest_destination_path = manifest_path_for(destination_path)
 
         if destination_path.exists():
-            raise FileExistsError(
-                f"Output already exists: {destination_path}"
-            )
+            raise FileExistsError(f"Output already exists: {destination_path}")
 
         if manifest_destination_path.exists():
             raise FileExistsError(
@@ -743,9 +631,7 @@ def main(argv: list[str] | None = None) -> int:
         }
 
         if routelink_selection is not None:
-            manifest_selection[
-                "spatial"
-            ] = routelink_selection
+            manifest_selection["spatial"] = routelink_selection
 
         manifest = build_operational_run_manifest(
             manifest_frame,
@@ -765,26 +651,18 @@ def main(argv: list[str] | None = None) -> int:
         )
 
         # Preserve the established one-product CLI data schema.
-        frame = manifest_frame.drop(
-            columns=["requested_product"]
+        frame = manifest_frame.drop(columns=["requested_product"])
+
+        destination, manifest_destination = write_timeseries_with_manifest(
+            frame,
+            args.out,
+            manifest,
+            output_format=resolved_output_format,
+            manifest_path=manifest_destination_path,
         )
 
-        destination, manifest_destination = (
-            write_timeseries_with_manifest(
-                frame,
-                args.out,
-                manifest,
-                output_format=resolved_output_format,
-                manifest_path=manifest_destination_path,
-            )
-        )
-
-        print(
-            f"wrote {len(frame)} rows to {destination}"
-        )
-        print(
-            f"wrote run manifest to {manifest_destination}"
-        )
+        print(f"wrote {len(frame)} rows to {destination}")
+        print(f"wrote run manifest to {manifest_destination}")
 
         return 0
 
