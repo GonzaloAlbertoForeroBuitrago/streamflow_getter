@@ -790,23 +790,10 @@ def _validate_operational_forecast_result(config, hour, requested, result) -> No
         raise ValueError("Non-finite streamflow values found")
 
 
-def fetch_operational_series(
-    config: ForecastConfig,
-    reach_ids: list[int],
-    start_hour: int,
-    end_hour: int,
-    *,
-    include_t0: bool = True,
-    cache_dir=None,
+def _prepare_operational_series_request(
+    config, reach_ids, start_hour, end_hour, include_t0
 ):
-    """Retrieve a validated operational NWM streamflow time series.
-
-    Analysis t0 is included by default. Each row retains the original
-    source reference time, forecast cycle, lead hour, and product.
-    """
-    import pandas as pd
-
-
+    """Validate reaches and determine operational forecast hours."""
     if (
         isinstance(start_hour, bool)
         or not isinstance(start_hour, int)
@@ -851,6 +838,30 @@ def fetch_operational_series(
 
     if include_t0:
         hours.insert(0, 0)
+
+    return requested, hours
+
+
+def fetch_operational_series(
+    config: ForecastConfig,
+    reach_ids: list[int],
+    start_hour: int,
+    end_hour: int,
+    *,
+    include_t0: bool = True,
+    cache_dir=None,
+):
+    """Retrieve a validated operational NWM streamflow time series.
+
+    Analysis t0 is included by default. Each row retains the original
+    source reference time, forecast cycle, lead hour, and product.
+    """
+    import pandas as pd
+
+
+    requested, hours = _prepare_operational_series_request(
+        config, reach_ids, start_hour, end_hour, include_t0
+    )
 
     records = []
 
