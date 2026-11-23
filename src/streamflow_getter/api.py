@@ -82,3 +82,31 @@ class StreamflowClient:
             latitude,
             include_usgs=include_usgs,
         )
+
+    def compare_station_result(self, gage_id: str, *, reference_utc: str):
+        """Return a convenient view of the existing station record."""
+        from streamflow_getter.results import ComparisonResult
+
+        return ComparisonResult(
+            self.compare_station(gage_id, reference_utc=reference_utc)
+        )
+
+    def compare_point_result(
+        self,
+        longitude: float,
+        latitude: float,
+        *,
+        reference_utc: str,
+        include_usgs: bool = True,
+    ):
+        """Return a convenient view of the existing point record."""
+        from streamflow_getter.results import ComparisonResult
+
+        return ComparisonResult(
+            self.compare_point(
+                longitude,
+                latitude,
+                reference_utc=reference_utc,
+                include_usgs=include_usgs,
+            )
+        )

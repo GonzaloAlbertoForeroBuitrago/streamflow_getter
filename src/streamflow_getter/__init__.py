@@ -9,4 +9,8 @@ def __getattr__(name):
         from .api import StreamflowClient
 
         return StreamflowClient
+    if name == "ComparisonResult":
+        from .results import ComparisonResult
+
+        return ComparisonResult
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
