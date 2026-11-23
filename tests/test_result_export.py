@@ -70,7 +70,7 @@ def test_csv_export_and_manifest(tmp_path, record):
 
     payload = json.loads(manifest.read_text())
 
-    assert payload["schema"] == "streamflow_getter.comparison_export.v1"
+    assert payload["schema"] == "streamflow_getter.comparison_export.v2"
     assert payload["data_file"] == "comparison.csv"
     assert payload["data_format"] == "csv"
     assert payload["metadata"]["ids"] == record["metadata"]["ids"]

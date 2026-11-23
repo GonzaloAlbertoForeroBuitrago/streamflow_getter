@@ -207,6 +207,7 @@ def write_timeseries_with_manifest(
     *,
     output_format=None,
     manifest_path=None,
+    include_sha256=False,
 ):
     """Publish streamflow output and its manifest as one logical result.
 
@@ -239,6 +240,9 @@ def write_timeseries_with_manifest(
     # Prove the complete manifest is serializable before creating data.
     manifest_payload = _serialize_manifest(manifest)
 
+    if include_sha256 and "data_integrity" in manifest:
+        raise ValueError("data_integrity is reserved for the output writer")
+
     if data_destination.exists():
         raise FileExistsError(f"Output already exists: {data_destination}")
 
@@ -252,6 +256,13 @@ def write_timeseries_with_manifest(
     )
 
     try:
+        if include_sha256:
+            from streamflow_getter.integrity import file_integrity
+
+            enriched = dict(manifest)
+            enriched["data_integrity"] = file_integrity(data_written)
+            manifest_payload = _serialize_manifest(enriched)
+
         manifest_written = _publish_manifest_payload(
             manifest_payload,
             manifest_destination,

@@ -146,7 +146,7 @@ class ComparisonResult:
         destination = Path(path).expanduser()
 
         manifest = {
-            "schema": "streamflow_getter.comparison_export.v1",
+            "schema": "streamflow_getter.comparison_export.v2",
             "data_file": destination.name,
             "data_format": resolve_output_format(destination, output_format),
             "metadata": dict(self.metadata),
@@ -168,6 +168,7 @@ class ComparisonResult:
             destination,
             manifest,
             output_format=output_format,
+            include_sha256=True,
         )
 
     @classmethod
@@ -177,6 +178,7 @@ class ComparisonResult:
 
         payload, data_format = _read_comparison_manifest(destination)
         metadata, geometries, saved_warnings = _validate_comparison_manifest(payload)
+        _verify_export_integrity(destination, payload)
         table = _read_comparison_table(destination, data_format)
 
         result = cls(
@@ -210,7 +212,10 @@ def _read_comparison_manifest(destination: Path):
     if not isinstance(payload, dict):
         raise ValueError("Comparison manifest must be an object.")
 
-    if payload.get("schema") != "streamflow_getter.comparison_export.v1":
+    if payload.get("schema") not in {
+        "streamflow_getter.comparison_export.v1",
+        "streamflow_getter.comparison_export.v2",
+    }:
         raise ValueError("Unsupported comparison manifest schema.")
 
     if payload.get("data_file") != destination.name:
@@ -286,3 +291,38 @@ def _read_comparison_table(destination: Path, data_format: str):
         raise ValueError("Invalid or missing UTC timestamps.")
 
     return table
+
+
+def _verify_export_integrity(destination: Path, payload: dict) -> None:
+    """Check v2 data bytes before decoding; v1 has no stored checksum."""
+    import hmac
+    import re
+
+    if payload["schema"] == "streamflow_getter.comparison_export.v1":
+        return
+
+    integrity = payload.get("data_integrity")
+
+    if not isinstance(integrity, dict) or integrity.get("algorithm") != "sha256":
+        raise ValueError("Missing or invalid SHA-256 integrity metadata.")
+
+    expected_size = integrity.get("size_bytes")
+    expected_hash = integrity.get("sha256")
+
+    if type(expected_size) is not int or expected_size < 0:
+        raise ValueError("Invalid integrity file size.")
+
+    if not isinstance(expected_hash, str) or not re.fullmatch(
+        r"[0-9a-f]{64}", expected_hash
+    ):
+        raise ValueError("Invalid SHA-256 digest.")
+
+    from streamflow_getter.integrity import file_integrity
+
+    actual = file_integrity(destination)
+
+    if actual["size_bytes"] != expected_size:
+        raise ValueError("Comparison data size mismatch.")
+
+    if not hmac.compare_digest(actual["sha256"], expected_hash):
+        raise ValueError("Comparison data SHA-256 mismatch.")
