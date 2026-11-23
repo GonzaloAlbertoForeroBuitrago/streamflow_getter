@@ -169,3 +169,120 @@ class ComparisonResult:
             manifest,
             output_format=output_format,
         )
+
+    @classmethod
+    def load(cls, path: str | Path) -> "ComparisonResult":
+        """Load a previously exported comparison without network access."""
+        destination = Path(path).expanduser()
+
+        payload, data_format = _read_comparison_manifest(destination)
+        metadata, geometries, saved_warnings = _validate_comparison_manifest(payload)
+        table = _read_comparison_table(destination, data_format)
+
+        result = cls(
+            {
+                "table": table,
+                "metadata": metadata,
+                "nwm_geojson": geometries.get("nwm"),
+                "geoglows_geometry": geometries.get("geoglows"),
+                "folder": None,
+            }
+        )
+
+        if list(result.warnings) != saved_warnings:
+            raise ValueError("Manifest warnings disagree with scientific metadata.")
+
+        return result
+
+
+def _read_comparison_manifest(destination: Path):
+    """Read and validate the identity of a comparison export."""
+    import json
+
+    from streamflow_getter.output import (
+        manifest_path_for,
+        resolve_output_format,
+    )
+
+    manifest_file = manifest_path_for(destination)
+    payload = json.loads(manifest_file.read_text(encoding="utf-8"))
+
+    if not isinstance(payload, dict):
+        raise ValueError("Comparison manifest must be an object.")
+
+    if payload.get("schema") != "streamflow_getter.comparison_export.v1":
+        raise ValueError("Unsupported comparison manifest schema.")
+
+    if payload.get("data_file") != destination.name:
+        raise ValueError("Manifest data filename mismatch.")
+
+    data_format = resolve_output_format(destination)
+
+    if payload.get("data_format") != data_format:
+        raise ValueError("Manifest data format mismatch.")
+
+    return payload, data_format
+
+
+def _validate_comparison_manifest(payload: dict):
+    """Validate the scientific metadata and saved warnings."""
+    metadata = payload.get("metadata")
+    geometries = payload.get("geometries")
+    warnings = payload.get("warnings")
+
+    if not isinstance(metadata, dict):
+        raise ValueError("Invalid comparison metadata.")
+
+    if not isinstance(geometries, dict):
+        raise ValueError("Invalid comparison geometries.")
+
+    if not isinstance(warnings, list) or not all(
+        isinstance(item, str) for item in warnings
+    ):
+        raise ValueError("Invalid comparison warnings.")
+
+    return metadata, geometries, warnings
+
+
+def _read_comparison_table(destination: Path, data_format: str):
+    """Read the original samples and enforce explicit UTC timestamps."""
+    if data_format == "parquet":
+        table = pd.read_parquet(destination)
+    else:
+        table = pd.read_csv(
+            destination,
+            dtype={"valid_time": "string"},
+        )
+
+    if table.empty or "valid_time" not in table.columns:
+        raise ValueError("Missing or empty valid_time series.")
+
+    if data_format == "parquet":
+        if not isinstance(
+            table["valid_time"].dtype,
+            pd.DatetimeTZDtype,
+        ):
+            raise ValueError("Parquet valid_time must be timezone-aware.")
+    else:
+        timestamps = table["valid_time"].str.strip()
+
+        # Accept explicit UTC, not naive local timestamps.
+        explicit_utc = timestamps.str.contains(
+            r"(?:Z|\+00:00)$",
+            regex=True,
+            na=False,
+        )
+
+        if not explicit_utc.all():
+            raise ValueError("CSV valid_time requires an explicit UTC offset.")
+
+    table["valid_time"] = pd.to_datetime(
+        table["valid_time"],
+        utc=True,
+        errors="raise",
+    )
+
+    if table["valid_time"].isna().any():
+        raise ValueError("Invalid or missing UTC timestamps.")
+
+    return table
