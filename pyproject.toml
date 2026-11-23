@@ -5,6 +5,7 @@ description = "Download streamflow time series from NWM, NRDS and GEOGLOWS outpu
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "numpy>=1.26",
     "dask>=2026.8.0",
     "pandas>=3.0.6",
     "s3fs>=2026.9.0",
@@ -13,6 +14,20 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+plot = [
+    "plotly",
+]
+
+notebook = [
+    "plotly",
+    "ipython",
+    "ipykernel",
+    "ipywidgets",
+    "ipyleaflet",
+    "anywidget",
+    "psutil",
+]
+
 spatial = [
     "geopandas",
     "pyogrio",
