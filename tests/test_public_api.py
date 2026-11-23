@@ -74,3 +74,23 @@ def test_client_delegates_to_existing_backend(monkeypatch):
     assert point["include_usgs"] is False
     assert all(call[2]["reference_utc"] == reference for call in calls)
     assert all(call[2]["auto_save"] is False for call in calls)
+
+
+def test_client_forwards_backend_revision(monkeypatch):
+    """The package entry point preserves the study's source revision."""
+    import sys
+    from types import ModuleType
+
+    revisions = []
+
+    class FakeStudy:
+        def __init__(self, settings, **options):
+            revisions.append(options["backend_revision"])
+
+    module = ModuleType("streamflow_getter.station_comparison")
+    module.StreamflowStudy = FakeStudy
+    monkeypatch.setitem(sys.modules, "streamflow_getter.station_comparison", module)
+
+    client = StreamflowClient({"workspace": "test"}, backend_revision="04e762c")
+    client.study("2025-07-04T06:00:00Z")
+    assert revisions == ["04e762c"]

@@ -26,6 +26,7 @@ notebook = [
     "ipyleaflet",
     "anywidget",
     "psutil",
+    "nbformat>=5.10.4",
 ]
 
 spatial = [

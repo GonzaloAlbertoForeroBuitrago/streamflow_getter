@@ -27,6 +27,7 @@ class StreamflowClient:
         max_workers: int = 5,
         save_csv: bool = False,
         auto_save: bool = False,
+        backend_revision: str | None = None,
     ):
         if not isinstance(settings, Mapping):
             raise TypeError("settings must be a mapping")
@@ -41,6 +42,7 @@ class StreamflowClient:
             "max_workers": max_workers,
             "save_csv": save_csv,
             "auto_save": auto_save,
+            "backend_revision": backend_revision,
         }
 
     @classmethod
