@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -108,3 +109,63 @@ class ComparisonResult:
             )
 
         return tuple(warnings)
+
+    @staticmethod
+    def _geojson_document(value: Any, *, source: str) -> dict[str, Any] | None:
+        """Preserve GeoJSON without changing its coordinates."""
+        if value is None:
+            return None
+
+        payload = (
+            value
+            if isinstance(value, Mapping)
+            else getattr(value, "__geo_interface__", None)
+        )
+
+        if not isinstance(payload, Mapping):
+            raise TypeError(f"{source} geometry must be GeoJSON-like")
+
+        return dict(payload)
+
+    def export(
+        self,
+        path: str | Path,
+        *,
+        output_format: str | None = None,
+    ) -> tuple[Path, Path]:
+        """Export original scientific data and a versioned manifest.
+
+        Existing files are never overwritten. Exporting does not
+        mutate the in-memory study record or reproject geometries.
+        """
+        from streamflow_getter.output import (
+            resolve_output_format,
+            write_timeseries_with_manifest,
+        )
+
+        destination = Path(path).expanduser()
+
+        manifest = {
+            "schema": "streamflow_getter.comparison_export.v1",
+            "data_file": destination.name,
+            "data_format": resolve_output_format(destination, output_format),
+            "metadata": dict(self.metadata),
+            "geometries": {
+                "nwm": self._geojson_document(
+                    self.raw.get("nwm_geojson"),
+                    source="NWM",
+                ),
+                "geoglows": self._geojson_document(
+                    self.raw.get("geoglows_geometry"),
+                    source="GEOGLOWS",
+                ),
+            },
+            "warnings": list(self.warnings),
+        }
+
+        return write_timeseries_with_manifest(
+            self.table,
+            destination,
+            manifest,
+            output_format=output_format,
+        )
